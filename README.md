@@ -1,3 +1,4 @@
+<img src="/BuildfestLogo.png" align="right" width="150"/>
 # 🚀 ZTM Build Fest
 
 ### 30 days. One idea. Make something that matters.
