@@ -26,7 +26,7 @@ And yes, **AI is absolutely allowed**. In fact, we want you to experiment with i
 
 ## How to contribute
 
-Want to add your project or improve this repository? Submit a pull request (PR) for the maintainers to review and merge.
+Want to add your project? Submit a pull request (PR) for the maintainers to review and merge.
 
 ### 1. Fork the repository
 
@@ -47,15 +47,39 @@ Never work directly on `main`. Create a branch with a short, descriptive name:
 git checkout -b add-my-project-name
 ```
 
-### 4. Make your changes
+### 4. Create your project folder
 
-Add your project or edit the files you want to improve. Keep each PR focused on one change so it's easier to review.
+Inside the `projects/` directory, create a folder for your project. Use lowercase letters and hyphens, and pick a name that reflects what your project does:
+
+```bash
+mkdir projects/my-project-name
+```
+
+Put **all** of your project's files inside this folder. Don't edit or add files anywhere else in the repo. Your folder must include:
+
+- A `README.md` that explains:
+  - What problem your project solves
+  - How to install and run it
+  - How you used AI, if you did
+- A `LICENSE` file (your project must be open source)
+- Your source code
+
+Your structure should look like this:
+
+```
+ZTM-BuildFest/
+└── projects/
+    └── my-project-name/
+        ├── README.md
+        ├── LICENSE
+        └── ...your code
+```
 
 ### 5. Commit your changes
 
 ```bash
-git add .
-git commit -m "Add [project name]: short description of the change"
+git add projects/my-project-name
+git commit -m "Add my-project-name: short description"
 ```
 
 ### 6. Push to your fork
@@ -68,11 +92,7 @@ git push origin add-my-project-name
 
 1. Go to your fork on GitHub and click **Compare & pull request**.
 2. Make sure the base repository is `zero-to-mastery/ZTM-BuildFest` and the base branch is `main`.
-3. Give your PR a clear title and describe what you changed and why. For a project submission, include:
-   - What problem it solves
-   - A link to the project (if hosted elsewhere)
-   - How to run or use it
-   - How you used AI, if you did
+3. Give your PR a clear title, like "Add my-project-name", and briefly describe your project.
 4. Click **Create pull request**.
 
 ### 8. Respond to feedback
@@ -81,9 +101,9 @@ A maintainer will review your PR and may ask for changes. To update your PR, pus
 
 ### Tips for a smooth review
 
-- Keep PRs small and focused.
-- Follow any formatting or naming conventions already used in the repo.
-- Make sure your project is open source and includes a license.
+- Only add or change files inside your own project folder.
+- Make sure your folder name is unique. Check that no one else has used it.
+- Test that your setup instructions work from a fresh clone.
 - Be kind and patient. Maintainers are volunteers.
 
 ### Staying in sync
