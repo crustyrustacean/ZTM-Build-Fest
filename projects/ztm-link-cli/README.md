@@ -70,6 +70,10 @@ ztm-link-cli/
 └── data/           # created at runtime (git-ignored)
 ```
 
+## How AI was used
+
+This project was built with [Claude Code](https://claude.com/claude-code). I described each feature in plain English: downloading the data, the menu, filtering, colours and spacing. Claude Code wrote and tested the Rust code, and I reviewed each change and steered the design.
+
 ## License
 
 [MIT](LICENSE)
