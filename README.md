@@ -30,12 +30,12 @@ Want to add your project? Submit a pull request (PR) for the maintainers to revi
 
 ### 1. Fork the repository
 
-Click the **Fork** button at the top right of the [ZTM-Build-Fest repo](https://github.com/zero-to-mastery/ZTM-BuildFest) to create your own copy under your GitHub account.
+Click the **Fork** button at the top right of the [ZTM-Build-Fest repo](https://github.com/zero-to-mastery/ZTM-Build-Fest) to create your own copy under your GitHub account.
 
 ### 2. Clone your fork
 
 ```bash
-git clone https://github.com/YOUR-USERNAME/ZTM-BuildFest.git
+git clone https://github.com/YOUR-USERNAME/ZTM-Build-Fest.git
 cd ZTM-Build-Fest
 ```
 
@@ -67,7 +67,7 @@ Put **all** of your project's files inside this folder. Don't edit or add files 
 Your structure should look like this:
 
 ```
-ZTM-BuildFest/
+ZTM-Build-Fest/
 └── projects/
     └── my-project-name/
         ├── README.md
@@ -111,7 +111,7 @@ A maintainer will review your PR and may ask for changes. To update your PR, pus
 If the main repo changes while your PR is open, sync your fork:
 
 ```bash
-git remote add upstream https://github.com/zero-to-mastery/ZTM-BuildFest.git
+git remote add upstream https://github.com/zero-to-mastery/ZTM-Build-Fest.git
 git fetch upstream
 git merge upstream/main
 ```
