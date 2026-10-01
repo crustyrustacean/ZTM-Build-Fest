@@ -36,7 +36,7 @@ Click the **Fork** button at the top right of the [ZTM-Build-Fest repo](https://
 
 ```bash
 git clone https://github.com/YOUR-USERNAME/ZTM-BuildFest.git
-cd ZTM-BuildFest
+cd ZTM-Build-Fest
 ```
 
 ### 3. Create a new branch
