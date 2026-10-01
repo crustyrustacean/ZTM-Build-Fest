@@ -81,13 +81,13 @@ IndexedDB event log
 Rust reconstructs household state
 ```
 
-Only after the local-first release should implementation consider a remote sync service. Its trust and protocol design is documented before implementation in v0.0.5:
+Only after the local-first release should implementation consider a remote sync service. Its trust and protocol design is documented before implementation in [SYNC](SYNC.md), with identity, pairing, cryptographic properties, and threats specified in [IDENTITY](IDENTITY.md), [PAIRING](PAIRING.md), [CRYPTOGRAPHY](CRYPTOGRAPHY.md), and [THREAT-MODEL](THREAT-MODEL.md):
 
 ```text
 Device A <---- encrypted event sync ----> Service <---- encrypted event sync ----> Device B
 ```
 
-The service-side protocol, conflict policy, and cryptographic design remain future implementation work. Their design is included in v0.0.5; sync is not part of v0.1.0.
+The service is intended as an authenticated encrypted-event relay, not a household source of truth or plaintext domain processor. Its protocol, conflict classes, and cryptographic design remain future implementation work. Design is documented in v0.0.5; sync is not part of v0.1.0.
 
 ## Dependency policy
 

@@ -1,6 +1,6 @@
 # Roadmap
 
-This roadmap is a planning baseline, not a promise of delivery dates. Releases may change as the product is tested. Kin is currently in documentation-only `v0.0.4`; no application code exists. Planning continues through `v0.0.6`.
+This roadmap is a planning baseline, not a promise of delivery dates. Releases may change as the product is tested. Kin is currently in documentation-only `v0.0.5`; no application code exists. Planning continues through `v0.0.6`.
 
 ## Planning releases
 
@@ -22,7 +22,7 @@ Define household entities and lifecycles, the immutable event envelope and namin
 
 ### `v0.0.5` — Trust, Identity, and Synchronization Design
 
-Specify household/member/device/credential identity, pairing and device revocation, cryptographic posture, threats, encrypted relay responsibilities, metadata exposure, and offline conflict classes. Design only; no identity, crypto, or sync implementation.
+Specify household/member/device/credential identity, pairing and device revocation, cryptographic posture, threats, encrypted relay responsibilities, metadata exposure, and offline conflict classes. Design only; no identity, crypto, or sync implementation. See [IDENTITY](IDENTITY.md), [PAIRING](PAIRING.md), [SYNC](SYNC.md), [CRYPTOGRAPHY](CRYPTOGRAPHY.md), and [THREAT-MODEL](THREAT-MODEL.md).
 
 ### `v0.0.6` — Implementation Contract
 

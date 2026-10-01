@@ -54,6 +54,8 @@ Parent A
 
 This is a conceptual direction only. Passkeys, household keys, encryption, pairing, authorization, revocation, and sync are not yet implemented. A passkey is not itself a household encryption design. Key creation, backup/recovery, device enrollment, revocation, metadata exposure, and failure recovery all need an explicit threat model before implementation.
 
+The planning design for these boundaries is documented in [Identity](IDENTITY.md), [Pairing](PAIRING.md), [Synchronization](SYNC.md), [Cryptography](CRYPTOGRAPHY.md), and the [Threat Model](THREAT-MODEL.md). These documents specify intended properties and open decisions; they do not establish implemented security guarantees.
+
 ## Data lifecycle questions
 
 Before remote sync, the project must specify which data is retained, how event history can be corrected or deleted, how deletion propagates to devices and backups, what metadata remains visible to a service, and how exports work. Event-oriented history is not an excuse to keep personal data indefinitely.
