@@ -2,7 +2,7 @@
 
 > A private, lightweight household coordination app for the little things families need to know, remember, hand off, or discuss.
 
-**Current status: `v0.0.1` — product definition. No usable application has been implemented.** This release contains product planning only; there is nothing to install or run yet. Kin's first functional prototype is planned for `v0.1.0`.
+**Current status: `v0.0.2` — architecture and privacy design. No usable application has been implemented.** This release contains product and technical planning only; there is nothing to install or run yet. Kin's first functional prototype is planned for `v0.1.0`.
 
 ## The problem
 
@@ -14,7 +14,7 @@ Kin aims to make useful household context easier to share and find. It is not a 
 
 Kin is planned as a private, lightweight shared household operating layer, initially for one household and two adults. Its long-term concepts include Today, Needs, Handoff, Talk, Pulse, and Since You Last Looked. These are not implemented features.
 
-The intended technical direction is Rust compiled to WebAssembly, native Web Components, vanilla JavaScript, and browser APIs, with a local-first start and no external framework unless a demonstrated requirement justifies one. Architecture and implementation details are planned for later documentation releases.
+The intended technical direction is Rust compiled to WebAssembly, native Web Components, vanilla JavaScript, and browser APIs, with a local-first start and no external framework unless a demonstrated requirement justifies one.
 
 ## Planned releases
 
@@ -35,3 +35,6 @@ AI-assisted development tools are being used for brainstorming, product planning
 
 - [Product vision](docs/PRODUCT.md)
 - [Principles and non-goals](docs/PRINCIPLES.md)
+- [Architecture](docs/ARCHITECTURE.md)
+- [Conceptual data model](docs/DATA-MODEL.md)
+- [Privacy](docs/PRIVACY.md)
