@@ -30,7 +30,7 @@ Want to add your project? Submit a pull request (PR) for the maintainers to revi
 
 ### 1. Fork the repository
 
-Click the **Fork** button at the top right of the [ZTM-BuildFest repo](https://github.com/zero-to-mastery/ZTM-BuildFest) to create your own copy under your GitHub account.
+Click the **Fork** button at the top right of the [ZTM-Build-Fest repo](https://github.com/zero-to-mastery/ZTM-BuildFest) to create your own copy under your GitHub account.
 
 ### 2. Clone your fork
 
