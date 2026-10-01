@@ -91,7 +91,7 @@ git push origin add-my-project-name
 ### 7. Open a pull request
 
 1. Go to your fork on GitHub and click **Compare & pull request**.
-2. Make sure the base repository is `zero-to-mastery/ZTM-BuildFest` and the base branch is `main`.
+2. Make sure the base repository is `zero-to-mastery/ZTM-Build-Fest` and the base branch is `main`.
 3. Give your PR a clear title, like "Add my-project-name", and briefly describe your project.
 4. Click **Create pull request**.
 
