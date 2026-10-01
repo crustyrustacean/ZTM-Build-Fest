@@ -2,7 +2,7 @@
 
 > A private, lightweight household coordination app for the little things families need to know, remember, hand off, or discuss.
 
-**Current status: `v0.0.3` — UX and implementation planning. No usable application has been implemented.** This release contains planning documentation only; there is nothing to install or run yet. Kin's first functional prototype is planned for `v0.1.0`.
+**Current status: `v0.0.4` — Household Domain Specification. No usable application has been implemented.** This release defines the planned household entities, immutable events, state reconstruction, and lifecycles. There is nothing to install or run yet; the first functional prototype remains planned for `v0.1.0`.
 
 ## The problem
 
@@ -21,6 +21,9 @@ The intended technical direction is Rust compiled to WebAssembly, native Web Com
 - `v0.0.1` — Product definition and principles (`kin-v0.0.1`)
 - `v0.0.2` — Architecture, event model, and privacy design (`kin-v0.0.2`)
 - `v0.0.3` — UX flows and implementation planning (`kin-v0.0.3`)
+- `v0.0.4` — Household Domain Specification (`kin-v0.0.4`)
+- `v0.0.5` — Trust, Identity, and Synchronization Design
+- `v0.0.6` — Implementation Contract
 - `v0.1.0` — First functional prototype
 
 ## Install and run
@@ -38,6 +41,10 @@ AI-assisted development tools are being used for brainstorming, product planning
 - [Architecture](docs/ARCHITECTURE.md)
 - [Conceptual data model](docs/DATA-MODEL.md)
 - [Privacy](docs/PRIVACY.md)
+- [Household domain](docs/DOMAIN.md)
+- [Event contract](docs/EVENTS.md)
+- [Derived state and replay](docs/STATE.md)
+- [Entity lifecycles](docs/LIFECYCLES.md)
 - [UX flows](docs/UX.md)
 - [Roadmap](docs/ROADMAP.md)
 - [v0.1.0 implementation specification](docs/V0.1.0.md)

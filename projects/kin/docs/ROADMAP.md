@@ -1,6 +1,6 @@
 # Roadmap
 
-This roadmap is a planning baseline, not a promise of delivery dates. Releases may change as the product is tested. Kin is currently in the documentation-only `v0.0.x` phase; no application code exists.
+This roadmap is a planning baseline, not a promise of delivery dates. Releases may change as the product is tested. Kin is currently in documentation-only `v0.0.4`; no application code exists. Planning continues through `v0.0.6`.
 
 ## Planning releases
 
@@ -14,13 +14,25 @@ Document intended browser/Rust responsibilities, a conceptual event model, the l
 
 ### `v0.0.3` — UX and implementation planning
 
-Describe conceptual daily flows, sequence the implementation roadmap, and specify the first coded release. This completes planning; it does not ship an app.
+Describe conceptual daily flows, sequence the implementation roadmap, and specify the initial direction for the first coded release. Later planning releases refine the domain, trust model, and implementation contract; no app ships in this release.
+
+### `v0.0.4` — Household Domain Specification
+
+Define household entities and lifecycles, the immutable event envelope and naming convention, event availability by release, deterministic validation/replay, and state/tombstone semantics. See [DOMAIN](DOMAIN.md), [EVENTS](EVENTS.md), [STATE](STATE.md), and [LIFECYCLES](LIFECYCLES.md).
+
+### `v0.0.5` — Trust, Identity, and Synchronization Design
+
+Specify household/member/device/credential identity, pairing and device revocation, cryptographic posture, threats, encrypted relay responsibilities, metadata exposure, and offline conflict classes. Design only; no identity, crypto, or sync implementation.
+
+### `v0.0.6` — Implementation Contract
+
+Freeze the v0.1.0 scope and specify its ABI, protocol, local storage, components, testing, accessibility, and release gate. This completes planning; it does not ship an app.
 
 ## First coded release
 
 ### `v0.1.0` — Household Heartbeat
 
-Build the smallest end-to-end technical foundation: Rust compiled to WebAssembly, a native `<kin-app>` custom element, an explicit JS/WASM boundary, an event model with `ADD_ITEM` and `COMPLETE_ITEM`, Rust state reconstruction, local browser persistence, adding and completing a simple household item, and refresh/replay. Use a temporary local identity only. No partner login, sync, or other product areas.
+Build the smallest end-to-end technical foundation: Rust compiled to WebAssembly, a native `<kin-app>` custom element, an explicit JS/WASM boundary, an event model with `ITEM_ADDED` and `ITEM_COMPLETED`, Rust state reconstruction, local browser persistence, adding and completing a simple household item, and refresh/replay. Use a temporary local identity only. No partner login, sync, or other product areas.
 
 The detailed boundary and acceptance scope are in [V0.1.0.md](V0.1.0.md).
 
@@ -64,4 +76,4 @@ Focus on polish, reliability, accessibility, mobile UX, privacy documentation, o
 
 ## Scope discipline
 
-Each roadmap item is future work. Authentication, passkeys, encryption, remote services, pairing, and synchronization are not part of the planning releases, and no v0.1.0 code should be started as part of this documentation phase.
+Each roadmap item is future work unless explicitly marked as a completed planning milestone. Authentication, passkeys, encryption, remote services, pairing, and synchronization are design topics in `v0.0.5`, not implemented features or part of `v0.1.0`. No v0.1.0 code should be started during planning through `v0.0.6`.

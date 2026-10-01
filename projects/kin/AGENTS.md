@@ -102,15 +102,18 @@ If an unrelated parent-repository file was modified accidentally, revert that ch
 
 Kin uses semantic versions.
 
-The current pre-implementation releases are:
+The pre-implementation releases are:
 
 ```text
 v0.0.1
 v0.0.2
 v0.0.3
+v0.0.4
+v0.0.5
+v0.0.6
 ```
 
-These are **planning and documentation releases only**.
+All releases through `v0.0.6` are **planning and documentation releases only**.
 
 No functional application code should be introduced during these versions.
 
@@ -170,6 +173,30 @@ Focus on:
 - v0.1.0 acceptance criteria
 
 No implementation.
+
+---
+
+## v0.0.4 — Household Domain Specification
+
+Define domain entities, event semantics, deterministic state reconstruction, and entity lifecycles. Update related existing specifications for consistency.
+
+No implementation.
+
+---
+
+## v0.0.5 — Trust, Identity, and Synchronization Design
+
+Specify household/member/device/credential identity, pairing, device authorization and revocation, cryptographic posture, threat model, encrypted relay, offline expectations, and conflict classes.
+
+No implementation.
+
+---
+
+## v0.0.6 — Implementation Contract
+
+Freeze the v0.1.0 implementation scope and specify its project layout, manual JS/WASM ABI and protocol, IndexedDB contract, component boundaries, test contract, accessibility contract, and release gate.
+
+Planning is complete at v0.0.6. The first coded milestone is v0.1.0; do not begin it until explicitly instructed.
 
 ---
 
@@ -494,8 +521,8 @@ Kin should be modeled around events rather than only mutable UI state.
 Prefer:
 
 ```text
-09:13 ADD_ITEM "Buy milk"
-11:42 COMPLETE_ITEM item-12
+09:13 ITEM_ADDED "Buy milk"
+11:42 ITEM_COMPLETED item-12
 ```
 
 over treating this as the authoritative record:
@@ -509,31 +536,42 @@ A conceptual event may include:
 ```text
 Event
 ├── event_id
+├── household_id
 ├── actor_id
+├── device_id
 ├── timestamp
+├── logical_time
 ├── kind
+├── event_version
 └── payload
 ```
 
 Possible future event types include:
 
 ```text
-ADD_ITEM
-COMPLETE_ITEM
-ARCHIVE_ITEM
+ITEM_ADDED
+ITEM_COMPLETED
+ITEM_REOPENED
+ITEM_ARCHIVED
 
-ADD_HANDOFF
-ACKNOWLEDGE_HANDOFF
+HANDOFF_ADDED
+HANDOFF_ACKNOWLEDGED
+HANDOFF_ARCHIVED
 
-ADD_TALK_ITEM
-RESOLVE_TALK_ITEM
+TALK_ADDED
+TALK_RESOLVED
+TALK_REOPENED
+TALK_ARCHIVED
 
-SET_PULSE
+PULSE_SET
+PULSE_CLEARED
 
-CREATE_ROUTINE
-COMPLETE_ROUTINE
+ROUTINE_CREATED
+ROUTINE_COMPLETED
 
-UPDATE_AGREEMENT
+AGREEMENT_CREATED
+AGREEMENT_REVISED
+AGREEMENT_ARCHIVED
 ```
 
 Do not implement event types before they are needed.
@@ -822,6 +860,21 @@ docs/
 ├── PRIVACY.md
 ├── UX.md
 ├── ROADMAP.md
+├── DOMAIN.md
+├── EVENTS.md
+├── STATE.md
+├── LIFECYCLES.md
+├── IDENTITY.md
+├── PAIRING.md
+├── SYNC.md
+├── CRYPTOGRAPHY.md
+├── THREAT-MODEL.md
+├── IMPLEMENTATION.md
+├── ABI.md
+├── STORAGE.md
+├── COMPONENTS.md
+├── TESTING.md
+├── ACCESSIBILITY.md
 └── V0.1.0.md
 ```
 
@@ -857,6 +910,9 @@ The intended early roadmap is:
 v0.0.1 — Product definition
 v0.0.2 — Architecture and privacy
 v0.0.3 — UX and implementation planning
+v0.0.4 — Household Domain Specification
+v0.0.5 — Trust, Identity, and Synchronization Design
+v0.0.6 — Implementation Contract
 
 v0.1.0 — Household Heartbeat
 v0.2.0 — Today + Needs
@@ -1098,17 +1154,20 @@ A release should represent a functioning milestone.
 
 # Current v0.0.x Rule
 
-Until explicitly instructed to begin `v0.1.0`:
+Until explicitly instructed to begin `v0.1.0`, including throughout `v0.0.4`–`v0.0.6`:
 
 # DO NOT WRITE FUNCTIONAL APPLICATION CODE.
 
-During `v0.0.1` through `v0.0.3`, acceptable changes include:
+During `v0.0.1` through `v0.0.6`, acceptable changes include:
 
 - Markdown documentation
 - diagrams
 - pseudocode
 - architecture decisions
 - UX flows
+- domain, event, state, and lifecycle specifications
+- identity, pairing, synchronization, cryptography, and threat-model documents
+- implementation, ABI, storage, component, test, and accessibility contracts
 - roadmap changes
 - README
 - license

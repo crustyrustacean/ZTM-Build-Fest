@@ -69,7 +69,7 @@ A manual ABI is being explored to keep the interface visible, understand the cos
 
 ## Local-first progression
 
-The first coded versions should work locally:
+The first coded version should work locally:
 
 ```text
 Browser UI
@@ -81,13 +81,13 @@ IndexedDB event log
 Rust reconstructs household state
 ```
 
-Only later should the design consider a remote sync service:
+Only after the local-first release should implementation consider a remote sync service. Its trust and protocol design is documented before implementation in v0.0.5:
 
 ```text
 Device A <---- encrypted event sync ----> Service <---- encrypted event sync ----> Device B
 ```
 
-The service-side protocol, conflict policy, and cryptographic design are future decisions. Sync is explicitly deferred; it is not part of the planning releases or v0.1.0.
+The service-side protocol, conflict policy, and cryptographic design remain future implementation work. Their design is included in v0.0.5; sync is not part of v0.1.0.
 
 ## Dependency policy
 
@@ -95,4 +95,4 @@ The goal is not “dependencies are bad.” The goal is to understand and use Ru
 
 ## Decisions still open
 
-Exact event encoding, ABI signatures, module boundaries, browser support floor, IndexedDB schema/migrations, and any future synchronization protocol must be decided and documented alongside implementation. None should be inferred from the illustrative examples here.
+The domain event envelope, event naming, ordering requirements, and replay behavior are specified in [Events](EVENTS.md) and [State](STATE.md). ABI signatures, browser support floor, and IndexedDB schema/migrations remain to be frozen in the v0.0.6 implementation contract. The examples in this document are not a wire format.
