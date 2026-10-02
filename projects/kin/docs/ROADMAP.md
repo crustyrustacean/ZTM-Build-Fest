@@ -1,6 +1,6 @@
 # Roadmap
 
-This roadmap is a planning baseline, not a promise of delivery dates. Releases may change as the product is tested. Kin is currently at the documentation-only `v0.0.7` milestone; no application code exists. Planning continues through `v0.0.9` before the first coded release.
+This roadmap is a planning baseline, not a promise of delivery dates. Releases may change as the product is tested. Kin is currently at the documentation-only `v0.0.8` milestone; no application code or executable developer tooling exists. Planning continues through `v0.0.9` before the first coded release.
 
 ## Planning releases
 
@@ -34,7 +34,7 @@ Define independent persistent-contract versions, compatibility and migration fai
 
 ### `v0.0.8` — Developer & Contributor Experience
 
-Document human contribution expectations, intended cross-platform development setup, code style, release procedure, and privacy-safe debugging. No executable tooling or application code.
+Document human contribution expectations, intended cross-platform development setup, code style, release procedure, and privacy-safe debugging. The commands/workflow are guidance only; no executable tooling or application code. See [CONTRIBUTING](../CONTRIBUTING.md), [DEVELOPMENT](DEVELOPMENT.md), [CODE-STYLE](CODE-STYLE.md), [RELEASES](RELEASES.md), and [DEBUGGING](DEBUGGING.md).
 
 ### `v0.0.9` — Implementation Preflight
 

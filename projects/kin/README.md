@@ -2,7 +2,7 @@
 
 > A private, lightweight household coordination app for the little things families need to know, remember, hand off, or discuss.
 
-**Current status: `v0.0.7` — Data Durability & Evolution. No usable application has been implemented.** This planning release defines persistent-contract versioning, migration safety, data portability, retention, and deletion boundaries. Contributor guidance and implementation preflight remain future planning releases; the first coded prototype is planned for `v0.1.0`.
+**Current status: `v0.0.8` — Developer & Contributor Experience. No usable application has been implemented.** Contributor expectations, the intended cross-platform workflow, code style, release procedure, and privacy-safe debugging are documented, not executable tooling. The final specification preflight remains before the first coded prototype, `v0.1.0`.
 
 ## The problem
 
@@ -25,7 +25,7 @@ The intended technical direction is Rust compiled to WebAssembly, native Web Com
 - `v0.0.5` — Trust, Identity, and Synchronization Design (`kin-v0.0.5`)
 - `v0.0.6` — Implementation Contract (`kin-v0.0.6`)
 - `v0.0.7` — Data Durability & Evolution (`kin-v0.0.7`)
-- `v0.0.8` — Developer & Contributor Experience
+- `v0.0.8` — Developer & Contributor Experience (`kin-v0.0.8`)
 - `v0.0.9` — Implementation Preflight
 - `v0.1.0` — First functional prototype
 
@@ -39,6 +39,7 @@ AI-assisted development tools are being used for brainstorming, product planning
 
 ## Project documents
 
+- [Contributing to Kin](CONTRIBUTING.md)
 - [Product vision](docs/PRODUCT.md)
 - [Principles and non-goals](docs/PRINCIPLES.md)
 - [Architecture](docs/ARCHITECTURE.md)
@@ -63,6 +64,10 @@ AI-assisted development tools are being used for brainstorming, product planning
 - [Migration safety](docs/MIGRATIONS.md)
 - [Portable household data](docs/PORTABILITY.md)
 - [Retention and deletion](docs/RETENTION.md)
+- [Development workflow](docs/DEVELOPMENT.md)
+- [Code style](docs/CODE-STYLE.md)
+- [Release process](docs/RELEASES.md)
+- [Debugging and diagnostics](docs/DEBUGGING.md)
 - [UX flows](docs/UX.md)
 - [Roadmap](docs/ROADMAP.md)
 - [v0.1.0 implementation specification](docs/V0.1.0.md)
