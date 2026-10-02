@@ -38,6 +38,17 @@ Semantic versioning describes Kin's product release; persistent event, ABI, stor
 - **Minor (`0.x.0`):** a planned new product capability that preserves the supported contracts where reasonably possible.
 - **Major (`x.0.0`):** a substantial product or compatibility break once Kin has a mature enough public compatibility promise to warrant it.
 
+For each approved minor capability, use these initial stabilization patches when meaningful work exists:
+
+```text
+v0.N.0 — new product capability
+v0.N.1 — correctness
+v0.N.2 — resilience and accessibility
+v0.N.3 — hardening and polish
+```
+
+After `.3`, stop and ask the user whether the line is satisfactory before beginning another feature. Additional fixes remain normal patches (`.4`, `.5`, and onward); do not use four-part versions or manufacture unnecessary patch releases. A new minor version requires both a genuinely new product capability and explicit user approval. Each completed version gets its own annotated, namespaced tag on the validated release commit.
+
 Before maturity, do not overpromise strict public API stability. Still document compatibility effects and provide migration/recovery expectations before changing persistent contracts.
 
 ## Release checks

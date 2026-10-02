@@ -1,6 +1,6 @@
 # Roadmap
 
-This roadmap is a planning baseline, not a promise of delivery dates. Releases may change as the product is tested. Kin is at the documentation-only `v0.0.10` community-readiness milestone; no application code or executable developer tooling exists. Planning/specification is complete through v0.0.9, and v0.1.0 remains the first coded release when authorized.
+This roadmap is a planning baseline, not a promise of delivery dates. Releases may change as the product is tested. Kin is at the documentation-only `v0.0.11` implementation-cycle handoff; no application code or executable developer tooling exists. Planning/specification is complete through v0.0.9, and v0.1.0 remains the first coded release when authorized.
 
 ## Planning releases
 
@@ -44,7 +44,13 @@ Complete the specification audit, accepted decision records, canonical test vect
 
 Align README with the Build Fest project requirements and add project-scoped conduct, security, support, issue, and pull-request guidance. The MIT license already exists. Because Kin is nested in a monorepo, GitHub does not automatically discover the nested community files/templates; document this limitation rather than changing parent-repository files. This release remains documentation-only.
 
+### `v0.0.11` — Implementation Cycle Handoff
+
+Record the general release cadence for future implementation lines, reaffirm v0.1.0 as the first implementation milestone, and correct stale current-version wording. Preserve the v0.1.0 specification and v0.0.10 community-health work; this release adds no application code or build tooling.
+
 ## First coded release
+
+Each minor release represents a new product capability. Its initial stabilization patches address correctness (`.1`), resilience/accessibility (`.2`), and hardening (`.3`) when needed. After `.3`, stop and ask the user before starting another feature; additional fixes remain patches `.4` and onward.
 
 ### `v0.1.0` — Household Heartbeat
 
@@ -92,4 +98,4 @@ Focus on polish, reliability, accessibility, mobile UX, privacy documentation, o
 
 ## Scope discipline
 
-Each roadmap item is future work unless explicitly marked as a completed planning milestone. Authentication, passkeys, encryption, remote services, pairing, and synchronization remain unimplemented and out of scope for `v0.1.0`. Documentation and community planning through `v0.0.10` remains code-free; v0.1.0 is the first coded release and has not begun.
+Each roadmap item is future work unless explicitly marked as a completed planning milestone. Authentication, passkeys, encryption, remote services, pairing, and synchronization remain unimplemented and out of scope for `v0.1.0`. Documentation and community planning through `v0.0.11` remains code-free; v0.1.0 is the first coded release and has not begun.

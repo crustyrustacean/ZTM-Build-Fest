@@ -115,13 +115,14 @@ v0.0.7
 v0.0.8
 v0.0.9
 v0.0.10
+v0.0.11
 ```
 
-All releases through `v0.0.10` are **planning and documentation releases only**.
+All releases through `v0.0.11` are **planning and documentation releases only**.
 
 No functional application code should be introduced during these versions.
 
-Planning/specification through `v0.0.9` is complete; `v0.0.10` adds project community documentation only. `v0.1.0` is the first implementation release. Before any implementation is explicitly authorized, read [V0.1.0](docs/V0.1.0.md), [PREFLIGHT](docs/PREFLIGHT.md), [TEST-VECTORS](docs/TEST-VECTORS.md), [TRACEABILITY](docs/TRACEABILITY.md), accepted ADRs under `docs/decisions/`, and the community/security policies. Do not allow features assigned to later versions to leak into v0.1.0.
+Planning/specification through `v0.0.9` is complete; `v0.0.10` added project community documentation and `v0.0.11` records the implementation-cycle handoff and general release discipline. `v0.1.0` is the first implementation release. Before implementation, read [V0.1.0](docs/V0.1.0.md), [PREFLIGHT](docs/PREFLIGHT.md), [TEST-VECTORS](docs/TEST-VECTORS.md), [TRACEABILITY](docs/TRACEABILITY.md), accepted ADRs under `docs/decisions/`, and the community/security policies. Do not allow features assigned to later versions to leak into v0.1.0.
 
 The first implementation release is:
 
@@ -227,6 +228,14 @@ Audit and reconcile the specification, record established decisions, define cano
 ## v0.0.10 — GitHub Community & Project Documentation
 
 Keep the Kin README aligned with the ZTM Build Fest project requirements and provide project-scoped license, conduct, contribution, security, support, and reusable issue/PR templates. Document that nested community files are not automatically discovered by GitHub for the parent monorepo.
+
+No functional application code, build tooling, or runtime dependencies.
+
+---
+
+## v0.0.11 — Implementation Cycle Handoff
+
+Record the v0.1.x release cadence, confirm v0.1.0 as the first implementation milestone, and reconcile current-version references without changing the frozen implementation architecture or adding application code.
 
 No functional application code, build tooling, or runtime dependencies.
 
@@ -975,6 +984,7 @@ v0.0.7 — Data Durability & Evolution
 v0.0.8 — Developer & Contributor Experience
 v0.0.9 — Implementation Preflight
 v0.0.10 — GitHub Community & Project Documentation
+v0.0.11 — Implementation Cycle Handoff
 
 v0.1.0 — Household Heartbeat
 v0.2.0 — Today + Needs
@@ -993,6 +1003,21 @@ This roadmap may evolve.
 Do not implement a future version merely because its concept appears in documentation.
 
 Follow the task's requested release scope.
+
+## Release cadence
+
+Use semantic `MAJOR.MINOR.PATCH` versions. Every minor release introduces a new product capability; a patch release does not introduce a new product capability.
+
+For each approved minor capability, use this stabilization pattern when meaningful work exists:
+
+```text
+v0.N.0 — new product capability
+v0.N.1 — correctness
+v0.N.2 — resilience and accessibility
+v0.N.3 — hardening and polish
+```
+
+After `.3`, stop and ask the user whether the minor release line is satisfactory before starting another feature. Additional fixes remain ordinary patch releases (`.4`, `.5`, and onward); never use four-part versions. Do not manufacture patches when there is no meaningful stabilization work. Each completed version receives its own annotated `kin-vX.Y.Z` tag on its validated release commit.
 
 ---
 
@@ -1013,6 +1038,7 @@ kin-v0.0.7
 kin-v0.0.8
 kin-v0.0.9
 kin-v0.0.10
+kin-v0.0.11
 kin-v0.1.0
 kin-v1.0.0
 ```
@@ -1221,13 +1247,13 @@ A release should represent a functioning milestone.
 
 ---
 
-# Current v0.0.x Rule
+# Planning Release Rule
 
-Until explicitly instructed to begin `v0.1.0`, including throughout `v0.0.4`–`v0.0.10`:
+Releases `v0.0.1` through `v0.0.11` are planning/documentation milestones only. `v0.1.0` is the first implementation release. Do not add functional application code while completing a planning release.
 
 # DO NOT WRITE FUNCTIONAL APPLICATION CODE.
 
-During `v0.0.1` through `v0.0.10`, acceptable changes include:
+During `v0.0.1` through `v0.0.11`, acceptable changes include:
 
 - Markdown documentation
 - diagrams
