@@ -1,6 +1,6 @@
 # Accessibility Contract
 
-**Status:** Today/Needs accessibility is retained. Handoff uses semantic lists, a dedicated labeled form, visible actions, textual status, and focus restoration. Testing gaps are recorded in the changelog.
+**Status:** Talk and earlier capture/actions use semantic controls, textual state, visible focus and focus restoration. Actual checks and unverified platforms are recorded below.
 
 ## Baseline requirements
 
@@ -46,3 +46,17 @@ Handoff add/acknowledge/archive restore its input focus. Peer refresh restores f
 ## v0.3.2 resilience and accessibility
 
 The browser runner covers delayed Handoff persistence across reconnect/peer refresh, newer draft ownership, sessionStorage denial, acknowledgement/archive failure and abort retry, rapid repeated retry, and stale actions without invalidation delivery. Handoff semantics, focus, announcements, disabled controls and touch targets are checked under the existing accessibility modes. No screen-reader or native desktop zoom certification is claimed.
+
+## v0.4.0 Talk
+
+Talk uses semantic heading/lists, native labels/buttons, textual status and input focus restoration after add/resolve/reopen/archive and peer action replacement. Busy state disables all controls. Require 48px targets, 320px reflow and accessibility modes; do not claim untested assistive-technology certification. See [V0.4.0](V0.4.0.md).
+
+## v0.4.2 resilience and accessibility evidence
+
+Expanded Talk browser checks for keyboard resolve/reopen/archive, native input-to-Add focus order, semantic headings/lists, labels, polite status/assertive errors, visible focus and 48px targets under forced colors. Added independent draft assertions and direct stale retries with missed invalidation, alongside repeated-refresh recovery. Retained delayed saves, reconnect, queued peer refresh, sessionStorage denial, quota/abort rollback, rapid retry once and supersession. No production defect was found. Passed 56 Rust and 17 Node/real-WASM tests, formatting, Clippy, version consistency, release WASM, both build scripts/launchers (page/WASM HTTP 200), and complete browser suite in Windows x64/Chrome 154.0.8037.59/Node 22.12.0, POSIX via WSL. 320px, increased spacing, forced colors, reduced motion and 200% page-scale emulation pass; native zoom, Firefox, Safari, NVDA and VoiceOver remain unverified.
+
+## v0.4.3 reflow correction
+
+Added every truncated v4 result-header/Talk-record boundary, malformed request headers and extreme lengths, 10,000-event mixed replay, and 10,000-Talk real-WASM growth with independent copied results across repeated success/error/empty calls. Retained explicit v3 Handoff truncation/trailing-byte coverage. Visual inspection found and fixed horizontal overflow caused by a 320px page minimum width when a desktop scrollbar consumes space; reflow assertions now compare scrollWidth with clientWidth. The corrected 320px screen preserves full input focus outlines and wrapping actions.
+
+Passed 58 Rust tests and 19 Node bridge/real-WASM tests, formatting, Clippy with warnings denied, version consistency, release WASM, PowerShell and WSL POSIX build scripts and build/run launchers (page and WASM HTTP 200), and complete browser regressions. Environment: Windows x64, Rust 1.93.0, Node 22.12.0, Chrome 154.0.8037.59; POSIX via WSL. Keyboard, all Talk lifecycle focus restoration, native focus order, semantics, busy/status/error, 48px targets, scrollbar-aware 320px reflow, forced colors, increased spacing, reduced motion and 200% page-scale emulation passed. Native desktop zoom, Firefox, Safari, NVDA and VoiceOver remain unverified.

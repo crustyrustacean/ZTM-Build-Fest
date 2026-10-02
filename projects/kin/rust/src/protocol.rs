@@ -1,14 +1,15 @@
 use crate::error::KinError;
 use crate::event::{
     ActorId, DeviceId, EventEnvelope, EventId, EventKind, HandoffId, HouseholdId,
-    ItemClassification, ItemId,
+    ItemClassification, ItemId, TalkId,
 };
-use crate::state::{HandoffStatus, HouseholdState, ItemStatus};
+use crate::state::{HandoffStatus, HouseholdState, ItemStatus, TalkStatus};
 
 pub const PROTOCOL_V1: u16 = 1;
 pub const PROTOCOL_V2: u16 = 2;
 pub const PROTOCOL_V3: u16 = 3;
-pub const PROTOCOL_VERSION: u16 = PROTOCOL_V3;
+pub const PROTOCOL_V4: u16 = 4;
+pub const PROTOCOL_VERSION: u16 = PROTOCOL_V4;
 pub const ERROR_PROTOCOL_VERSION: u16 = PROTOCOL_V1;
 pub const MAX_EVENT_COUNT: usize = 10_000;
 pub const MAX_PROTOCOL_BYTES: usize = 64 * 1024 * 1024;
@@ -27,7 +28,10 @@ pub fn decode_request(bytes: &[u8]) -> Result<(u16, Vec<EventEnvelope>), KinErro
     }
 
     let version = read_u16(bytes, 4)?;
-    if !matches!(version, PROTOCOL_V1 | PROTOCOL_V2 | PROTOCOL_V3) {
+    if !matches!(
+        version,
+        PROTOCOL_V1 | PROTOCOL_V2 | PROTOCOL_V3 | PROTOCOL_V4
+    ) {
         return Err(KinError::UnsupportedVersion);
     }
     if read_u16(bytes, 6)? != 0 {
@@ -67,13 +71,25 @@ pub fn decode_request(bytes: &[u8]) -> Result<(u16, Vec<EventEnvelope>), KinErro
 }
 
 pub fn encode_state(state: &HouseholdState, protocol_version: u16) -> Result<Vec<u8>, KinError> {
-    if !matches!(protocol_version, PROTOCOL_V1 | PROTOCOL_V2 | PROTOCOL_V3) {
+    if !matches!(
+        protocol_version,
+        PROTOCOL_V1 | PROTOCOL_V2 | PROTOCOL_V3 | PROTOCOL_V4
+    ) {
         return Err(KinError::UnsupportedVersion);
     }
     if protocol_version < PROTOCOL_V3 && !state.handoffs.is_empty() {
         return Err(KinError::UnsupportedVersion);
     }
-    if state.items.len().saturating_add(state.handoffs.len()) > MAX_EVENT_COUNT {
+    if protocol_version < PROTOCOL_V4 && !state.talks.is_empty() {
+        return Err(KinError::UnsupportedVersion);
+    }
+    if state
+        .items
+        .len()
+        .saturating_add(state.handoffs.len())
+        .saturating_add(state.talks.len())
+        > MAX_EVENT_COUNT
+    {
         return Err(KinError::SizeLimit);
     }
     let item_count = u32::try_from(state.items.len()).map_err(|_| KinError::SizeLimit)?;
@@ -85,8 +101,11 @@ pub fn encode_state(state: &HouseholdState, protocol_version: u16) -> Result<Vec
     push_u16(&mut result, protocol_version);
     push_u16(&mut result, 0);
     push_u32(&mut result, item_count);
-    if protocol_version == PROTOCOL_V3 {
+    if protocol_version >= PROTOCOL_V3 {
         push_u32(&mut result, state.handoffs.len() as u32);
+    }
+    if protocol_version >= PROTOCOL_V4 {
+        push_u32(&mut result, state.talks.len() as u32);
     }
 
     for item in &state.items {
@@ -156,6 +175,34 @@ pub fn encode_state(state: &HouseholdState, protocol_version: u16) -> Result<Vec
             HandoffStatus::Unacknowledged => 0,
             HandoffStatus::Acknowledged => 1,
             HandoffStatus::Archived => 2,
+        });
+        result.extend_from_slice(&[0; 3]);
+        push_u32(&mut result, text.len() as u32);
+        result.extend_from_slice(text);
+    }
+    for talk in &state.talks {
+        let text = talk.text.as_bytes();
+        let additional = ITEM_HEADER_BYTES
+            .checked_add(text.len())
+            .ok_or(KinError::SizeLimit)?;
+        if result
+            .len()
+            .checked_add(additional)
+            .ok_or(KinError::SizeLimit)?
+            > MAX_PROTOCOL_BYTES
+        {
+            return Err(KinError::SizeLimit);
+        }
+        result
+            .try_reserve(additional)
+            .map_err(|_| KinError::SizeLimit)?;
+        result.extend_from_slice(&talk.talk_id.0);
+        result.extend_from_slice(&talk.created_by.0);
+        result.extend_from_slice(&talk.created_at.to_le_bytes());
+        result.push(match talk.status {
+            TalkStatus::Open => 0,
+            TalkStatus::Resolved => 1,
+            TalkStatus::Archived => 2,
         });
         result.extend_from_slice(&[0; 3]);
         push_u32(&mut result, text.len() as u32);
@@ -265,7 +312,7 @@ fn decode_event(record: &[u8], protocol_version: u16) -> Result<EventEnvelope, K
                 item_id: ItemId(read_id(payload, 0)?),
             }
         }
-        (1, 5) if protocol_version == PROTOCOL_V3 => {
+        (1, 5) if protocol_version >= PROTOCOL_V3 => {
             if payload.len() < 20 {
                 return Err(KinError::MalformedProtocol);
             }
@@ -285,7 +332,7 @@ fn decode_event(record: &[u8], protocol_version: u16) -> Result<EventEnvelope, K
                 text: text.to_owned(),
             }
         }
-        (1, 6 | 7) if protocol_version == PROTOCOL_V3 => {
+        (1, 6 | 7) if protocol_version >= PROTOCOL_V3 => {
             if payload.len() != 16 {
                 return Err(KinError::MalformedProtocol);
             }
@@ -294,6 +341,39 @@ fn decode_event(record: &[u8], protocol_version: u16) -> Result<EventEnvelope, K
                 EventKind::HandoffAcknowledged { handoff_id }
             } else {
                 EventKind::HandoffArchived { handoff_id }
+            }
+        }
+        (1, 8) if protocol_version >= PROTOCOL_V4 => {
+            if payload.len() < 20 {
+                return Err(KinError::MalformedProtocol);
+            }
+            let length = read_u32(payload, 16)? as usize;
+            if !(1..=MAX_ITEM_TEXT_BYTES).contains(&length)
+                || payload.len()
+                    != 20usize
+                        .checked_add(length)
+                        .ok_or(KinError::MalformedProtocol)?
+            {
+                return Err(KinError::MalformedProtocol);
+            }
+            let text =
+                std::str::from_utf8(&payload[20..]).map_err(|_| KinError::MalformedProtocol)?;
+            EventKind::TalkAdded {
+                talk_id: TalkId(read_id(payload, 0)?),
+                text: text.to_owned(),
+            }
+        }
+        (1, 9..=11) if protocol_version >= PROTOCOL_V4 => {
+            if payload.len() != 16 {
+                return Err(KinError::MalformedProtocol);
+            }
+            let talk_id = TalkId(read_id(payload, 0)?);
+            if event_kind == 9 {
+                EventKind::TalkResolved { talk_id }
+            } else if event_kind == 10 {
+                EventKind::TalkReopened { talk_id }
+            } else {
+                EventKind::TalkArchived { talk_id }
             }
         }
         _ => return Err(KinError::UnsupportedVersion),
@@ -993,5 +1073,256 @@ mod tests {
             result,
             encode_state(&handoff_replay(&records).unwrap(), 3).unwrap()
         );
+    }
+    fn talk_record(kind: u16, sequence: u8) -> Vec<u8> {
+        let mut record = handoff_record(if kind == 8 { 5 } else { 6 }, sequence);
+        record[2..4].copy_from_slice(&kind.to_le_bytes());
+        record
+    }
+
+    fn talk_replay(records: &[Vec<u8>]) -> Result<HouseholdState, KinError> {
+        let (_, events) =
+            decode_request(&request_with(&records.concat(), 4, records.len() as u32))?;
+        rebuild(&events)
+    }
+
+    #[test]
+    fn talk_lifecycle_and_terminal_archive() {
+        for (kinds, expected) in [
+            (vec![8], TalkStatus::Open),
+            (vec![8, 9], TalkStatus::Resolved),
+            (vec![8, 9, 9], TalkStatus::Resolved),
+            (vec![8, 9, 10], TalkStatus::Open),
+            (vec![8, 10], TalkStatus::Open),
+            (vec![8, 11], TalkStatus::Archived),
+            (vec![8, 9, 11], TalkStatus::Archived),
+        ] {
+            let records: Vec<_> = kinds
+                .iter()
+                .enumerate()
+                .map(|(i, k)| talk_record(*k, i as u8 + 1))
+                .collect();
+            let state = talk_replay(&records).unwrap();
+            assert_eq!(state.talks[0].status, expected);
+            assert_eq!(state.talks[0].created_by, ActorId([0xbb; 16]));
+            assert_eq!(state.talks[0].created_at, 1);
+            assert_eq!(talk_replay(&records).unwrap(), state);
+            for version in [1, 2, 3] {
+                assert_eq!(
+                    encode_state(&state, version),
+                    Err(KinError::UnsupportedVersion)
+                );
+            }
+            if expected == TalkStatus::Archived {
+                for kind in [8, 9, 10, 11] {
+                    let mut invalid = records.clone();
+                    invalid.push(talk_record(kind, invalid.len() as u8 + 1));
+                    assert_eq!(talk_replay(&invalid), Err(KinError::InvalidEvent));
+                }
+            }
+        }
+        for kind in [9, 10, 11] {
+            assert_eq!(
+                talk_replay(&[talk_record(kind, 1)]),
+                Err(KinError::InvalidEvent)
+            );
+        }
+    }
+
+    #[test]
+    fn talk_identity_mixed_replay_and_legacy_rejection() {
+        let added = talk_record(8, 1);
+        assert_eq!(
+            talk_replay(&[added.clone(), added.clone()])
+                .unwrap()
+                .talks
+                .len(),
+            1
+        );
+        let mut conflict = added.clone();
+        *conflict.last_mut().unwrap() = b'x';
+        assert_eq!(
+            talk_replay(&[added.clone(), conflict]),
+            Err(KinError::InvalidEvent)
+        );
+        assert_eq!(
+            talk_replay(&[added, talk_record(8, 2)]),
+            Err(KinError::InvalidEvent)
+        );
+        let records = vec![
+            added_record(b"Milk"),
+            added_record_v2(2, 2, b"Need", 1),
+            handoff_record(5, 3),
+            talk_record(8, 4),
+        ];
+        let state = talk_replay(&records).unwrap();
+        assert_eq!(
+            (state.items.len(), state.handoffs.len(), state.talks.len()),
+            (2, 1, 1)
+        );
+        let bytes = encode_state(&state, 4).unwrap();
+        assert_eq!(
+            &bytes[..20],
+            &[75, 73, 78, 83, 4, 0, 0, 0, 2, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0]
+        );
+        let (_, events) = decode_request(&request_with(&records.concat(), 4, 4)).unwrap();
+        for (event, original) in events.iter().zip(records) {
+            assert_eq!(event.canonical_bytes, original);
+        }
+        for version in [1, 2, 3] {
+            for kind in [8, 9, 10, 11] {
+                assert_eq!(
+                    decode_request(&request_with(&talk_record(kind, 1), version, 1)),
+                    Err(KinError::UnsupportedVersion)
+                );
+            }
+        }
+    }
+    #[test]
+    fn talk_payload_boundaries_and_versions_fail_closed() {
+        for kind in [8, 9, 10, 11] {
+            let record = talk_record(kind, 1);
+            for length in 0..record.len() - 88 {
+                let mut truncated = record[..88 + length].to_vec();
+                truncated[84..88].copy_from_slice(&(length as u32).to_le_bytes());
+                assert_eq!(
+                    decode_request(&request_with(&truncated, 4, 1)),
+                    Err(KinError::MalformedProtocol)
+                );
+            }
+            let mut trailing = record.clone();
+            trailing.push(0);
+            let length = (trailing.len() - 88) as u32;
+            trailing[84..88].copy_from_slice(&length.to_le_bytes());
+            assert_eq!(
+                decode_request(&request_with(&trailing, 4, 1)),
+                Err(KinError::MalformedProtocol)
+            );
+            for version in [0u16, 2, 3, u16::MAX] {
+                let mut invalid = record.clone();
+                invalid[..2].copy_from_slice(&version.to_le_bytes());
+                assert_eq!(
+                    decode_request(&request_with(&invalid, 4, 1)),
+                    Err(KinError::UnsupportedVersion)
+                );
+            }
+            let mut extreme = record.clone();
+            extreme[84..88].copy_from_slice(&u32::MAX.to_le_bytes());
+            assert_eq!(
+                decode_request(&request_with(&extreme, 4, 1)),
+                Err(KinError::MalformedProtocol)
+            );
+        }
+    }
+
+    #[test]
+    fn talk_text_and_exact_result_record() {
+        for text in [vec![], vec![b'x'; 4097], vec![0xff]] {
+            let mut row = added_record(&text);
+            row[2..4].copy_from_slice(&8u16.to_le_bytes());
+            assert_eq!(talk_replay(&[row]), Err(KinError::MalformedProtocol));
+        }
+        let mut row = added_record(b" \t\n");
+        row[2..4].copy_from_slice(&8u16.to_le_bytes());
+        assert_eq!(talk_replay(&[row]), Err(KinError::InvalidEvent));
+        for (kind, status) in [(8, 0), (9, 1), (10, 0), (11, 2)] {
+            let mut rows = vec![talk_record(8, 1)];
+            if kind != 8 {
+                rows.push(talk_record(kind, 2));
+            }
+            let state = talk_replay(&rows).unwrap();
+            let bytes = encode_state(&state, 4).unwrap();
+            assert_eq!(
+                &bytes[..20],
+                &[75, 73, 78, 83, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0]
+            );
+            assert_eq!(&bytes[20..36], &[0x11; 16]);
+            assert_eq!(&bytes[36..52], &[0xbb; 16]);
+            assert_eq!(&bytes[52..60], &1i64.to_le_bytes());
+            assert_eq!(&bytes[60..64], &[status, 0, 0, 0]);
+            assert_eq!(&bytes[64..68], &18u32.to_le_bytes());
+            assert_eq!(&bytes[68..], b"Dishwasher running");
+        }
+    }
+
+    #[test]
+    fn v4_combined_entity_limit() {
+        let mut state = talk_replay(&[
+            added_record(b"Milk"),
+            handoff_record(5, 2),
+            talk_record(8, 3),
+        ])
+        .unwrap();
+        state.items.resize(3333, state.items[0].clone());
+        state.handoffs.resize(3333, state.handoffs[0].clone());
+        state.talks.resize(3334, state.talks[0].clone());
+        assert!(encode_state(&state, 4).is_ok());
+        state.talks.push(state.talks[0].clone());
+        assert_eq!(encode_state(&state, 4), Err(KinError::SizeLimit));
+    }
+    #[test]
+    fn talk_request_header_and_length_hardening() {
+        let request = request_with(&talk_record(8, 1), 4, 1);
+        for length in 0..100 {
+            assert_eq!(
+                decode_request(&request[..length]),
+                Err(KinError::MalformedProtocol)
+            );
+        }
+        for offset in [6, 7] {
+            let mut invalid = request.clone();
+            invalid[offset] = 1;
+            assert_eq!(decode_request(&invalid), Err(KinError::MalformedProtocol));
+        }
+        for length in [0u32, 4097, u32::MAX] {
+            let mut invalid = request.clone();
+            invalid[116..120].copy_from_slice(&length.to_le_bytes());
+            assert_eq!(decode_request(&invalid), Err(KinError::MalformedProtocol));
+        }
+        let mut trailing = request;
+        trailing.push(0);
+        assert_eq!(decode_request(&trailing), Err(KinError::MalformedProtocol));
+    }
+
+    #[test]
+    fn maximum_mixed_talk_replay_is_deterministic() {
+        let mut records = Vec::new();
+        for number in 1..=MAX_EVENT_COUNT as u32 {
+            let mut record = match number % 3 {
+                0 => added_record_v2(number, number, b"x", 1),
+                1 => handoff_record(5, 1),
+                _ => talk_record(8, 1),
+            };
+            record[4..20].copy_from_slice(&numbered_id(number));
+            record[88..104].copy_from_slice(&numbered_id(number));
+            record[76..84].copy_from_slice(&u64::from(number).to_le_bytes());
+            records.push(record);
+        }
+        let state = talk_replay(&records).unwrap();
+        assert_eq!(
+            (state.items.len(), state.handoffs.len(), state.talks.len()),
+            (3333, 3334, 3333)
+        );
+        let result = encode_state(&state, 4).unwrap();
+        assert!(result.len() < MAX_PROTOCOL_BYTES);
+        assert_eq!(
+            result,
+            encode_state(&talk_replay(&records).unwrap(), 4).unwrap()
+        );
+        for collection in [
+            state
+                .items
+                .iter()
+                .map(|row| row.item_id.0)
+                .collect::<Vec<_>>(),
+            state.handoffs.iter().map(|row| row.handoff_id.0).collect(),
+            state.talks.iter().map(|row| row.talk_id.0).collect(),
+        ] {
+            assert!(collection.windows(2).all(|pair| u32::from_le_bytes(
+                pair[0][..4].try_into().unwrap()
+            ) < u32::from_le_bytes(
+                pair[1][..4].try_into().unwrap()
+            )));
+        }
     }
 }

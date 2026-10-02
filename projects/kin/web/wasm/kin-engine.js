@@ -1,4 +1,4 @@
-const PROTOCOL_VERSION = 3;
+const PROTOCOL_VERSION = 4;
 const REQUEST_HEADER_BYTES = 12;
 const EVENT_HEADER_BYTES = 88;
 const RESULT_HEADER_BYTES = 12;
@@ -231,6 +231,31 @@ export function encodeHandoffArchivedRecord({ handoffId, ...identity }) {
   return encodeEventRecord({ ...identity, eventVersion: 1, kind: 7, payload: assertId(handoffId) });
 }
 
+export function encodeTalkAddedRecord({ talkId, text, ...identity }) {
+  const textBytes = textEncoder.encode(text);
+  if (strictTextDecoder.decode(textBytes) !== text || textBytes.length < 1 ||
+      textBytes.length > MAX_ITEM_TEXT_BYTES) {
+    throw new KinEngineError(2, "Talk text must be valid Unicode and no more than 4096 UTF-8 bytes.");
+  }
+  const payload = new Uint8Array(20 + textBytes.length);
+  payload.set(assertId(talkId));
+  new DataView(payload.buffer).setUint32(16, textBytes.length, true);
+  payload.set(textBytes, 20);
+  return encodeEventRecord({ ...identity, eventVersion: 1, kind: 8, payload });
+}
+
+export function encodeTalkResolvedRecord({ talkId, ...identity }) {
+  return encodeEventRecord({ ...identity, eventVersion: 1, kind: 9, payload: assertId(talkId) });
+}
+
+export function encodeTalkArchivedRecord({ talkId, ...identity }) {
+  return encodeEventRecord({ ...identity, eventVersion: 1, kind: 11, payload: assertId(talkId) });
+}
+
+export function encodeTalkReopenedRecord({ talkId, ...identity }) {
+  return encodeEventRecord({ ...identity, eventVersion: 1, kind: 10, payload: assertId(talkId) });
+}
+
 function encodeEventRecord({
   eventId,
   householdId,
@@ -368,7 +393,7 @@ function decodeError(bytes, status) {
   const code = view.getUint16(6, true);
   const messageLength = view.getUint32(8, true);
   if (
-    ![1, 2, PROTOCOL_VERSION].includes(version) ||
+    ![1, 2, 3, PROTOCOL_VERSION].includes(version) ||
     code !== status ||
     bytes.length !== REQUEST_HEADER_BYTES + messageLength
   ) {
@@ -397,24 +422,25 @@ function decodeState(bytes) {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const protocolVersion = view.getUint16(4, true);
   if (
-    ![1, 2, PROTOCOL_VERSION].includes(protocolVersion) ||
+    ![1, 2, 3, PROTOCOL_VERSION].includes(protocolVersion) ||
     view.getUint16(6, true) !== 0
   ) {
     throw new KinEngineError(6, "Kin received an unsupported state format.");
   }
-  if (protocolVersion === 3 && bytes.length < 16) {
+  if (bytes.length < (protocolVersion === 4 ? 20 : protocolVersion === 3 ? 16 : 12)) {
     throw new KinEngineError(6, "Kin received a truncated state header.");
   }
-  const handoffCount = protocolVersion === 3 ? view.getUint32(12, true) : 0;
+  const handoffCount = protocolVersion >= 3 ? view.getUint32(12, true) : 0;
+  const talkCount = protocolVersion === 4 ? view.getUint32(16, true) : 0;
   const itemCount = view.getUint32(8, true);
-  if (itemCount + handoffCount > MAX_EVENT_COUNT) {
+  if (itemCount + handoffCount + talkCount > MAX_EVENT_COUNT) {
     throw new KinEngineError(
       6,
       "Kin received too many items from its household engine.",
     );
   }
   const items = [];
-  let offset = protocolVersion === 3 ? 16 : RESULT_HEADER_BYTES;
+  let offset = protocolVersion === 4 ? 20 : protocolVersion === 3 ? 16 : RESULT_HEADER_BYTES;
   for (let index = 0; index < itemCount; index += 1) {
     const headerEnd = offset + ITEM_HEADER_BYTES;
     if (headerEnd > bytes.length) {
@@ -495,13 +521,36 @@ function decodeState(bytes) {
     });
     offset = end;
   }
+  const talks = [];
+  for (let index = 0; index < talkCount; index += 1) {
+    const headerEnd = offset + 48;
+    if (headerEnd > bytes.length) throw new KinEngineError(6, "Kin received a truncated talk record.");
+    const textLength = view.getUint32(offset + 44, true);
+    const end = headerEnd + textLength;
+    const status = bytes[offset + 40];
+    const createdAt = Number(view.getBigInt64(offset + 32, true));
+    if (end > bytes.length || textLength < 1 || textLength > MAX_ITEM_TEXT_BYTES ||
+        status > 2 || bytes.slice(offset + 41, offset + 44).some(value => value !== 0) ||
+        !Number.isSafeInteger(createdAt)) {
+      throw new KinEngineError(6, "Kin received an invalid talk record.");
+    }
+    let text;
+    try { text = strictTextDecoder.decode(bytes.subarray(headerEnd, end)); }
+    catch { throw new KinEngineError(6, "Kin received invalid talk text."); }
+    talks.push({
+      talkId: idToHex(bytes.subarray(offset, offset + 16)),
+      createdBy: idToHex(bytes.subarray(offset + 16, offset + 32)),
+      createdAt, text, status: ["open", "resolved", "archived"][status],
+    });
+    offset = end;
+  }
   if (offset !== bytes.length) {
     throw new KinEngineError(
       6,
       "Kin received trailing bytes from its household engine.",
     );
   }
-  return { items, handoffs };
+  return { items, handoffs, talks };
 }
 
 function assertId(value) {

@@ -22,6 +22,7 @@ id_type!(ActorId);
 id_type!(DeviceId);
 id_type!(ItemId);
 id_type!(HandoffId);
+id_type!(TalkId);
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ItemClassification {
@@ -31,6 +32,19 @@ pub enum ItemClassification {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum EventKind {
+    TalkAdded {
+        talk_id: TalkId,
+        text: String,
+    },
+    TalkResolved {
+        talk_id: TalkId,
+    },
+    TalkReopened {
+        talk_id: TalkId,
+    },
+    TalkArchived {
+        talk_id: TalkId,
+    },
     HandoffAdded {
         handoff_id: HandoffId,
         text: String,

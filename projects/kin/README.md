@@ -2,7 +2,7 @@
 
 > A private, lightweight household coordination app for the little things families need to know, remember, hand off, or discuss.
 
-**Current status: `v0.3.5` — Build & Run Convenience.** Kin separates household items into Today and Needs, defaults fast capture to Needs, and supports completion, reopening, and archival. Rust remains the only domain reducer; IndexedDB schema 1 remains canonical, v0.1.x event bytes remain unchanged, and no runtime framework or remote service is present. Handoff adds short context capture, acknowledgement, and archival with protocol v3. Actor IDs remain local placeholders, not verified people.
+**Current status: `v0.4.3` — Talk Hardening & Polish.** Kin separates household items into Today and Needs, defaults fast capture to Needs, and supports completion, reopening, and archival. Rust remains the only domain reducer; IndexedDB schema 1 remains canonical, v0.1.x event bytes remain unchanged, and no runtime framework or remote service is present. Handoff adds short context capture, acknowledgement, and archival with protocol v3. Talk adds short topics, Open/Resolved lists, resolve/reopen/archive and protocol v4. Resolution is workflow state only. Actor IDs remain local placeholders, not verified people.
 
 ## The problem
 
@@ -12,7 +12,7 @@ Kin aims to make useful household context easier to share and find. It is not a 
 
 ## Intended direction
 
-Kin is intended as a private, lightweight shared household operating layer. Today and Needs views, lightweight classification, capture, completion, reopening, and archival are implemented locally. Handoff capture, acknowledgement, and recent context are implemented locally. Talk, Pulse, Routines, and Since You Last Looked remain future concepts.
+Kin is intended as a private, lightweight shared household operating layer. Today and Needs views, lightweight classification, capture, completion, reopening, and archival are implemented locally. Handoff capture, acknowledgement, and recent context are implemented locally. Talk captures short topics for later, with Open/Resolved lists, resolve, reopen, and archive. Resolved is workflow state only, not agreement or an objective solution. Pulse, Routines, and Since You Last Looked remain future concepts.
 
 The intended technical direction is Rust compiled to WebAssembly, native Web Components, vanilla JavaScript, and browser APIs, with a local-first start and no external framework unless a demonstrated requirement justifies one.
 
@@ -47,6 +47,10 @@ The intended technical direction is Rust compiled to WebAssembly, native Web Com
 - `v0.3.3` — Handoff Hardening & Polish (`kin-v0.3.3`)
 - `v0.3.4` — Handoff Retry Recovery (`kin-v0.3.4`)
 - `v0.3.5` — Build & Run Convenience (`kin-v0.3.5`)
+- `v0.4.0` — Talk (`kin-v0.4.0`)
+- `v0.4.1` — Talk Correctness (`kin-v0.4.1`)
+- `v0.4.2` — Talk Resilience & Accessibility (`kin-v0.4.2`)
+- `v0.4.3` — Talk Hardening & Polish (`kin-v0.4.3`)
 - See the [changelog](CHANGELOG.md) for the completed release history.
 
 ## Install, build, and run
@@ -62,7 +66,7 @@ rustup target add wasm32-unknown-unknown
 
 The script builds the WASM module and serves the web app at `http://localhost:8000`. On macOS/Linux, run `sh projects/kin/run.sh` from the repository root.
 
-Kin stores household events in the current browser profile's IndexedDB and may keep the in-progress compose draft in tab-scoped `sessionStorage`. It does not provide accounts, backup, encryption, pairing, or cross-device sync; browser storage is not a security boundary against device compromise or extensions. Use synthetic household text while evaluating this prototype.
+Kin stores household events in the current browser profile's IndexedDB and may keep independent in-progress Item, Handoff and Talk drafts in tab-scoped `sessionStorage`. It does not provide accounts, backup, encryption, pairing, or cross-device sync; browser storage is not a security boundary against device compromise or extensions. Use synthetic household text while evaluating this prototype.
 
 ## AI usage
 
@@ -121,3 +125,5 @@ Kin is nested in the ZTM Build Fest repository. Its community files and template
 - [Roadmap](docs/ROADMAP.md)
 - [v0.1.0 implementation specification](docs/V0.1.0.md)
 - [Handoff release contract and final validation](docs/V0.3.0.md)
+
+- [Talk release contract and validation](docs/V0.4.0.md)

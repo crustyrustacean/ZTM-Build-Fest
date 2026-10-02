@@ -1,6 +1,6 @@
 # Privacy
 
-**Status:** Item and Handoff events remain local in IndexedDB with tab-scoped drafts. No verified members, accounts, encryption, sync, analytics, or remote content service exists. Browser storage is not protection against device compromise or extensions.
+**Status:** Item, Handoff and Talk events remain local in IndexedDB with independent tab drafts. No verified identity, accounts, encryption, sync, analytics or remote content service exists.
 
 The in-progress compose draft may be held in tab-scoped `sessionStorage` to survive a reload. It is not part of the event log, is not shared with another tab, and is cleared after successful save or explicit clear. Browser site-data controls remove both the event store and any draft.
 

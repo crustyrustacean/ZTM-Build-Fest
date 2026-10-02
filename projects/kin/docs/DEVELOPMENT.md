@@ -1,6 +1,6 @@
 # Development Workflow
 
-**Status:** current workflow for the v0.3.5 Today + Needs + Handoff prototype.
+**Status:** Current workflow for Today + Needs + Handoff + Talk. All tooling and build output remain project-local.
 
 ## Build and run
 
@@ -20,7 +20,7 @@ build the Rust/WASM module using the project-local manifest
 serve the static web files from localhost
         |
         v
-open the supported browser and exercise Today + Needs
+open the supported browser and exercise Today + Needs + Handoff + Talk
 ```
 
 From the repository root in PowerShell:
@@ -50,7 +50,7 @@ No npm dependency tree or framework runtime is planned. If static serving later 
 
 ## Browser capabilities
 
-The application requires WebAssembly, ES modules, Custom Elements, IndexedDB, `CustomEvent`, text encoders/decoders, and secure-context browser APIs. WebAuthn and Web Crypto for content security belong to later identity/sync work, not v0.3.x. Browser validation is recorded per release and does not certify the full browser support target.
+The application requires WebAssembly, ES modules, Custom Elements, IndexedDB, `CustomEvent`, text encoders/decoders, and secure-context browser APIs. WebAuthn and Web Crypto for content security belong to later identity/sync work, not v0.4.x. Browser validation is recorded per release and does not certify the full browser support target.
 
 ## Development data
 

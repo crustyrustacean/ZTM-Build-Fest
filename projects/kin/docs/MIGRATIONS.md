@@ -1,6 +1,6 @@
 # Data Migrations
 
-**Status:** No structural migration is required in v0.3.0. Legacy Item bytes and Handoff bytes coexist in schema 1; normalization is in memory only.
+**Status:** No structural migration is required for Talk. Legacy Item/Handoff bytes and new Talk bytes coexist in IndexedDB schema 1 unchanged.
 
 ## Migration categories
 

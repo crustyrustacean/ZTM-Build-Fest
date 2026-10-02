@@ -1,6 +1,6 @@
 # v0.1.0 Implementation Contract
 
-**Status:** Today, Needs, and Handoff are implemented; Rust is the sole reducer. Talk and later capabilities remain future work.
+**Status:** Today, Needs, Handoff and Talk are implemented; Rust is the sole reducer. Pulse and later capabilities remain future work.
 
 ## Proposed project layout
 
@@ -42,8 +42,8 @@ The v0.1.0 implementation uses this layout. The generated `target/` tree and `we
 ## Module responsibilities
 
 - **`rust/src/event.rs`:** event kinds, typed classification, envelope representation, and normalized payloads.
-- **`rust/src/state.rs`:** deterministic reducer and projection of ordered events into classified Item state and dedicated Handoff state.
-- **`rust/src/protocol.rs`:** bounded protocol-v1/v2/v3 parsing/results and explicit event-schema v1/v2 decoding.
+- **`rust/src/state.rs`:** deterministic reducer and projection of ordered events into classified Item state and dedicated Handoff and Talk state.
+- **`rust/src/protocol.rs`:** bounded protocol-v1/v2/v3/v4 parsing/results and explicit event-schema v1/v2 decoding.
 - **`rust/src/abi.rs`:** exported C-ABI functions, pointer/length checks, buffer ownership, and status codes.
 - **`rust/src/error.rs`:** stable error categories and non-sensitive messages.
 - **`rust/src/lib.rs`:** module exports only; no DOM or browser API access.
@@ -70,3 +70,7 @@ The target remains the latest two stable major releases of desktop and mobile Ch
 ## Handoff implementation
 
 `web/components/kin-handoff-list.js` owns capture/list presentation; kin-app owns command orchestration. The frozen domain and protocol contract is [V0.3.0](V0.3.0.md).
+
+## v0.4.0 Talk
+
+rust/src/event.rs and state.rs add distinct TalkId/TalkStatus/TalkState; protocol.rs adds explicit v4. web/components/kin-talk-list.js presents Talk; kin-app.js reuses canonical refresh and suspended retry infrastructure. No framework or runtime dependency is added. See [V0.4.0](V0.4.0.md).

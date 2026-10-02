@@ -1,6 +1,6 @@
 # Web Component Contract
 
-**Status:** Native custom elements present Today, Needs, and Handoff. KinApp orchestrates persistence and Rust replay.
+**Status:** Native custom elements present Today, Needs, Handoff and Talk. KinApp orchestrates atomic persistence, Rust replay and retry recovery.
 
 ## Component responsibilities
 
@@ -46,3 +46,7 @@ Parent/application orchestration supplies state as properties or a documented at
 ## v0.3.4 retry recovery
 
 User-authorized follow-up patch: a failed canonical refresh retains the original failed command and feedback in transient application memory. Repeated refresh failure offers refresh retry first; successful Rust replay restores the command retry unless canonical state invalidates it. No automatic append occurs on refresh recovery. New commands supersede suspended retries. Browser regressions cover Handoff add/acknowledge/archive, Item add, repeated failure, newer drafts, stale peer actions and supersession. This is not persisted household state or a new capability.
+
+## v0.4.0 Talk
+
+kin-talk-list owns the single labeled input and semantic Open/Resolved lists. Bubbling/composed commands: kin:add-talk { text }, kin:resolve-talk { talkId }, kin:reopen-talk { talkId }, kin:archive-talk { talkId }. KinApp validates through Rust and persists; the component only renders and dispatches intent. See [V0.4.0](V0.4.0.md).

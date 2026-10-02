@@ -1,6 +1,6 @@
 # JavaScript–WASM ABI
 
-**Status:** Protocols v1/v2 remain supported unchanged. Protocol v3 explicitly carries Item + Handoff state; current browser calls use v3.
+**Status:** Protocols v1/v2/v3 remain supported unchanged. Explicit v4 carries Items, Handoffs and Talks; current browser calls use v4.
 
 ## Target and exports
 
@@ -116,7 +116,7 @@ size  field
 N     text bytes
 ```
 
-Items remain serialized in original add-event order, including archived tombstones so the caller can make a filtered view without becoming a reducer. The browser hides archived items from ordinary lists. Protocol v3 is written by new browser instances. `KERR` retains the v1 header/version and stable numeric error codes for both request versions.
+Items remain serialized in original add-event order, including archived tombstones so the caller can make a filtered view without becoming a reducer. The browser hides archived items from ordinary lists. Protocol v4 is written by new browser instances. `KERR` retains the v1 header/version and stable numeric error codes across all supported request protocol versions.
 
 ## Ownership and lifetime
 
@@ -127,12 +127,12 @@ Items remain serialized in original add-event order, including archived tombston
 - Rust owns result/error buffers. `kin_result_ptr/len` refer to the most recent successful result; `kin_error_ptr/len` refer to the most recent failed call. The inactive pair returns `(0, 0)`.
 - Result/error bytes stay valid until the next `kin_apply_events` call or module teardown. JavaScript must copy them into host-owned memory before another call. The bridge must not retain a view that may become stale if WASM memory grows.
 - Each call clears the previous result and error before processing. Repeated calls are independent full replays; the module has no hidden household state between calls.
-- A valid empty household response is a non-empty protocol result containing zero entity counts (12 bytes for v1/v2, 16 for v3). A zero-length error/result accessor means that no buffer is available, not a successful empty state.
+- A valid empty household response is a non-empty protocol result containing zero entity counts (12 bytes for v1/v2, 16 for v3, 20 for v4). A zero-length error/result accessor means that no buffer is available, not a successful empty state.
 - Output allocation is released by Rust on the next apply call/module teardown; JavaScript must not call `kin_free` on result/error pointers.
 
 ## Call behavior
 
-`kin_apply_events` accepts one complete, ordered event batch using protocol version 1, 2, or 3. It validates the entire request and reconstructs from scratch. On success it publishes a complete result in the requested protocol version and returns zero. On failure it publishes an error and no partial result; stored IndexedDB bytes remain untouched. Unknown protocol/event versions fail with a stable unsupported-version code; malformed payload, bounds overflow, and invalid state transitions fail deterministically.
+`kin_apply_events` accepts one complete, ordered event batch using protocol version 1, 2, 3, or 4. It validates the entire request and reconstructs from scratch. On success it publishes a complete result in the requested protocol version and returns zero. On failure it publishes an error and no partial result; stored IndexedDB bytes remain untouched. Unknown protocol/event versions fail with a stable unsupported-version code; malformed payload, bounds overflow, and invalid state transitions fail deterministically.
 
 The function may grow memory while parsing or building output. JavaScript must reacquire `memory.buffer` after the call before copying result/error bytes. Length arithmetic is checked for overflow in both languages. Cap a request and result at 64 MiB, a request at 10,000 events, and individual item text at 4096 UTF-8 bytes for v0.1.0; reject larger input before unbounded allocation. The matching 10,000-event storage limit is specified in [STORAGE](STORAGE.md).
 
@@ -140,10 +140,14 @@ The function may grow memory while parsing or building output. JavaScript must r
 
 The high-level bridge owns loading/instantiation, ABI export checks, buffer allocation/copy/free, memory view refresh, binary protocol encode/decode, and conversion of stable ABI errors to UI-safe messages. It must not implement event replay or state transitions.
 
-## Protocol version 3 (current)
+## Protocol version 3 (legacy Handoff)
 
 Requests retain the 12-byte KINE header and 88-byte envelope with explicit version 3. All v2 events plus schema-1 kinds 5 HANDOFF_ADDED, 6 HANDOFF_ACKNOWLEDGED, and 7 HANDOFF_ARCHIVED are supported. Add payload: handoff_id[16], text_length:u32, strict UTF-8 text (1–4096 bytes). Reference payloads: exactly handoff_id[16]. Existing codes/payloads are unchanged.
 
 KINS v3 header: magic[4], version:u16=3, reserved:u16=0, item_count:u32, handoff_count:u32 (16 bytes). All v2-layout Item records precede Handoff records. A Handoff record is handoff_id[16], created_by[16], created_at:i64, status:u8 (0 unacknowledged, 1 acknowledged, 2 archived), reserved[3]=0, text_length:u32, text. Fixed record size is 48 bytes. Collections retain original add order including tombstones; combined count is at most 10,000. The 64 MiB bound remains. Empty v3 output is 16 bytes. KERR stays version 1.
 
 Protocols v1/v2 reject Handoff events and cannot serialize Handoff projection, including archived state. They never silently omit it. Protocol v1 still rejects Needs/archived Item state. See [V0.3.0](V0.3.0.md).
+
+## v0.4.0 Talk
+
+Protocol v4 requests retain the 12-byte KINE header and 88-byte envelope, version 4. KINS header: magic[4], version:u16=4, reserved:u16=0, item_count:u32, handoff_count:u32, talk_count:u32 (20 bytes). All v2 Item records precede v3 Handoff records and Talk records. Talk: talk_id[16], created_by[16], created_at:i64, status:u8 (0 open, 1 resolved, 2 archived), reserved[3]=0, text_length:u32, text[N]. Combined count is at most 10,000; 64 MiB limits, little-endian integers, strict UTF-8, exact lengths and KERR v1 remain unchanged. Protocols 1–3 reject Talk events/state, including tombstones, with unsupported category 3. Browser writes v4. See [V0.4.0](V0.4.0.md).

@@ -1,6 +1,6 @@
 # Household Events
 
-**Status:** Item kinds 1–4 and Handoff kinds 5–7 are implemented. See [V0.3.0](V0.3.0.md); later event kinds remain future work.
+**Status:** Item kinds 1–4, Handoff kinds 5–7 and Talk kinds 8–11 are implemented. Later kinds remain future work.
 
 ## Canonical record
 
@@ -35,7 +35,7 @@ Fields are specified now to avoid casually changing identity semantics later. Th
 
 ## Event naming and availability
 
-Use uppercase entity/action-past-tense names consistently. The milestone column records assigned scope; Item and Handoff events are implemented; later events remain planned.
+Use uppercase entity/action-past-tense names consistently. The milestone column records assigned scope; Item, Handoff and Talk events are implemented; later events remain planned.
 
 | Event kind             | Planned milestone | Purpose                                                      |
 | ---------------------- | ----------------- | ------------------------------------------------------------ |
@@ -64,7 +64,7 @@ Use uppercase entity/action-past-tense names consistently. The milestone column 
 | `AGREEMENT_REVISED`    | Unscheduled       | Record a deliberate revision.                                |
 | `AGREEMENT_ARCHIVED`   | Unscheduled       | Archive an agreement.                                        |
 
-“Since You Last Looked” is a derived view of events, not a new event kind. v0.3.0 supports Item kinds 1–4 plus Handoff kinds 5–7, each Handoff kind using schema 1; all other kinds are deferred. Event kind codes remain 1–4 respectively. Event schema v1 `ITEM_ADDED` contains no classification and normalizes to Today. Schema v2 `ITEM_ADDED` adds a fixed classification byte (`0 = Today`, `1 = Need`) and three zero reserved bytes before the text length. New instances write schema v2 for adds and schema v1 for the other Item events. Protocol and event version compatibility is specified in [ABI](ABI.md) and [VERSIONING](VERSIONING.md). The unscheduled agreement events are not a release commitment.
+“Since You Last Looked” is a derived view of events, not a new event kind. v0.4.x supports Item kinds 1–4, Handoff kinds 5–7 and Talk kinds 8–11. Handoff/Talk kinds use schema 1; later kinds are deferred. Existing event kind codes remain unchanged. Event schema v1 `ITEM_ADDED` contains no classification and normalizes to Today. Schema v2 `ITEM_ADDED` adds a fixed classification byte (`0 = Today`, `1 = Need`) and three zero reserved bytes before the text length. New instances write schema v2 for adds and schema v1 for the other Item events. Protocol and event version compatibility is specified in [ABI](ABI.md) and [VERSIONING](VERSIONING.md). The unscheduled agreement events are not a release commitment.
 
 ## Immutability and corrections
 
@@ -102,3 +102,7 @@ Wall clocks can drift, collide, or move backward, so timestamps are never the di
 Event schema evolution must not rewrite history merely because the current internal model changes. Use explicit supported-version decoders and preserve canonical source bytes; unsupported newer events fail closed without destructive reinterpretation. Migration and forward-compatibility rules are detailed in [VERSIONING](VERSIONING.md) and [MIGRATIONS](MIGRATIONS.md).
 
 Invalid input must not yield partially mutated visible state. The reducer returns an error for the failed stream; storage remains unchanged until an explicitly designed recovery action exists. See [State](STATE.md) for reconstruction semantics.
+
+## v0.4.0 Talk
+
+Stable schema-1 codes: 8 TALK_ADDED, 9 TALK_RESOLVED, 10 TALK_REOPENED, 11 TALK_ARCHIVED. Add payload is talk_id[16], text_length:u32, strict UTF-8 text (1–4096 bytes, nonblank). Lifecycle payloads are exactly talk_id[16]. Codes 1–7 and their canonical bytes are unchanged. Exact duplicate delivery is idempotent; conflicting event identity and duplicate Talk identity fail. See [V0.4.0](V0.4.0.md).

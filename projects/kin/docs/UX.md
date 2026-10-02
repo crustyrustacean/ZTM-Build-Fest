@@ -1,6 +1,6 @@
 # UX
 
-**Status:** Today, Needs, and Handoff are implemented. Talk, Pulse, and Since You Last Looked remain conceptual.
+**Status:** Today, Needs, Handoff and Talk are implemented. Pulse and Since You Last Looked remain conceptual.
 
 ## Primary question
 
@@ -12,7 +12,7 @@ The home view should make useful context scannable and keep capture close at han
 
 ## Current home hierarchy
 
-The implemented view presents Today and Needs as separate sections, with active and completed items grouped within each. Archived items are omitted. Handoff follows with dedicated capture, needs-attention context, and recent acknowledged context; archived rows are hidden.
+The implemented view presents Today and Needs as separate sections, with active and completed items grouped within each. Archived items are omitted. Handoff follows with dedicated capture, needs-attention context, and recent acknowledged context; archived rows are hidden. Talk follows with one short topic field and Open/Resolved groups, newest additions first. Resolve/Reopen change workflow state; Archive hides the topic while retaining its history.
 
 ## Future home concepts
 
@@ -94,7 +94,7 @@ Talk about:
 Weekend plans
 ```
 
-A future structured conversation might optionally ask “What do I need?”, “What am I willing to compromise on?”, or “What is a boundary?” This is secondary to everyday coordination and must not turn Kin into a relationship counselor or judge.
+Talk uses one short topic field. Resolve, Reopen and Archive manage workflow only. No agreement, objective solution or partner confirmation is implied. Structured conversations, compromise/boundary forms, chat and counseling are excluded.
 
 ## Pulse
 

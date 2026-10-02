@@ -1,6 +1,6 @@
 # Derived Household State
 
-**Status:** Rust projects Items and Handoffs from one immutable event stream. Later projections remain future work.
+**Status:** Rust projects separate Items, Handoffs and Talks from one immutable event stream. Later projections remain future work.
 
 ## Projection pipeline
 
@@ -29,7 +29,8 @@ Keep the first projection small:
 HouseholdState
 ├── household_id: Option<HouseholdId>
 ├── items: Vec<ItemState> in original add-event order
-└── handoffs: Vec<HandoffState> in original add-event order
+├── handoffs: Vec<HandoffState> in original add-event order
+└── talks: Vec<TalkState> in original add-event order
 
 ItemState
 ├── item_id
@@ -40,7 +41,7 @@ ItemState
 └── status: active | completed | archived
 ```
 
-Items are identified by stable item ID, never display text. Actor, household, and device IDs remain local placeholders. Schema-v1 `ITEM_ADDED` events normalize to `today`; schema-v2 events carry explicit classification. HandoffState contains handoff_id, text, created_by, created_at, and status (unacknowledged, acknowledged, archived). Acknowledgement actor/time remain in its source envelope. Talk, Pulse, Routine, Agreement, authentication, and remote device state remain future work.
+Items are identified by stable item ID, never display text. Actor, household, and device IDs remain local placeholders. Schema-v1 `ITEM_ADDED` events normalize to `today`; schema-v2 events carry explicit classification. HandoffState contains handoff_id, text, created_by, created_at, and status (unacknowledged, acknowledged, archived). Acknowledgement actor/time remain in its source envelope. TalkState contains talk_id, text, created_by, created_at and open/resolved/archived status. Pulse, Routine, Agreement, authentication, and remote device state remain future work.
 
 ## Validation and errors
 
@@ -83,3 +84,7 @@ This does not override a person's right to request data deletion. Physical log c
 ## Future sync boundary
 
 A deterministic total event ordering makes projections reproducible; it does not decide which conflicting human intent wins. Semantic conflict rules, including archive versus complete, are separate future sync design work. v0.1.0 has one local append-ordered stream and no merge behavior.
+
+## v0.4.0 Talk
+
+HouseholdState adds talks: Vec<TalkState> beside items and handoffs. Each is ordered by its original creation event. TalkState has talk_id, text, created_by, created_at and status; no duplicated resolution metadata. Archived tombstones stay in projection/history but are hidden in normal lists. See [V0.4.0](V0.4.0.md).

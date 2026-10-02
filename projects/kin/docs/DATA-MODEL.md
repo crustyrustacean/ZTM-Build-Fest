@@ -1,6 +1,6 @@
 # Data Model
 
-**Status:** Items and Handoffs share immutable events and Rust projection. Other domain concepts remain specifications.
+**Status:** Items, Handoffs and Talks share immutable events with separate Rust domain types and projections. Later entities remain specifications.
 
 ## Event-oriented source of truth
 
@@ -28,7 +28,7 @@ Event
 └── payload
 ```
 
-The envelope is a domain contract, not the JS/WASM byte encoding. The field meanings, local and future distributed ordering, idempotency, and invalid-event behavior are defined in [EVENTS](EVENTS.md). v0.3.x uses local placeholders, Item kinds 1–4 and Handoff kinds 5–7; legacy bytes remain readable.
+The envelope is a domain contract, not the JS/WASM byte encoding. The field meanings, local and future distributed ordering, idempotency, and invalid-event behavior are defined in [EVENTS](EVENTS.md). v0.4.x uses local placeholders, Item kinds 1–4, Handoff kinds 5–7 and Talk kinds 8–11; legacy bytes remain readable.
 
 ## Conceptual entities
 
@@ -38,13 +38,13 @@ The envelope is a domain contract, not the JS/WASM byte encoding. The field mean
 - **Credential:** An authenticator associated with a member; not itself a member or household key.
 - **Item:** A lightweight household need/reminder.
 - **Handoff:** Context one member wants another to know.
-- **TalkItem:** A topic that matters but may be better discussed later.
+- **Talk:** A topic that matters but may be better discussed later.
 - **Pulse:** Time-bounded context about current capacity.
 - **Routine:** A recurring household need, not a general calendar entry.
 - **Agreement:** A deliberately recorded household understanding, never inferred.
 - **Event:** An immutable identified fact from which current state is reconstructed.
 
-See [DOMAIN](DOMAIN.md) for definitions and release scope, and [LIFECYCLES](LIFECYCLES.md) for transition rules. The Item and Handoff subsets are implemented; see [V0.3.0](V0.3.0.md).
+See [DOMAIN](DOMAIN.md) for definitions and release scope, and [LIFECYCLES](LIFECYCLES.md) for transition rules. Item, Handoff and Talk are implemented; see [V0.4.0](V0.4.0.md).
 
 ## Data evolution and ownership
 

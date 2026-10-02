@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
 
-import { encodeAddedRecord, encodeHandoffAddedRecord, encodeHandoffAcknowledgedRecord, encodeHandoffArchivedRecord, loadKinEngine } from "./kin-engine.js";
+import { encodeTalkAddedRecord, encodeTalkResolvedRecord, encodeTalkReopenedRecord, encodeTalkArchivedRecord, encodeAddedRecord, encodeHandoffAddedRecord, encodeHandoffAcknowledgedRecord, encodeHandoffArchivedRecord, loadKinEngine } from "./kin-engine.js";
 
 const zeroId = new Uint8Array(16);
 
@@ -182,7 +182,7 @@ test("real WASM ABI clears stale result and error buffers across versions", asyn
 test("bridge decodes real v1 and v2 completed results as Today, not Need", async (context) => {
   const instantiate = WebAssembly.instantiate;
   let requestedVersion = 1;
-  // The browser writes v3 only. A test transport shim requests v1 from the
+  // The browser writes v4 only. A test transport shim requests v1 from the
   // real encoder so the bridge's historical decoder is exercised as well.
   context.mock.method(WebAssembly, "instantiate", async (...args) => {
     const { instance } = await instantiate(...args);
@@ -202,7 +202,7 @@ test("bridge decodes real v1 and v2 completed results as Today, not Need", async
   const wasm = await readFile(new URL("./kin_engine.wasm", import.meta.url));
   const engine = await loadKinEngine(`data:application/wasm;base64,${wasm.toString("base64")}`);
   for (requestedVersion of [1, 2]) {
-    assert.deepEqual(engine.applyEvents([]), { items: [], handoffs: [] });
+    assert.deepEqual(engine.applyEvents([]), { items: [], handoffs: [], talks: [] });
     for (const completed of [false, true]) {
       const records = [legacyRecord(1, 1)];
       if (completed) records.push(legacyRecord(2, 2));
@@ -263,6 +263,7 @@ test("bridge rejects malformed Handoff result fields and recovers", async contex
     const { instance } = await instantiate(...args);
     const abi = instance.exports;
     return { instance: { exports: { ...abi, kin_apply_events(pointer, length) {
+      new DataView(abi.memory.buffer).setUint16(pointer + 4, 3, true);
       const status = abi.kin_apply_events(pointer, length);
       if (status === 0) mutate(new Uint8Array(abi.memory.buffer, abi.kin_result_ptr(), abi.kin_result_len()));
       return status;
@@ -292,7 +293,11 @@ test("bridge fails closed at every truncated Handoff result boundary", async con
   context.mock.method(WebAssembly, "instantiate", async (...args) => {
     const { instance } = await instantiate(...args);
     const abi = instance.exports;
-    return { instance: { exports: { ...abi, kin_result_len: () => resultLength ?? abi.kin_result_len() } } };
+    return { instance: { exports: { ...abi,
+      kin_apply_events(pointer,length) {
+        new DataView(abi.memory.buffer).setUint16(pointer+4,3,true);
+        return abi.kin_apply_events(pointer,length);
+      }, kin_result_len: () => resultLength ?? abi.kin_result_len() } } };
   });
   const wasm = await readFile(new URL("./kin_engine.wasm", import.meta.url));
   const engine = await loadKinEngine(`data:application/wasm;base64,${wasm.toString("base64")}`);
@@ -326,9 +331,136 @@ test("large Handoff replay grows WASM memory and preserves independent repeated 
   for(let iteration=0;iteration<4;iteration++) {
     const bad=handoff(1);new DataView(bad.buffer).setUint16(2,99,true);
     assert.throws(()=>engine.applyEvents([bad]),error=>error.code===3);
-    assert.deepEqual(engine.applyEvents([]),{items:[],handoffs:[]});
+    assert.deepEqual(engine.applyEvents([]),{items:[],handoffs:[],talks:[]});
     assert.deepEqual(engine.applyEvents(records),state);
   }
   assert.equal(state.handoffs[0].text.length,4096,"host-owned result survives later calls");
+  assert.throws(()=>engine.applyEvents([...records,records[0]]),error=>error.code===5);
+});
+
+function talk(sequence, kind = 8, text = "Weekend plans") {
+  const values = {eventId:new Uint8Array(16).fill(sequence),householdId:new Uint8Array(16).fill(0xaa),
+    actorId:new Uint8Array(16).fill(0xbb),deviceId:new Uint8Array(16).fill(0xcc),
+    timestamp:sequence,logicalTime:sequence,talkId:new Uint8Array(16).fill(0x33),text};
+  return ({8:encodeTalkAddedRecord,9:encodeTalkResolvedRecord,10:encodeTalkReopenedRecord,11:encodeTalkArchivedRecord})[kind](values);
+}
+
+test("Talk real WASM mixed replay, lifecycle and legacy compatibility", async () => {
+  const wasm = await readFile(new URL("./kin_engine.wasm", import.meta.url));
+  const engine = await loadKinEngine(`data:application/wasm;base64,${wasm.toString("base64")}`);
+  const records = [legacyRecord(1,1),handoff(2),talk(3)];
+  const originals = records.map(row=>row.slice());
+  assert.equal(engine.applyEvents(records).talks[0].status,"open");
+  for (const [kind,status] of [[9,"resolved"],[10,"open"],[11,"archived"]]) {
+    records.push(talk(records.length+1,kind));
+    const state=engine.applyEvents(records);
+    assert.equal(state.talks[0].status,status);
+    assert.equal(state.items.length,1);assert.equal(state.handoffs.length,1);
+  }
+  assert.deepEqual(records.slice(0,3),originals);
+  assert.throws(()=>engine.applyEvents([...records,talk(7,10)]),error=>error.code===4);
+  const apply=await rawEngine();
+  for (const version of [1,2,3]) for (const kind of [8,9,10,11]) apply(version,[talk(1,kind)],3);
+  assert.deepEqual(apply(4,[]),new Uint8Array([75,73,78,83,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]));
+});
+
+test("Talk payload codes, schemas, Unicode and byte limits", () => {
+  const text="\uFEFF"+"\u{1f95b}".repeat(1023)+"x";
+  for (const kind of [8,9,10,11]) {
+    const row=talk(1,kind,text),view=new DataView(row.buffer);
+    assert.equal(view.getUint16(0,true),1);assert.equal(view.getUint16(2,true),kind);
+    assert.equal(row.length,kind===8?108+4096:104);
+  }
+  assert.throws(()=>talk(1,8,text+"x"),/4096/);
+  assert.throws(()=>talk(1,8,"\uD800"),/valid Unicode/);
+});
+
+test("v4 rejects malformed Talk records, headers and combined counts", async context => {
+  const instantiate=WebAssembly.instantiate;let mutate=()=>{};
+  context.mock.method(WebAssembly,"instantiate",async (...args)=>{
+    const {instance}=await instantiate(...args);const abi=instance.exports;
+    return {instance:{exports:{...abi,kin_apply_events(pointer,length){
+      const status=abi.kin_apply_events(pointer,length);
+      if(status===0)mutate(new Uint8Array(abi.memory.buffer,abi.kin_result_ptr(),abi.kin_result_len()));
+      return status;
+    }}}};
+  });
+  const wasm=await readFile(new URL("./kin_engine.wasm",import.meta.url));
+  const engine=await loadKinEngine(`data:application/wasm;base64,${wasm.toString("base64")}`);
+  const mutations=[bytes=>bytes[0]=0,bytes=>bytes[4]=99,bytes=>bytes[6]=1,bytes=>bytes[7]=1,
+    bytes=>bytes[60]=3,...[61,62,63].map(offset=>bytes=>bytes[offset]=1),bytes=>bytes[68]=255,
+    bytes=>new DataView(bytes.buffer,bytes.byteOffset).setBigInt64(52,2n**60n,true),
+    ...[0,4097,0xffffffff].map(length=>bytes=>new DataView(bytes.buffer,bytes.byteOffset).setUint32(64,length,true)),
+    ...[8,12,16].map(offset=>bytes=>new DataView(bytes.buffer,bytes.byteOffset).setUint32(offset,0xffffffff,true)),
+    bytes=>{const v=new DataView(bytes.buffer,bytes.byteOffset);v.setUint32(8,3333,true);v.setUint32(12,3333,true);v.setUint32(16,3335,true);}];
+  for(mutate of mutations) assert.throws(()=>engine.applyEvents([talk(1)]),error=>error.code===6);
+  mutate=()=>{};assert.equal(engine.applyEvents([talk(1)]).talks[0].text,"Weekend plans");
+});
+
+test("exact pre-Talk event writer bytes and v3 result remain unchanged",async()=>{
+  const old=legacyRecord(1,1);
+  const identity={eventId:new Uint8Array(16).fill(1),householdId:new Uint8Array(16).fill(0xaa),
+    actorId:new Uint8Array(16).fill(0xbb),deviceId:new Uint8Array(16).fill(0xcc),timestamp:1,logicalTime:1};
+  const expected=new Uint8Array(116);expected.set(old.subarray(0,88));expected[0]=2;expected[84]=28;
+  expected.fill(0x11,88,104);expected[104]=1;expected[108]=4;expected.set([77,105,108,107],112);
+  assert.deepEqual(encodeAddedRecord({...identity,itemId:new Uint8Array(16).fill(0x11),text:"Milk"}),expected);
+  for(const kind of [5,6,7]) {
+    const fixture=legacyRecord(kind===5?1:2,1);fixture[2]=kind;fixture.fill(0x22,88,104);
+    assert.deepEqual(handoff(1,kind,"Milk"),fixture);
+  }
+  const apply=await rawEngine();
+  const expectedV3=new Uint8Array(68);expectedV3.set([75,73,78,83,3,0,0,0,0,0,0,0,1,0,0,0]);
+  expectedV3.fill(0x22,16,32);expectedV3.fill(0xbb,32,48);expectedV3[48]=1;expectedV3[60]=4;expectedV3.set([77,105,108,107],64);
+  assert.deepEqual(apply(3,[handoff(1,5,"Milk")]),expectedV3);
+});
+
+test("bridge fails closed at every truncated Talk result boundary", async context => {
+  const instantiate = WebAssembly.instantiate;
+  let resultLength;
+  context.mock.method(WebAssembly, "instantiate", async (...args) => {
+    const { instance } = await instantiate(...args);
+    const abi = instance.exports;
+    return { instance: { exports: { ...abi,
+      kin_apply_events(pointer,length) {
+        new DataView(abi.memory.buffer).setUint16(pointer+4,4,true);
+        return abi.kin_apply_events(pointer,length);
+      }, kin_result_len: () => resultLength ?? abi.kin_result_len() } } };
+  });
+  const wasm = await readFile(new URL("./kin_engine.wasm", import.meta.url));
+  const engine = await loadKinEngine(`data:application/wasm;base64,${wasm.toString("base64")}`);
+  for (resultLength = 0; resultLength < 20+48+13; resultLength++) {
+    assert.throws(() => engine.applyEvents([talk(1)]), error => error.code === 6);
+  }
+  resultLength = 20+48+13+1;
+  assert.throws(() => engine.applyEvents([talk(1)]), error => error.code === 6);
+  resultLength = undefined;
+  assert.equal(engine.applyEvents([talk(1)]).talks.length,1);
+});
+
+test("large Talk replay grows WASM memory and preserves independent repeated results", async context => {
+  const instantiate = WebAssembly.instantiate;
+  let memory;
+  context.mock.method(WebAssembly,"instantiate",async(...args)=>{
+    const result=await instantiate(...args); memory=result.instance.exports.memory; return result;
+  });
+  const wasm = await readFile(new URL("./kin_engine.wasm", import.meta.url));
+  const engine = await loadKinEngine(`data:application/wasm;base64,${wasm.toString("base64")}`);
+  const initial = memory.buffer.byteLength;
+  const id = number => { const bytes=new Uint8Array(16); new DataView(bytes.buffer).setUint32(0,number,true); return bytes; };
+  const records=Array.from({length:10000},(_,index)=>encodeTalkAddedRecord({
+    eventId:id(index+1), talkId:id(index+1), householdId:zeroId, actorId:zeroId, deviceId:zeroId,
+    timestamp:index,logicalTime:index+1,text:index<1000 ? "x".repeat(4096) : "x",
+  }));
+  const state=engine.applyEvents(records);
+  assert.ok(memory.buffer.byteLength>initial,"real memory growth occurred");
+  assert.equal(state.talks.length,10000);
+  assert.equal(state.talks[999].text.length,4096);
+  for(let iteration=0;iteration<4;iteration++) {
+    const bad=talk(1);new DataView(bad.buffer).setUint16(2,99,true);
+    assert.throws(()=>engine.applyEvents([bad]),error=>error.code===3);
+    assert.deepEqual(engine.applyEvents([]),{items:[],handoffs:[],talks:[]});
+    assert.deepEqual(engine.applyEvents(records),state);
+  }
+  assert.equal(state.talks[0].text.length,4096,"host-owned result survives later calls");
   assert.throws(()=>engine.applyEvents([...records,records[0]]),error=>error.code===5);
 });

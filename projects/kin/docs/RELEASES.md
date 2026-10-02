@@ -1,6 +1,6 @@
 # Release Process
 
-**Status:** Kin development uses the `kin-v0.3.0-development` branch. v0.3.5 is the final authorized patch in this line; stop for evaluation afterward. Do not merge to kin-main automatically.
+**Status:** The approved v0.4.0–v0.4.3 Talk line is complete on kin-v0.4.0-development. Stop for evaluation. Do not begin another patch/Pulse, push or merge automatically.
 
 ## Release sequence
 
@@ -58,3 +58,7 @@ Before maturity, do not overpromise strict public API stability. Still document 
 ## Release checks
 
 For documentation milestones, validate required documents, internal links, scope, and absence of application code. For coded releases, use the release gate defined in [V0.1.0](V0.1.0.md) and any later release-specific criteria. Report the release commit, exact tag, and whether each was actually pushed. When publication is not authorized, provide the exact `git push origin kin-vX.Y.Z` command and do not claim the release is published.
+
+## v0.4.0 Talk
+
+Use kin-v0.4.0-development; create dedicated commits and annotated kin-v0.4.0 through kin-v0.4.3 tags only after each full validation gate. Stop after v0.4.3; no automatic push or kin-main merge. See [V0.4.0](V0.4.0.md).
