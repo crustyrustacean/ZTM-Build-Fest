@@ -328,13 +328,19 @@ mod tests {
         record
     }
 
+    fn numbered_id(value: u32) -> [u8; 16] {
+        let mut id = [0; 16];
+        id[..4].copy_from_slice(&value.to_le_bytes());
+        id
+    }
+
     fn added_record_v2(
-        event_number: u8,
-        item_number: u8,
+        event_number: u32,
+        item_number: u32,
         text: &[u8],
         classification: u8,
     ) -> Vec<u8> {
-        let mut payload = vec![item_number; 16];
+        let mut payload = numbered_id(item_number).to_vec();
         payload.push(classification);
         payload.extend_from_slice(&[0; 3]);
         payload.extend_from_slice(&(text.len() as u32).to_le_bytes());
@@ -342,7 +348,7 @@ mod tests {
         let mut record = Vec::new();
         record.extend_from_slice(&2u16.to_le_bytes());
         record.extend_from_slice(&1u16.to_le_bytes());
-        record.extend_from_slice(&[event_number; 16]);
+        record.extend_from_slice(&numbered_id(event_number));
         record.extend_from_slice(&[0xaa; 16]);
         record.extend_from_slice(&[0xbb; 16]);
         record.extend_from_slice(&[0xcc; 16]);
@@ -419,6 +425,33 @@ mod tests {
         assert_eq!(state.items[1].classification, ItemClassification::Need);
         assert_eq!(state.items[0].text, "Legacy item");
         assert_eq!(state.items[1].text, "Current item");
+    }
+
+    #[test]
+    fn maximum_event_count_projects_deterministically_within_result_limit() {
+        let mut request = Vec::with_capacity(REQUEST_HEADER_BYTES + MAX_EVENT_COUNT * 109);
+        request.extend_from_slice(b"KINE");
+        push_u16(&mut request, PROTOCOL_V2);
+        push_u16(&mut request, 0);
+        push_u32(&mut request, MAX_EVENT_COUNT as u32);
+        for value in 1..=MAX_EVENT_COUNT as u32 {
+            request.extend_from_slice(&added_record_v2(value, value, b"x", 1));
+        }
+
+        assert!(request.len() <= MAX_PROTOCOL_BYTES);
+        let (_, events) = decode_request(&request).unwrap();
+        let state = rebuild(&events).unwrap();
+        assert_eq!(state.items.len(), MAX_EVENT_COUNT);
+        assert_eq!(state.items[0].text, "x");
+        assert_eq!(
+            state.items[MAX_EVENT_COUNT - 1].classification,
+            ItemClassification::Need
+        );
+
+        let first_result = encode_state(&state, PROTOCOL_V2).unwrap();
+        let second_result = encode_state(&rebuild(&events).unwrap(), PROTOCOL_V2).unwrap();
+        assert!(first_result.len() <= MAX_PROTOCOL_BYTES);
+        assert_eq!(first_result, second_result);
     }
 
     #[test]

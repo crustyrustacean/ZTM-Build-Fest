@@ -228,3 +228,9 @@ Expected: deterministic malformed-protocol error. Protocol v2 does not reinterpr
 For protocol v2, encode each of `ITEM_REOPENED` and `ITEM_ARCHIVED` with schema version 1. Try payload lengths 0 through 17, excluding 16, with the same valid event envelope.
 
 Expected: every record fails with malformed-protocol status (ABI status code 2). The supported payload is exactly the referenced `item_id[16]`; no truncated or trailing payload bytes are reinterpreted.
+
+### Vector 018 — Maximum classified replay
+
+Construct 10,000 protocol-v2/schema-v2 `ITEM_ADDED` events in increasing logical/local order. Use unique event and item IDs, one shared household, one-byte UTF-8 text, and alternate classification `Need`/`Today`.
+
+Expected: Rust derives 10,000 ordered active items with exactly 5,000 items in each classification. Protocol-v2 result encoding remains below 64 MiB and is byte-identical across repeated reconstruction. The equivalent real-WASM replay succeeds without stale output or memory-view reuse.

@@ -272,6 +272,68 @@ async function regressions() {
     "synthetic v0.1 event replay, Today normalization, immutable source bytes",
   );
 
+  const replayRecords = (await app.store.loadEvents()).map(
+    (event) => event.encoded_event,
+  );
+  const replayBeforeFailure = app.engine.applyEvents(replayRecords);
+  const malformedRecord = new Uint8Array(replayRecords.at(-1));
+  new DataView(malformedRecord.buffer).setUint16(0, 3, true);
+  let replayFailureCode;
+  try {
+    app.engine.applyEvents([...replayRecords.slice(0, -1), malformedRecord]);
+  } catch (error) {
+    replayFailureCode = error.code;
+  }
+  check(
+    replayFailureCode === 3,
+    "unsupported replay exposes stable error code",
+  );
+  check(
+    app.engine.applyEvents([]).items.length === 0,
+    "empty replay replaces previous result",
+  );
+  check(
+    JSON.stringify(app.engine.applyEvents(replayRecords)) ===
+      JSON.stringify(replayBeforeFailure),
+    "success/failure/empty/repeated WASM calls do not retain stale output",
+  );
+  passed.push(
+    "repeated WASM calls clear stale output after failure and empty replay",
+  );
+  const { encodeAddedRecord } = await import(
+    new URL("./wasm/kin-engine.js", location.href)
+  );
+  const workloadContext = await app.store.ensureContext();
+  const workloadId = (value) => {
+    const id = new Uint8Array(16);
+    new DataView(id.buffer).setUint32(12, value, true);
+    return id;
+  };
+  const workloadRecords = Array.from({ length: 10_000 }, (_, index) =>
+    encodeAddedRecord({
+      eventId: workloadId(index + 10_001),
+      householdId: workloadContext.household_id,
+      actorId: workloadContext.actor_id,
+      deviceId: workloadContext.device_id,
+      timestamp: 1_760_000_000_000 + index,
+      logicalTime: BigInt(index + 1),
+      itemId: workloadId(index + 1),
+      text: "x",
+      classification: index % 2 === 0 ? "need" : "today",
+    }),
+  );
+  const workloadState = app.engine.applyEvents(workloadRecords);
+  check(
+    workloadState.items.length === 10_000,
+    "WASM replays maximum event count",
+  );
+  check(
+    workloadState.items.filter((item) => item.classification === "need")
+      .length === 5_000,
+    "maximum replay retains classification across large result",
+  );
+  passed.push("10,000-event real-WASM replay and bounded classified result");
+
   // Fail an actual IndexedDB transaction after a successful add request.
   // Quota injection separately verifies the actionable storage-full path.
   async function failOnce(mode, operation = submit) {

@@ -1,6 +1,6 @@
 # Accessibility Contract
 
-**Status:** v0.2.2 hardens Today/Needs and lifecycle interaction recovery while retaining native controls and the v0.1.x accessibility baseline. Release-specific checks and unverified environments are listed in the changelog.
+**Status:** the v0.2.3 hardening pass completes the approved Today/Needs accessibility audit. The native controls and v0.1.x baseline remain; release-specific evidence and unverified environments are listed in the changelog.
 
 ## Baseline requirements
 

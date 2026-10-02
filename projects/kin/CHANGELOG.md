@@ -2,6 +2,21 @@
 
 This file records completed Kin releases. The `v0.0.x` releases are planning and documentation milestones; they do not represent implemented application features. The first implementation milestone remains `v0.1.0`.
 
+## [0.2.3] — Today + Needs Hardening & Polish
+
+### Hardened
+
+- Rechecked Rust-owned replay, protocol/event version boundaries, IndexedDB schema 1, immutable history, safe text rendering, same-origin-only runtime requests, content-free BroadcastChannel messages, and the absence of runtime dependencies or remote services.
+- Added deterministic 10,000-event classified replay checks through native Rust and real WASM, plus valid/error/empty/repeated-call coverage for stale ABI output handling.
+- Completed focused Today/Needs clarity and accessibility regressions without adding a product concept. `v0.3.0 — Handoff` remains future work.
+
+### Validation
+
+- Passed 44 Rust tests, 4 built-in Node bridge tests, `cargo fmt --check`, Clippy with warnings denied, version consistency, and both PowerShell and POSIX WASM release builds. The shell build ran in WSL Ubuntu 22.04 with Rust 1.93.0.
+- The Windows x64 browser runner passed in headless Chrome 154.0.8037.59 with Node 22.12.0. It covered v0.1 byte preservation, protocol errors/repeated calls, maximum 10,000-event replay, draft/action recovery, stale cross-tab actions, two-tab canonical replay, 320px, forced colors, reduced motion, increased text spacing, 200% page-scale emulation, CSP, and same-origin-only requests.
+- Native desktop 200% browser zoom, Firefox, Safari, NVDA, and VoiceOver were not tested. The 200% check was Chromium page-scale emulation, not native desktop zoom; no screen-reader certification is claimed.
+- No product capability, IndexedDB schema change, runtime dependency, framework, backend, or remote service was added.
+
 ## [0.2.2] — Today + Needs Resilience & Accessibility
 
 ### Improved
