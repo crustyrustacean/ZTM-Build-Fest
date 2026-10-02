@@ -1,6 +1,6 @@
 # v0.1.0 Implementation Contract
 
-**Status:** Today, Needs, Handoff and Talk are implemented; Rust is the sole reducer. Pulse and later capabilities remain future work.
+**Status:** Current through v0.5.3 Pulse; earlier version sections are historical contracts. See Pulse below.
 
 ## Proposed project layout
 
@@ -74,3 +74,7 @@ The target remains the latest two stable major releases of desktop and mobile Ch
 ## v0.4.0 Talk
 
 rust/src/event.rs and state.rs add distinct TalkId/TalkStatus/TalkState; protocol.rs adds explicit v4. web/components/kin-talk-list.js presents Talk; kin-app.js reuses canonical refresh and suspended retry infrastructure. No framework or runtime dependency is added. See [V0.4.0](V0.4.0.md).
+
+## v0.5.0 Pulse
+
+event.rs defines PulseValue; state.rs defines actor-scoped PulseState/rebuild_at; protocol.rs adds v5; kin-engine.js requires asOf; kin-pulse.js presents capacity. KinApp owns canonical reprojection and existing retries; EventStore appends atomically. See [V0.5.0](V0.5.0.md).

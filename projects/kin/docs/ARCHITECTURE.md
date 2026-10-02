@@ -1,6 +1,6 @@
 # Architecture
 
-**Status:** Today, Needs, Handoff and Talk are implemented locally. Rust owns deterministic domain replay; browser components capture intents and render projection. No runtime dependency or remote service exists.
+**Status:** Current through v0.5.3 Pulse; earlier version sections are historical contracts. See Pulse below.
 
 ## System shape
 
@@ -88,7 +88,7 @@ The v0.1.x core is intended to be extended, not treated as proof that later feat
 | Today / Needs         | Versioned event pipeline and Rust-derived projection | Implemented in v0.2.0                  | Stabilization and accessibility audit in v0.2.1–v0.2.3             |
 | Handoff | Actor-aware immutable event envelope | Implemented in v0.3.0 | Stabilization through v0.3.3 |
 | Talk | Identified events and deterministic replay | Implemented in v0.4.0 | Stabilization audited through v0.4.3; see V0.4.0 |
-| Pulse                 | Actor IDs and timestamps                             | Yes                                    | Time-bounded domain, explicit evaluation time, and expiry rules    |
+| Pulse | Actor IDs and timestamps | Implemented in v0.5.0 | Explicit as_of, fixed enum, set/replace/clear; audited through v0.5.3 |
 | Since You Last Looked | Ordered immutable event history                      | Yes                                    | Last-seen marker and derived summary                               |
 | Routines              | Event infrastructure and replay                      | Yes                                    | Recurrence model and occurrence semantics                          |
 | Pairing               | Household/member/device identity fields              | Yes                                    | Authentication, authorization, pairing, recovery, and device trust |
@@ -105,3 +105,7 @@ The goal is not “dependencies are bad.” The goal is to understand and use Ru
 ## Decisions still open
 
 The domain event envelope, event naming, ordering requirements, and replay behavior are specified in [Events](EVENTS.md) and [State](STATE.md). The v0.0.6 [implementation](IMPLEMENTATION.md), [ABI](ABI.md), and [storage](STORAGE.md) contracts define module responsibilities, browser support, buffer protocol, and initial IndexedDB shape. Persistent contract versioning and non-destructive evolution are specified in [VERSIONING](VERSIONING.md) and [MIGRATIONS](MIGRATIONS.md). The examples in this document are not a wire format.
+
+## v0.5.0 Pulse
+
+Pulse adds Rust rebuild_at(events, as_of). Timers request canonical reprojection; Rust never reads ambient time. Same events plus same explicit time yield identical state. See [V0.5.0](V0.5.0.md).

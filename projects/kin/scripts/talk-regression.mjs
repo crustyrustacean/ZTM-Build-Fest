@@ -163,7 +163,7 @@ export async function talkRegressions() {
     !app.state.talks.some(row=>row.text==="Superseded retry"), "new command supersedes suspended retry");
   edit("Newer talk draft");
   const events = (await app.store.loadEvents()).map(row => row.encoded_event);
-  check(JSON.stringify(app.engine.applyEvents(events)) === JSON.stringify(app.state), "mixed deterministic replay");
+  check(JSON.stringify(app.engine.applyEvents(events, 0)) === JSON.stringify(app.state), "mixed deterministic replay");
   check(app.store.database.version === 1, "no IndexedDB migration");
   return "PASS Talk add/resolve/reopen/archive, tombstones, invalid references, inert Unicode, retry draft ownership and mixed replay";
 }

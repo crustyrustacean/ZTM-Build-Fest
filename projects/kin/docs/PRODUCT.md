@@ -34,7 +34,7 @@ A place to capture something that matters but would be better discussed at anoth
 
 ### Pulse
 
-A lightweight indication of current capacity, such as “Good,” “Drained,” “Rough day,” or “Need space.” It is context, not a mood score, diagnosis, or invitation to interpret someone.
+A lightweight indication of current capacity, such as “Good,” “Drained,” “Rough day,” or “Need quiet.” It is context, not a mood score, diagnosis, or invitation to interpret someone.
 
 ### Since You Last Looked
 
@@ -46,4 +46,4 @@ Kin is not couples therapy, a marriage score, a chore competition, a relationshi
 
 ## Current status
 
-Kin implements the Today and Needs views, fixed lightweight classification, fast local capture, completion, reopening, and archival. Older v0.1.x items without classification remain visible in Today. Handoff adds short context capture, acknowledgement, recent context, and archival. Local actors are not verified people. Talk captures short topics with workflow-only resolution. Pulse, Since You Last Looked, and Routines remain future concepts.
+Kin implements the Today and Needs views, fixed lightweight classification, fast local capture, completion, reopening, and archival. Older v0.1.x items without classification remain visible in Today. Handoff adds short context capture, acknowledgement, recent context, and archival. Local actors are not verified people. Talk captures short topics with workflow-only resolution. Pulse adds fixed temporary current capacity, explicit expiry and clear. Since You Last Looked and Routines remain future concepts.

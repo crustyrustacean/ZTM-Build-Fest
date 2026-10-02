@@ -1,5 +1,8 @@
 import {
   encodeAddedRecord,
+  encodePulseSetRecord,
+  encodePulseClearedRecord,
+  idToHex,
   encodeTalkAddedRecord,
   encodeTalkResolvedRecord,
   encodeTalkReopenedRecord,
@@ -88,7 +91,8 @@ export class EventStore {
     const store = new EventStore(database);
     database.onversionchange = () => database.close();
     try {
-      await store.ensureContext();
+      const context = await store.ensureContext();
+      store.actorId = idToHex(context.actor_id);
     } catch (error) {
       database.close();
       throw error;
@@ -149,7 +153,8 @@ export class EventStore {
             );
           }
           const eventId = randomId();
-          const timestamp = Date.now();
+          const asOf = Date.now();
+          const timestamp = command.type === "set-pulse" ? command.timestamp : asOf;
           const identity = {
             eventId,
             householdId: context.household_id,
@@ -160,7 +165,13 @@ export class EventStore {
           };
           let kind;
           let encodedEvent;
-          if (command.type === "add-talk") {
+          if (command.type === "set-pulse") {
+            kind = "PULSE_SET";
+            encodedEvent = encodePulseSetRecord({ ...identity, value: command.value, expiresAt: command.expiresAt });
+          } else if (command.type === "clear-pulse") {
+            kind = "PULSE_CLEARED";
+            encodedEvent = encodePulseClearedRecord(identity);
+          } else if (command.type === "add-talk") {
             kind = "TALK_ADDED";
             encodedEvent = encodeTalkAddedRecord({ ...identity, talkId: randomId(), text: command.text });
           } else if (command.type === "resolve-talk") {
@@ -216,7 +227,7 @@ export class EventStore {
           candidateState = engine.applyEvents([
             ...loadedEvents.map((event) => event.encoded_event),
             encodedEvent,
-          ]);
+          ], asOf);
 
           const existingRequest = events.index("event_id").get(eventId);
           existingRequest.onsuccess = () => {
@@ -434,6 +445,8 @@ function validateEventRow(row) {
     TALK_RESOLVED: 9,
     TALK_REOPENED: 10,
     TALK_ARCHIVED: 11,
+    PULSE_SET: 12,
+    PULSE_CLEARED: 13,
   }[row.kind];
   const supportedVersion =
     (row.kind === "ITEM_ADDED" && [1, 2].includes(row.event_version)) ||

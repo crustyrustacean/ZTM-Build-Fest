@@ -1,6 +1,6 @@
 # UX
 
-**Status:** Today, Needs, Handoff and Talk are implemented. Pulse and Since You Last Looked remain conceptual.
+**Status:** Today, Needs, Handoff and Talk are implemented. Pulse is implemented; Since You Last Looked remains conceptual.
 
 ## Primary question
 
@@ -98,17 +98,17 @@ Talk uses one short topic field. Resolve, Reopen and Archive manage workflow onl
 
 ## Pulse
 
-Pulse is a current, lightweight capacity signal. Possible labels include:
+Pulse is a current, lightweight capacity signal. The fixed labels are:
 
 ```text
 Good
 Okay
 Drained
-Rough
+Rough day
 Need quiet
 ```
 
-It is context, not a mood score, diagnosis, historical ranking, or prompt to infer intent. Any future signal should have a clear lifespan and a respectful way to change or clear it.
+It is context, not a mood score, diagnosis, historical ranking, or prompt to infer intent. Choose a fixed value and 1, 4 or 8 hours, then Set pulse. Active context shows Until time, Change and Clear; expired shows “No current pulse.” No countdown, arbitrary text, acknowledgement or history.
 
 ## Since You Last Looked
 

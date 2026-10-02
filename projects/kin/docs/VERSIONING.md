@@ -1,6 +1,6 @@
 # Persistent Contract Versioning
 
-**Status:** Protocols 1/2/3/4 and supported Item/Handoff/Talk schemas have explicit decoders. Browser writes v4; IndexedDB remains schema 1 with no source-event migration.
+**Status:** Current through v0.5.3 Pulse; earlier version sections are historical contracts. See Pulse below.
 
 ## Independent version axes
 
@@ -10,7 +10,7 @@ Kin version numbers describe product releases; they do not version every persist
 | ------------------------ | --------------------------- | ------------------------------------------------------------------------ |
 | Application version      | `v0.1.0`, `v0.2.0`          | A Kin product release, source snapshot, and namespaced Git tag.          |
 | Event schema version     | `event_version = 1`         | The payload/envelope interpretation for one persisted event kind.        |
-| ABI/protocol version     | `protocol_version = 1, 2, 3, or 4` | The byte-level JavaScript ↔ WASM request/result contract.                |
+| ABI/protocol version     | `protocol_version = 1, 2, 3, 4, or 5` | The byte-level JavaScript ↔ WASM request/result contract.                |
 | IndexedDB schema version | database `version = 1`      | Object stores, indexes, and local record structure managed by IndexedDB. |
 | Export format version    | `format_version = 1`        | The portable archive manifest and event-container representation.        |
 
@@ -50,8 +50,12 @@ This separates durable history from evolving in-memory types and enables old his
 
 ## Backward and forward guarantees
 
-Kin has published v0.1.x event history. v0.2.0 explicitly reads schema-v1 legacy item events, normalizes them in memory, and preserves their exact bytes; it writes schema-v2 `ITEM_ADDED` and schema-v1 lifecycle events. Protocols v1/v2/v3/v4 are supported, with v4 written by current clients. Protocols v1/v2 reject Handoff history rather than return lossy state. IndexedDB remains schema 1. A client with no decoder for a future event must preserve it and fail closed, not pretend it has derived complete household state.
+Kin has published v0.1.x event history. v0.2.0 explicitly reads schema-v1 legacy item events, normalizes them in memory, and preserves their exact bytes; it writes schema-v2 `ITEM_ADDED` and schema-v1 lifecycle events. Protocols v1/v2/v3/v4/v5 are supported, with v5 written by current clients. Protocols v1/v2 reject Handoff history rather than return lossy state. IndexedDB remains schema 1. A client with no decoder for a future event must preserve it and fail closed, not pretend it has derived complete household state.
 
 ## v0.4.0 Talk
 
 Current compatibility: protocols 1/2/3/4; writer v4; Item add schemas 1/2, lifecycle and Handoff/Talk schema 1. IndexedDB schema 1. Legacy events retain exact source bytes. Protocols 1–3 reject Talk rather than omit it. See [V0.4.0](V0.4.0.md).
+
+## v0.5.0 Pulse
+
+Supported protocols 1/2/3/4/5; writer v5; Pulse kinds 12/13 schema 1; previous schemas unchanged. IndexedDB schema 1, no byte migration. Protocols 1–4 reject Pulse histories, even cleared histories. See [V0.5.0](V0.5.0.md).

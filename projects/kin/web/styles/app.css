@@ -407,3 +407,12 @@ kin-talk-list { display: block; }
 @media (max-width: 420px) {
   .talk-form .add-button { grid-column: 1 / -1; }
 }
+
+kin-pulse { display: block; }
+.pulse-section { margin-top: 28px; padding-top: 28px; border-top: 1px solid var(--line); }
+.pulse-current { font-size: 18px; }
+.pulse-until { color: var(--muted); }
+.pulse-form { display: flex; flex-wrap: wrap; align-items: end; gap: 16px; }
+.pulse-form label { display: grid; gap: 8px; flex: 1 1 140px; min-width: 0; }
+.pulse-form select { width: 100%; min-height: 48px; padding: 10px; color: var(--ink); background: var(--paper); border: 1px solid #89998e; border-radius: 5px; }
+.pulse-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 16px; }

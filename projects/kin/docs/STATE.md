@@ -1,6 +1,6 @@
 # Derived Household State
 
-**Status:** Rust projects separate Items, Handoffs and Talks from one immutable event stream. Later projections remain future work.
+**Status:** Current through v0.5.3 Pulse; earlier version sections are historical contracts. See Pulse below.
 
 ## Projection pipeline
 
@@ -17,7 +17,7 @@ apply deterministic reducer
 HouseholdState
 ```
 
-The same valid ordered event stream must always derive the same household state. Current state is a projection of events; the event history remains the underlying record. Do not persist an independently editable state snapshot as a second source of truth. A future cache may accelerate replay only if it can be discarded and rebuilt from events.
+The same valid ordered event stream and explicit as_of must always derive the same household state. Current state is a projection of events; the event history remains the underlying record. Do not persist an independently editable state snapshot as a second source of truth. A future cache may accelerate replay only if it can be discarded and rebuilt from events.
 
 If replay later becomes expensive, a snapshot/checkpoint may accelerate reconstruction only as a verified derived projection. It is not authoritative and cannot justify deleting source events by itself. Optimization must not change observable household state; see [Retention](RETENTION.md) for the deferred event-compaction policy.
 
@@ -30,7 +30,8 @@ HouseholdState
 ├── household_id: Option<HouseholdId>
 ├── items: Vec<ItemState> in original add-event order
 ├── handoffs: Vec<HandoffState> in original add-event order
-└── talks: Vec<TalkState> in original add-event order
+├── talks: Vec<TalkState> in original add-event order
+└── pulses: Vec<PulseState> ordered by actor_id
 
 ItemState
 ├── item_id
@@ -41,7 +42,7 @@ ItemState
 └── status: active | completed | archived
 ```
 
-Items are identified by stable item ID, never display text. Actor, household, and device IDs remain local placeholders. Schema-v1 `ITEM_ADDED` events normalize to `today`; schema-v2 events carry explicit classification. HandoffState contains handoff_id, text, created_by, created_at, and status (unacknowledged, acknowledged, archived). Acknowledgement actor/time remain in its source envelope. TalkState contains talk_id, text, created_by, created_at and open/resolved/archived status. Pulse, Routine, Agreement, authentication, and remote device state remain future work.
+Items are identified by stable item ID, never display text. Actor, household, and device IDs remain local placeholders. Schema-v1 `ITEM_ADDED` events normalize to `today`; schema-v2 events carry explicit classification. HandoffState contains handoff_id, text, created_by, created_at, and status (unacknowledged, acknowledged, archived). Acknowledgement actor/time remain in its source envelope. TalkState contains talk_id, text, created_by, created_at and open/resolved/archived status. Routine, Agreement, authentication, and remote device state remain future work.
 
 ## Validation and errors
 
@@ -88,3 +89,7 @@ A deterministic total event ordering makes projections reproducible; it does not
 ## v0.4.0 Talk
 
 HouseholdState adds talks: Vec<TalkState> beside items and handoffs. Each is ordered by its original creation event. TalkState has talk_id, text, created_by, created_at and status; no duplicated resolution metadata. Archived tombstones stay in projection/history but are hidden in normal lists. See [V0.4.0](V0.4.0.md).
+
+## v0.5.0 Pulse
+
+HouseholdState adds pulses sorted by actor ID. Explicit rebuild_at(events, as_of) projects active iff as_of < expires_at, otherwise expired. SET replaces per actor; CLEAR removes, including absent no-op. Clock rollback may reactivate latest expired context; source events stay unchanged. See [V0.5.0](V0.5.0.md).

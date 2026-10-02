@@ -1,6 +1,6 @@
 # Development Workflow
 
-**Status:** Current workflow for Today + Needs + Handoff + Talk. All tooling and build output remain project-local.
+**Status:** Current through v0.5.3 Pulse; earlier version sections are historical contracts. See Pulse below.
 
 ## Build and run
 
@@ -20,7 +20,7 @@ build the Rust/WASM module using the project-local manifest
 serve the static web files from localhost
         |
         v
-open the supported browser and exercise Today + Needs + Handoff + Talk
+open the supported browser and exercise Today + Needs + Handoff + Talk + Pulse
 ```
 
 From the repository root in PowerShell:
@@ -50,8 +50,12 @@ No npm dependency tree or framework runtime is planned. If static serving later 
 
 ## Browser capabilities
 
-The application requires WebAssembly, ES modules, Custom Elements, IndexedDB, `CustomEvent`, text encoders/decoders, and secure-context browser APIs. WebAuthn and Web Crypto for content security belong to later identity/sync work, not v0.4.x. Browser validation is recorded per release and does not certify the full browser support target.
+The application requires WebAssembly, ES modules, Custom Elements, IndexedDB, `CustomEvent`, text encoders/decoders, and secure-context browser APIs. WebAuthn and Web Crypto for content security belong to later identity/sync work, not v0.5.x. Browser validation is recorded per release and does not certify the full browser support target.
 
 ## Development data
 
 Use synthetic household text only. Never copy private family messages, health details, credentials, or real household history into test fixtures, screenshots, bug reports, or logs. Local test data can be removed through the browser's site-data controls for the local origin. Kin does not include a reset command that could accidentally remove household data.
+
+## v0.5.0 Pulse
+
+Pulse uses the established build/run scripts and complete regression runner. No runtime dependency or parent-level build changes. See [V0.5.0](V0.5.0.md).

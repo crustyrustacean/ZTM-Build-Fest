@@ -1,6 +1,6 @@
 # Household Domain
 
-**Status:** Items, Handoffs and Talks are implemented as distinct entities. Actors remain local placeholders, not verified people. Later entities remain future specifications.
+**Status:** Current through v0.5.3 Pulse; earlier version sections are historical contracts. See Pulse below.
 
 ## Scope and relationships
 
@@ -59,7 +59,7 @@ A Talk captures “This matters, but right now may not be the right moment.” I
 
 ## Pulse
 
-A Pulse is lightweight, time-bounded context about current capacity, for example “Good,” “Okay,” “Drained,” “Rough day,” or “Need quiet.” It is not a mental-health diagnosis, relationship score, historical performance metric, or permanent characterization of a person. A Pulse has an explicit expiry or is cleared; time-dependent display is derived using an explicit evaluation time, not hidden wall-clock reads during replay. Pulse is planned for v0.5.0 and is not implemented.
+A Pulse is lightweight, time-bounded context about current capacity, for example “Good,” “Okay,” “Drained,” “Rough day,” or “Need quiet.” It is not a mental-health diagnosis, relationship score, historical performance metric, or permanent characterization of a person. A Pulse has an explicit expiry or is cleared; time-dependent display is derived using an explicit evaluation time, not hidden wall-clock reads during replay. Pulse is implemented in v0.5.0.
 
 ## Routine
 
@@ -72,3 +72,7 @@ An Agreement, if introduced, represents an explicit understanding deliberately e
 ## Event
 
 An Event is an immutable, identified fact describing a domain change. The v0.2.0 item subset is implemented with household, actor, and originating device placeholders, timestamp, event kind/version, and validated payload. The canonical naming, identity, ordering, replay, and error rules are in [Events](EVENTS.md). Other conceptual entities in this document remain unimplemented unless explicitly marked otherwise.
+
+## v0.5.0 Pulse
+
+Pulse is the latest capacity per actor: enum Good/Okay/Drained/RoughDay/NeedQuiet, set_at, expires_at, active/expired status. No PulseId, arbitrary text, name or acknowledgement. Actor IDs remain unverified placeholders. See [V0.5.0](V0.5.0.md).

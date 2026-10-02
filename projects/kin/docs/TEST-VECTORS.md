@@ -1,6 +1,6 @@
 # v0.1.0 Canonical Test Vectors
 
-**Status:** specification vectors, not executable tests. Field names and semantics follow [EVENTS](EVENTS.md), [ABI](ABI.md), and [STATE](STATE.md). These are decoded domain-level inputs; serialize them with ABI protocol version 1 for byte-level tests.
+**Status:** Current through v0.5.3 Pulse; earlier version sections are historical contracts. See Pulse below.
 
 ## Common envelope values
 
@@ -262,3 +262,7 @@ Added every truncated v4 result-header/Talk-record boundary, malformed request h
 Passed 58 Rust tests and 19 Node bridge/real-WASM tests, formatting, Clippy with warnings denied, version consistency, release WASM, PowerShell and WSL POSIX build scripts and build/run launchers (page and WASM HTTP 200), and complete browser regressions. Environment: Windows x64, Rust 1.93.0, Node 22.12.0, Chrome 154.0.8037.59; POSIX via WSL. Keyboard, all Talk lifecycle focus restoration, native focus order, semantics, busy/status/error, 48px targets, scrollbar-aware 320px reflow, forced colors, increased spacing, reduced motion and 200% page-scale emulation passed. Native desktop zoom, Firefox, Safari, NVDA and VoiceOver remain unverified.
 
 Architecture/product/privacy audit confirms Rust-only reduction; separate Item/Handoff/Talk semantics; immutable canonical IndexedDB schema-1 events; no migration; unchanged v1/v2/v3 contracts and explicit v4; content-free invalidation; textContent rendering; same-origin static requests; no framework/runtime dependency, analytics, AI, remote service, sentiment, scores, blame, identity inference, resolver attribution or response metrics. Resolved is workflow state only and claims neither agreement nor an objective solution. No remaining release-blocking defect was found in exercised environments. Cross-browser, assistive-technology and native-zoom checks remain validation gaps, not certifications. No additional UI feature was added. Duplication remains manageable, so no orchestration refactor was introduced.
+
+## v0.5.0 Pulse
+
+Vector 021: actor A SET Drained at 1000ms, expiry 2000ms. as_of 1999 => active; 2000/2001 => expired; rollback to 1000 => active. SET replaces A only; CLEAR A twice succeeds; B remains independent. No expiry event. See [V0.5.0](V0.5.0.md).
