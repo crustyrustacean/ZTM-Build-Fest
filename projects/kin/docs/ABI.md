@@ -1,6 +1,6 @@
 # JavaScript–WASM ABI
 
-**Status:** proposed v0.1.0 manual ABI contract. No WASM module or ABI code exists. The protocol byte layout is specified below; module responsibilities are in [IMPLEMENTATION](IMPLEMENTATION.md), and state semantics are in [EVENTS](EVENTS.md) and [STATE](STATE.md).
+**Status:** implemented for v0.1.0. The manual WASM exports and protocol byte layout below define the current bridge; module responsibilities are in [IMPLEMENTATION](IMPLEMENTATION.md), and state semantics are in [EVENTS](EVENTS.md) and [STATE](STATE.md).
 
 ## Target and exports
 

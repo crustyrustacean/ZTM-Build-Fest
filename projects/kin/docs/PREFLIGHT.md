@@ -1,6 +1,6 @@
 # v0.0.9 Implementation Preflight
 
-**Status:** Specification Release Candidate 1. Planning review only. No functional application code is present or authorized by this release.
+**Status:** historical v0.0.9 record. At the time of this preflight, the review was planning-only and no functional application code was present or authorized. v0.1.0 implementation followed this Specification Freeze A in later commits.
 
 ## Review scope and method
 
@@ -13,7 +13,7 @@ The audit compared release scope, event names/envelope/immutability/identity, or
 1. **Planning completion moved from v0.0.6 to v0.0.9.** The earlier README/roadmap/AGENTS language said planning was complete at `.6`. The `.7`–`.9` releases are now explicitly documentation-only and `.1.0` remains first implementation.
 2. **Event naming was inconsistent in early examples.** The canonical past-tense names `ITEM_ADDED` and `ITEM_COMPLETED` are used for the `.1.0` subset; older imperative names appear only as a disallowed naming example in EVENTS.md.
 3. **The `.1.0` serialization decision was initially deferred until implementation.** It is now specified as ABI protocol version 1 in ABI.md; V0.1.0 points to that contract.
-4. **README/roadmap previously treated contributor workflow as executable or omitted it.** DEVELOPMENT.md and CONTRIBUTING.md explicitly distinguish planned setup from commands that can currently run; README continues to say no application exists.
+4. **README/roadmap previously treated contributor workflow as executable or omitted it.** At preflight time, DEVELOPMENT.md and CONTRIBUTING.md distinguished planned setup from commands that could run; README said no application existed.
 5. **Data evolution/export/deletion was previously open-ended.** VERSIONING, MIGRATIONS, PORTABILITY, and RETENTION now separate the version axes and define non-destructive compatibility, migration failure, import validation, and deletion limitations.
 6. **Debugging examples could have duplicated ABI error definitions.** DEBUGGING.md treats symbolic diagnostics as a future mapping to the existing numeric ABI status categories, not a replacement registry.
 
@@ -44,7 +44,7 @@ Freeze A does not make documentation immutable. Implementation must not silently
 
 The v0.1.0 scope remains limited to the local add-item, complete-item, reload/replay loop. Handoff, Talk, Pulse, pairing, passkeys, sync, encryption, routines, AI, and notifications remain excluded. Canonical specification vectors are in [TEST-VECTORS](TEST-VECTORS.md); requirement authority and future validation are mapped in [TRACEABILITY](TRACEABILITY.md).
 
-**Readiness result:** The specification is implementation-ready for the bounded v0.1.0 scope when explicitly authorized. This is not an authorization to code, and implementation has not begun.
+**Readiness result at v0.0.9:** The specification was implementation-ready for the bounded v0.1.0 scope. Implementation had not begun at that historical point; it began after v0.0.12.
 
 ## Implementation handoff checklist
 
@@ -63,4 +63,4 @@ v0.1.0 is specification-ready when:
 - [x] Privacy constraints are specified.
 - [x] No unresolved architecture contradiction blocks the local-only v0.1.0 scope.
 
-This readiness result does not mean implementation, testing, or release acceptance has occurred. Follow [V0.1.0](V0.1.0.md) and its release gate when v0.1.0 is explicitly authorized.
+At the time, this readiness result did not mean implementation, testing, or release acceptance had occurred. The later implementation and release checks are documented in [V0.1.0](V0.1.0.md) and [CHANGELOG](../CHANGELOG.md).

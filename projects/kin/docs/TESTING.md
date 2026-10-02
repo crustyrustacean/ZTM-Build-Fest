@@ -1,6 +1,6 @@
 # v0.1.0 Testing Contract
 
-**Status:** required future validation; no test code or runtime exists. Accessibility requirements are in [ACCESSIBILITY](ACCESSIBILITY.md); the event/protocol behavior is in [EVENTS](EVENTS.md) and [ABI](ABI.md).
+**Status:** v0.1.x Rust unit/protocol tests, built-in Node bridge regression tests, and browser acceptance checks are available. Continue using this contract for regression coverage. Accessibility requirements are in [ACCESSIBILITY](ACCESSIBILITY.md); event/protocol behavior is in [EVENTS](EVENTS.md) and [ABI](ABI.md).
 
 ## Rust domain tests
 
@@ -19,6 +19,12 @@ Before v0.1.0 is considered complete, cover at least:
 
 The Rust reducer must be testable without a browser or WebAssembly runtime. Use the standard Rust test harness; no third-party test framework is required.
 
+The browser bridge's focused Unicode regression tests use Node's built-in test runner (no npm dependencies):
+
+```text
+node --experimental-default-type=module --test web/wasm/kin-engine.test.mjs
+```
+
 ## ABI/protocol tests
 
 Verify null/zero pointers, undersized and oversized buffers, overflow-safe range checks, zero-item results, stale-output reset between calls, correct result lifetime, memory growth handling, deterministic error status, malformed encoding, and the rule that input pointers are not retained after return.
@@ -35,6 +41,8 @@ Manually exercise or use a lightweight browser-native harness to verify:
 - Repeated actions and replay do not duplicate/corrupt state.
 - User-entered text renders safely as text.
 - Storage/ABI failures reach an understandable error state without claiming success.
+- A compose draft survives a same-tab reload and clears only after successful persistence; the draft is not written to the event store.
+- Focus returns to a usable control after add and completion, and `aria-busy` clears after success or failure.
 - No household-content, backend, analytics, or third-party network requests occur; serving local static assets from the application origin is expected.
 - Browser console has no uncaught errors.
 - Keyboard interaction, focus visibility, status announcements, and a narrow mobile viewport work.

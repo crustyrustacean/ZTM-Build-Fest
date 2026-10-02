@@ -1,6 +1,8 @@
 # Privacy
 
-**Status:** intended posture, not an implemented guarantee. Kin currently has no application, storage, account system, encryption, or sync service.
+**Status:** v0.1.0 processes the item event stream locally in the browser and persists it in IndexedDB. There is no account system, encryption, or sync service. Local browser storage is not a security boundary against device compromise, shared browser profiles, or malicious extensions.
+
+The in-progress compose draft may be held in tab-scoped `sessionStorage` to survive a reload. It is not part of the event log, is not shared with another tab, and is cleared after successful save or explicit clear. Browser site-data controls remove both the event store and any draft.
 
 Household information can be highly personal. Future implementation must minimize exposure and communicate clearly what is stored and shared.
 
@@ -18,7 +20,7 @@ Household information can be highly personal. Future implementation must minimiz
 
 ## Local-first progression
 
-The first coded releases are expected to store a local event history in browser storage and reconstruct state locally:
+The v0.1.0 release stores a local event history in browser storage and reconstructs state locally:
 
 ```text
 Browser
@@ -30,7 +32,7 @@ IndexedDB
 Rust reconstructs state
 ```
 
-No remote sync is planned for v0.1.0. Local-first is an architectural direction, not a claim that browser storage alone is secure against device compromise, shared browser profiles, or malicious extensions.
+No remote sync exists in v0.1.0. Local-first describes where this release processes data; it is not a claim that browser storage alone is secure against device compromise, shared browser profiles, or malicious extensions.
 
 ## Future encrypted sync concept
 

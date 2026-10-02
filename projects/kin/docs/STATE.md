@@ -1,6 +1,6 @@
 # Derived Household State
 
-**Status:** state/replay contract for future implementation. No reducer or state engine exists yet. Event rules are in [Events](EVENTS.md); entity meaning is in [Domain](DOMAIN.md).
+**Status:** v0.1.0 item state and deterministic replay are implemented in Rust. Later domain projections remain future work. Event rules are in [Events](EVENTS.md); entity meaning is in [Domain](DOMAIN.md).
 
 ## Projection pipeline
 

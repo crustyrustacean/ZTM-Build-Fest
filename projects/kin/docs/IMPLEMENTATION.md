@@ -1,6 +1,6 @@
 # v0.1.0 Implementation Contract
 
-**Status:** specification only. The layout and responsibilities below are plans; no source directories, application source, Cargo files, build tooling, or dependencies have been created. The release is frozen by [V0.1.0](V0.1.0.md).
+**Status:** implemented for v0.1.0. The project-local layout and responsibilities below describe the current Household Heartbeat implementation; later product capabilities remain future work.
 
 ## Proposed project layout
 
@@ -8,8 +8,11 @@
 projects/kin/
 ├── AGENTS.md
 ├── README.md
+├── CHANGELOG.md
 ├── LICENSE
 ├── Cargo.toml
+├── build-wasm.ps1
+├── .gitignore
 ├── docs/
 ├── rust/
 │   └── src/
@@ -27,13 +30,14 @@ projects/kin/
     │   ├── kin-compose.js
     │   └── kin-item.js
     ├── wasm/
-    │   └── kin-engine.js
+    │   ├── kin-engine.js
+    │   └── kin-engine.test.mjs
     ├── storage/
     │   └── event-store.js
     └── styles/
 ```
 
-This is a proposed implementation layout, not a set of directories to create during planning. Avoid a demo app, general framework, or extra component/module unless v0.1.0 requires it.
+The v0.1.0 implementation uses this layout. The generated `target/` tree and `web/wasm/kin_engine.wasm` are local build artifacts and are ignored by Git. Avoid a general framework or extra component/module unless a scoped requirement needs it.
 
 ## Module responsibilities
 
@@ -55,8 +59,8 @@ See [ABI](ABI.md), [Storage](STORAGE.md), and [Components](COMPONENTS.md) for im
 
 ## Build boundary
 
-The intended target is `wasm32-unknown-unknown`. Build output should be a local artifact loaded by the page; no server or remote code loader is required. No `wasm-bindgen`, `web-sys`, `js-sys`, `serde`, `serde_json`, UI framework, or runtime library is planned. A future build command/script may be documented or added during implementation, but no build pipeline is part of these documentation releases.
+The target is `wasm32-unknown-unknown`. The local WASM artifact is loaded by the page; no remote code loader is used. Kin has no `wasm-bindgen`, `web-sys`, `js-sys`, `serde`, `serde_json`, UI framework, or runtime library dependency. `build-wasm.ps1` builds and copies the artifact for local static serving.
 
 ## Browser support floor
 
-Target the latest two stable major releases of desktop and mobile Chrome, Firefox, and Safari available when v0.1.0 implementation begins. The browser must provide core WebAssembly, ES modules, Custom Elements, IndexedDB, `CustomEvent`, `TextEncoder`/`TextDecoder`, `crypto.getRandomValues`, and a secure context (including localhost for development). Do not target Internet Explorer or obsolete browsers. Record the exact tested browser/OS versions during the v0.1.0 release gate; this policy is a target, not a claim of tested compatibility today.
+The target remains the latest two stable major releases of desktop and mobile Chrome, Firefox, and Safari. The browser must provide core WebAssembly, ES modules, Custom Elements, IndexedDB, `CustomEvent`, `TextEncoder`/`TextDecoder`, `crypto.getRandomValues`, and a secure context (including localhost for development). Do not target Internet Explorer or obsolete browsers. The v0.1.0 release was exercised in desktop Chrome through the integrated VS Code browser; the broader target is not certified by that check.
