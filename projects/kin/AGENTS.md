@@ -100,7 +100,7 @@ If an unrelated parent-repository file was modified accidentally, revert that ch
 
 # Current Development Stage
 
-Kin uses semantic versions. The current release is `v0.4.3` — Talk Hardening & Polish. The completed authorized Talk line runs through v0.4.3 on `kin-v0.4.0-development`, from merged v0.3.5. Follow frozen `docs/V0.4.0.md`. Stop after v0.4.3 for evaluation; do not begin v0.4.4 or v0.5.0, merge to kin-main, or push automatically.
+Kin uses semantic versions. Current release: `v0.5.0` — Pulse. The user authorized v0.5.0–v0.5.3 on `kin-v0.5.0-development` from merged Talk. Follow frozen `docs/V0.5.0.md`. Stop after v0.5.3; no v0.5.4, v0.6.0, kin-main merge or automatic push.
 
 The pre-implementation releases are:
 
@@ -1069,6 +1069,7 @@ kin-v0.4.0
 kin-v0.4.1
 kin-v0.4.2
 kin-v0.4.3
+kin-v0.5.0
 kin-v1.0.0
 ```
 

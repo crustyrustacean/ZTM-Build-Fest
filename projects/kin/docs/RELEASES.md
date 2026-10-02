@@ -1,6 +1,6 @@
 # Release Process
 
-**Status:** The approved v0.4.0–v0.4.3 Talk line is complete on kin-v0.4.0-development. Stop for evaluation. Do not begin another patch/Pulse, push or merge automatically.
+**Status:** v0.5.0 Pulse on kin-v0.5.0-development from merged Talk. Complete authorized stabilization through v0.5.3, then stop. No push or kin-main merge authorized.
 
 ## Release sequence
 
@@ -62,3 +62,7 @@ For documentation milestones, validate required documents, internal links, scope
 ## v0.4.0 Talk
 
 Use kin-v0.4.0-development; create dedicated commits and annotated kin-v0.4.0 through kin-v0.4.3 tags only after each full validation gate. Stop after v0.4.3; no automatic push or kin-main merge. See [V0.4.0](V0.4.0.md).
+
+## v0.5.x Pulse
+
+Dedicated validated commits and annotated kin-v0.5.0 through kin-v0.5.3 tags. Stop after v0.5.3. See [V0.5.0](V0.5.0.md).

@@ -2,8 +2,8 @@ use std::collections::BTreeMap;
 
 use crate::error::KinError;
 use crate::event::{
-    ActorId, EventEnvelope, EventId, EventKind, HandoffId, HouseholdId, ItemClassification, ItemId,
-    TalkId,
+    valid_timestamp, ActorId, EventEnvelope, EventId, EventKind, HandoffId, HouseholdId,
+    ItemClassification, ItemId, PulseValue, TalkId,
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -55,15 +55,45 @@ pub struct TalkState {
     pub status: TalkStatus,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum PulseStatus {
+    Active,
+    Expired,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PulseState {
+    pub actor_id: ActorId,
+    pub value: PulseValue,
+    pub set_at: i64,
+    pub expires_at: i64,
+    pub status: PulseStatus,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct HouseholdState {
     pub household_id: Option<HouseholdId>,
     pub items: Vec<ItemState>,
     pub handoffs: Vec<HandoffState>,
     pub talks: Vec<TalkState>,
+    pub pulses: Vec<PulseState>,
 }
 
 pub fn rebuild(events: &[EventEnvelope]) -> Result<HouseholdState, KinError> {
+    if events
+        .iter()
+        .any(|e| matches!(e.kind, EventKind::PulseSet { .. } | EventKind::PulseCleared))
+    {
+        return Err(KinError::UnsupportedVersion);
+    }
+    rebuild_at(events, 0)
+}
+
+pub fn rebuild_at(events: &[EventEnvelope], as_of: i64) -> Result<HouseholdState, KinError> {
+    if !valid_timestamp(as_of) {
+        return Err(KinError::MalformedProtocol);
+    }
+    let mut pulses = BTreeMap::new();
     let mut household_id = None;
     let mut items = Vec::new();
     let mut handoffs = Vec::new();
@@ -95,6 +125,34 @@ pub fn rebuild(events: &[EventEnvelope]) -> Result<HouseholdState, KinError> {
         }
 
         match &event.kind {
+            EventKind::PulseSet { value, expires_at } => {
+                if !valid_timestamp(event.timestamp) || !valid_timestamp(*expires_at) {
+                    return Err(KinError::MalformedProtocol);
+                }
+                if *expires_at <= event.timestamp {
+                    return Err(KinError::InvalidEvent);
+                }
+                pulses.insert(
+                    event.actor_id,
+                    PulseState {
+                        actor_id: event.actor_id,
+                        value: *value,
+                        set_at: event.timestamp,
+                        expires_at: *expires_at,
+                        status: if as_of < *expires_at {
+                            PulseStatus::Active
+                        } else {
+                            PulseStatus::Expired
+                        },
+                    },
+                );
+            }
+            EventKind::PulseCleared => {
+                if !valid_timestamp(event.timestamp) {
+                    return Err(KinError::MalformedProtocol);
+                }
+                pulses.remove(&event.actor_id);
+            }
             EventKind::TalkAdded { talk_id, text } => {
                 if text.trim().is_empty() || talk_positions.contains_key(talk_id) {
                     return Err(KinError::InvalidEvent);
@@ -216,6 +274,7 @@ pub fn rebuild(events: &[EventEnvelope]) -> Result<HouseholdState, KinError> {
         items,
         handoffs,
         talks,
+        pulses: pulses.into_values().collect(),
     })
 }
 
@@ -232,6 +291,11 @@ mod tests {
         let event_id = EventId(id(event_number));
         let mut canonical_bytes = vec![event_number, logical_time as u8];
         match &kind {
+            EventKind::PulseSet { value, expires_at } => {
+                canonical_bytes.push(*value as u8);
+                canonical_bytes.extend_from_slice(&expires_at.to_le_bytes());
+            }
+            EventKind::PulseCleared => canonical_bytes.push(13),
             EventKind::TalkAdded { talk_id, text } => {
                 canonical_bytes.extend_from_slice(&talk_id.0);
                 canonical_bytes.extend_from_slice(text.as_bytes());

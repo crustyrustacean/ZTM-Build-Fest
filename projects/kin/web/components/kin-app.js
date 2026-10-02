@@ -5,6 +5,7 @@ import "./kin-item.js";
 import "./kin-today.js";
 import "./kin-handoff-list.js";
 import "./kin-talk-list.js";
+import "./kin-pulse.js";
 
 const START_ERROR =
   "Kin could not start its household engine or local storage. Your saved information was not intentionally deleted.";
@@ -16,7 +17,7 @@ class KinApp extends HTMLElement {
     super();
     this.engine = null;
     this.store = null;
-    this.state = { items: [], handoffs: [], talks: [] };
+    this.state = { items: [], handoffs: [], talks: [], pulses: [] };
     this.busy = false;
     this.starting = null;
     this.initialized = false;
@@ -38,6 +39,25 @@ class KinApp extends HTMLElement {
     this.onResolveTalk = event => this.saveTalk({ type: "resolve-talk", talkId: event.detail.talkId });
     this.onReopenTalk = event => this.saveTalk({ type: "reopen-talk", talkId: event.detail.talkId });
     this.onArchiveTalk = event => this.saveTalk({ type: "archive-talk", talkId: event.detail.talkId });
+    this.pulseTimer = null;
+    this.onSetPulse = event => {
+      const timestamp = Date.now();
+      const hours = event.detail.hours;
+      if (![1, 4, 8].includes(hours)) return;
+      this.savePulse({ type: "set-pulse", value: event.detail.value,
+        timestamp, expiresAt: timestamp + hours * 3_600_000 });
+    };
+    this.onWindowFocus = () => {
+      // Let the interaction that activated the window finish before disabling controls.
+      clearTimeout(this.focusTimer);
+      this.focusTimer = setTimeout(this.onTimeWake, 150);
+    };
+    this.onClearPulse = () => this.savePulse({ type: "clear-pulse" });
+    this.onTimeWake = event => {
+      if (event?.type === "focus" && event.target !== window) return;
+      if (document.visibilityState === "hidden") return;
+      this.refreshFromEvents();
+    };
     this.onPeerMessage = (event) => this.handlePeerMessage(event);
   }
 
@@ -57,6 +77,10 @@ class KinApp extends HTMLElement {
     this.addEventListener("kin:resolve-talk", this.onResolveTalk);
     this.addEventListener("kin:reopen-talk", this.onReopenTalk);
     this.addEventListener("kin:archive-talk", this.onArchiveTalk);
+    this.addEventListener("kin:set-pulse", this.onSetPulse);
+    this.addEventListener("kin:clear-pulse", this.onClearPulse);
+    document.addEventListener("visibilitychange", this.onTimeWake);
+    window.addEventListener("focus", this.onWindowFocus);
     this.openPeerChannel();
     if (this.store) {
       // Reconnecting must not restart the engine or unlock an in-flight save.
@@ -88,7 +112,8 @@ class KinApp extends HTMLElement {
     this.compose = document.createElement("kin-compose");
     this.handoffs = document.createElement("kin-handoff-list");
     this.talks = document.createElement("kin-talk-list");
-    main.append(this.today, this.compose, this.handoffs, this.talks);
+    this.pulse = document.createElement("kin-pulse");
+    main.append(this.today, this.compose, this.handoffs, this.talks, this.pulse);
 
     const feedback = document.createElement("div");
     feedback.className = "app-feedback";
@@ -123,6 +148,12 @@ class KinApp extends HTMLElement {
     this.removeEventListener("kin:resolve-talk", this.onResolveTalk);
     this.removeEventListener("kin:reopen-talk", this.onReopenTalk);
     this.removeEventListener("kin:archive-talk", this.onArchiveTalk);
+    this.removeEventListener("kin:set-pulse", this.onSetPulse);
+    this.removeEventListener("kin:clear-pulse", this.onClearPulse);
+    document.removeEventListener("visibilitychange", this.onTimeWake);
+    window.removeEventListener("focus", this.onWindowFocus);
+    clearTimeout(this.pulseTimer);
+    clearTimeout(this.focusTimer);
     this.closePeerChannel();
   }
 
@@ -150,7 +181,7 @@ class KinApp extends HTMLElement {
       this.openPeerChannel();
       const events = await this.store.loadEvents();
       this.state = this.engine.applyEvents(
-        events.map((event) => event.encoded_event),
+        events.map((event) => event.encoded_event), Date.now(),
       );
       this.renderState();
       this.setStatus("Ready.");
@@ -265,6 +296,38 @@ class KinApp extends HTMLElement {
     }
   }
 
+  async savePulse(command) {
+    if (this.busy || !this.store || !this.engine) return;
+    const submitted = Object.freeze({ ...command });
+    this.setBusy(true);
+    this.clearAlert();
+    this.setStatus("Saving…");
+    try {
+      this.state = await this.store.append(submitted, this.engine);
+      this.renderState();
+      this.pulse.saved();
+      this.setStatus(submitted.type === "set-pulse" ? "Pulse set." : "Pulse cleared.");
+      this.broadcastEventChange();
+    } catch (error) {
+      this.showAlert(error.userMessage ?? SAVE_ERROR, () => this.savePulse(submitted));
+      this.setStatus("");
+    } finally {
+      this.setBusy(false);
+      this.pulse.focusInput();
+      this.flushPeerRefresh();
+    }
+  }
+
+  schedulePulseRefresh() {
+    clearTimeout(this.pulseTimer);
+    if (!this.isConnected || !this.state.pulses.length) return;
+    // Timers only request canonical replay. Rust alone decides expiry.
+    const now = Date.now();
+    const active = this.state.pulses.filter(pulse => pulse.status === "active");
+    const delay = Math.max(1, Math.min(60_000, ...active.map(pulse => pulse.expiresAt - now)));
+    this.pulseTimer = setTimeout(this.onTimeWake, delay);
+  }
+
   async handleCompleteItem(event) {
     return this.handleItemAction("complete", event.detail.itemId);
   }
@@ -368,6 +431,7 @@ class KinApp extends HTMLElement {
       return;
     }
     this.refreshing = true;
+    const focusedControl = this.contains(document.activeElement) ? document.activeElement : null;
     this.setBusy(true);
     // A failed refresh must not replace the command awaiting recovery.
     const previousFailure = this.suspendedRetry ?? {
@@ -386,10 +450,10 @@ class KinApp extends HTMLElement {
     try {
       const events = await this.store.loadEvents();
       this.state = this.engine.applyEvents(
-        events.map((storedEvent) => storedEvent.encoded_event),
+        events.map((storedEvent) => storedEvent.encoded_event), Date.now(),
       );
       this.renderState();
-      this.setStatus("Updated from another tab.");
+      this.setStatus("Household context updated.");
       if (previousRetry) {
         const handoff = previousRetryIntent?.handoffId
           ? this.state.handoffs.find(record => record.handoffId === previousRetryIntent.handoffId) : null;
@@ -417,6 +481,7 @@ class KinApp extends HTMLElement {
     } finally {
       this.refreshing = false;
       this.setBusy(false);
+      if (focusedControl?.isConnected && !focusedControl.closest("[hidden]")) focusedControl.focus();
       if (restoreHandoffFocus) this.handoffs.focusInput();
       if (restoreTalkFocus) this.talks.focusInput();
       if (restoreComposeFocus) {
@@ -438,6 +503,8 @@ class KinApp extends HTMLElement {
     this.today.items = this.state.items;
     this.handoffs.handoffs = this.state.handoffs;
     this.talks.talks = this.state.talks;
+    this.pulse.pulse = this.state.pulses.find(pulse => pulse.actorId === this.store?.actorId);
+    this.schedulePulseRefresh();
   }
 
   setBusy(isBusy) {
@@ -447,6 +514,7 @@ class KinApp extends HTMLElement {
     this.today.disabled = isBusy || !this.store;
     this.handoffs.disabled = isBusy || !this.store;
     this.talks.disabled = isBusy || !this.store;
+    this.pulse.disabled = isBusy || !this.store;
     this.retryButton.disabled = isBusy;
   }
 

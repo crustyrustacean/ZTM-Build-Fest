@@ -1,5 +1,6 @@
 // Node 22+ and a Chromium-family executable; no npm packages required.
 // Uses a fresh temporary profile and loopback server, never an existing Kin DB.
+import { pulseRegressions, pulsePeerRegressions } from "./pulse-regression.mjs";
 import { talkRegressions, talkPeerRegressions } from "./talk-regression.mjs";
 import assert from "node:assert/strict";
 import { handoffRegressions, handoffPeerRegressions } from "./handoff-regression.mjs";
@@ -277,12 +278,12 @@ async function regressions() {
   const replayRecords = (await app.store.loadEvents()).map(
     (event) => event.encoded_event,
   );
-  const replayBeforeFailure = app.engine.applyEvents(replayRecords);
+  const replayBeforeFailure = app.engine.applyEvents(replayRecords, 0);
   const malformedRecord = new Uint8Array(replayRecords.at(-1));
   new DataView(malformedRecord.buffer).setUint16(0, 3, true);
   let replayFailureCode;
   try {
-    app.engine.applyEvents([...replayRecords.slice(0, -1), malformedRecord]);
+    app.engine.applyEvents([...replayRecords.slice(0, -1), malformedRecord], 0);
   } catch (error) {
     replayFailureCode = error.code;
   }
@@ -291,11 +292,11 @@ async function regressions() {
     "unsupported replay exposes stable error code",
   );
   check(
-    app.engine.applyEvents([]).items.length === 0,
+    app.engine.applyEvents([], 0).items.length === 0,
     "empty replay replaces previous result",
   );
   check(
-    JSON.stringify(app.engine.applyEvents(replayRecords)) ===
+    JSON.stringify(app.engine.applyEvents(replayRecords, 0)) ===
       JSON.stringify(replayBeforeFailure),
     "success/failure/empty/repeated WASM calls do not retain stale output",
   );
@@ -324,7 +325,7 @@ async function regressions() {
       classification: index % 2 === 0 ? "need" : "today",
     }),
   );
-  const workloadState = app.engine.applyEvents(workloadRecords);
+  const workloadState = app.engine.applyEvents(workloadRecords, 0);
   check(
     workloadState.items.length === 10_000,
     "WASM replays maximum event count",
@@ -790,6 +791,7 @@ try {
   console.log(await first.evaluate(`(${regressions.toString()})()`));
   console.log(await first.evaluate(`(${handoffRegressions.toString()})()`));
   console.log(await first.evaluate(`(${talkRegressions.toString()})()`));
+  console.log(await first.evaluate(`(${pulseRegressions.toString()})()`));
   const state = await first.evaluate('JSON.stringify(document.querySelector("kin-app").state)');
   await first.send("Page.reload");
   await until(() => first.evaluate("window.kinExpectedState === undefined"));
@@ -905,7 +907,7 @@ try {
   await second.evaluate(`window.peerReads=0; window.peerReplays=0; window.peerMessages=[];
     { const a=document.querySelector('kin-app'); const load=a.store.loadEvents.bind(a.store); const replay=a.engine.applyEvents;
       a.store.loadEvents=async()=>{window.peerReads++;return load();};
-      a.engine.applyEvents=(events)=>{window.peerReplays++;return replay(events);};
+      a.engine.applyEvents=(events,asOf)=>{window.peerReplays++;return replay(events,asOf);};
       a.channel.addEventListener('message',e=>window.peerMessages.push(e.data)); }`);
   await first.evaluate(
     `{const a=document.querySelector('kin-app');a.compose.input.value='Peer addition';a.compose.saveDraft();a.compose.form.requestSubmit();}`,
@@ -1086,6 +1088,7 @@ try {
 
   await handoffPeerRegressions(first, second, until);
   await talkPeerRegressions(first, second, until);
+  await pulsePeerRegressions(first, second, until);
   await first.evaluate(`(()=>{
     const app=document.querySelector('kin-app');
     const item=[...app.querySelectorAll('kin-item')]

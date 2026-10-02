@@ -1,6 +1,6 @@
 # Roadmap
 
-Current release: `v0.4.3 — Talk Hardening & Polish`. The planned Talk capability and stabilization line is complete. Stop for user evaluation before any additional patch or v0.5.0 Pulse.
+Current release: `v0.5.0 — Pulse`. Authorized stabilization continues through v0.5.3, then stop for evaluation.
 
 ## Planning releases
 
@@ -142,11 +142,11 @@ Completed: keyboard lifecycle/focus, semantic controls, native focus order, inde
 
 ### `v0.4.3` — Talk Hardening & Polish
 
-Completed: parser truncation/length boundaries, maximum mixed replay, real WASM growth/copied results, architecture/privacy review and documentation reconciliation. No further capability is authorized.
+Completed: parser truncation/length boundaries, maximum mixed replay, real WASM growth/copied results, architecture/privacy review and documentation reconciliation. Pulse preserves all Talk regressions.
 
 ### `v0.5.0` — Pulse
 
-Explore a lightweight current-capacity signal with expiration and acknowledgement only if useful. No scoring or historical ranking.
+Implemented: fixed actor-scoped capacity, set/replace/clear, deterministic explicit-time expiry and protocol v5. No acknowledgement, scoring or interpretation. See [V0.5.0](V0.5.0.md).
 
 ### `v0.6.0` — Since You Last Looked
 
@@ -170,4 +170,4 @@ Focus on polish, reliability, accessibility, mobile UX, privacy documentation, o
 
 ## Scope discipline
 
-Each roadmap item is future work unless explicitly marked as completed. Authentication, passkeys, encryption, remote services, pairing, and synchronization remain unimplemented and out of scope for v0.4.x. Releases through `v0.0.12` were documentation-only; v0.1.0 is the first coded release. Handoff is implemented in v0.3.0; Talk is implemented; Pulse remains future work.
+Each roadmap item is future work unless explicitly marked as completed. Authentication, passkeys, encryption, remote services, pairing, and synchronization remain unimplemented and out of scope for v0.4.x. Releases through `v0.0.12` were documentation-only; v0.1.0 is the first coded release. Handoff is implemented in v0.3.0; Talk is implemented; Pulse is implemented in v0.5.0.

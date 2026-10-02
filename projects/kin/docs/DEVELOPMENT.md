@@ -1,6 +1,6 @@
 # Development Workflow
 
-**Status:** Current workflow for Today + Needs + Handoff + Talk. All tooling and build output remain project-local.
+**Status:** Current through v0.5.0 Pulse; earlier version sections are historical contracts. See Pulse below.
 
 ## Build and run
 
@@ -55,3 +55,7 @@ The application requires WebAssembly, ES modules, Custom Elements, IndexedDB, `C
 ## Development data
 
 Use synthetic household text only. Never copy private family messages, health details, credentials, or real household history into test fixtures, screenshots, bug reports, or logs. Local test data can be removed through the browser's site-data controls for the local origin. Kin does not include a reset command that could accidentally remove household data.
+
+## v0.5.0 Pulse
+
+Pulse uses the established build/run scripts and complete regression runner. No runtime dependency or parent-level build changes. See [V0.5.0](V0.5.0.md).

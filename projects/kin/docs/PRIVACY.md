@@ -1,6 +1,6 @@
 # Privacy
 
-**Status:** Item, Handoff and Talk events remain local in IndexedDB with independent tab drafts. No verified identity, accounts, encryption, sync, analytics or remote content service exists.
+**Status:** Current through v0.5.0 Pulse; earlier version sections are historical contracts. See Pulse below.
 
 The in-progress compose draft may be held in tab-scoped `sessionStorage` to survive a reload. It is not part of the event log, is not shared with another tab, and is cleared after successful save or explicit clear. Browser site-data controls remove both the event store and any draft.
 
@@ -67,3 +67,7 @@ Event-oriented history is not an excuse to keep personal data indefinitely. The 
 ## Claims boundary
 
 Documentation describes intent, not verified security properties. Kin must not be described as encrypted, private-by-design in a technically verified sense, or safe for sensitive content until implementation and review support those claims.
+
+## v0.5.0 Pulse
+
+Fixed Pulse value/expiry stay in local canonical events. No analytics, history UI, scores, interpretation, external service or content-bearing broadcasts. Expiry hides current detail without deleting source events. No actor ID/name is displayed. See [V0.5.0](V0.5.0.md).

@@ -1,5 +1,7 @@
-const PROTOCOL_VERSION = 4;
-const REQUEST_HEADER_BYTES = 12;
+const PROTOCOL_VERSION = 5;
+const REQUEST_HEADER_BYTES = 20;
+const MAX_TIMESTAMP = 8_640_000_000_000_000;
+const PULSE_VALUES = ["good", "okay", "drained", "rough-day", "need-quiet"];
 const EVENT_HEADER_BYTES = 88;
 const RESULT_HEADER_BYTES = 12;
 const ITEM_HEADER_BYTES = 48;
@@ -72,7 +74,7 @@ export async function loadKinEngine(
   }
 
   return {
-    applyEvents: (records) => applyEvents(exports, records),
+    applyEvents: (records, asOf) => applyEvents(exports, records, asOf),
   };
 }
 
@@ -256,6 +258,28 @@ export function encodeTalkReopenedRecord({ talkId, ...identity }) {
   return encodeEventRecord({ ...identity, eventVersion: 1, kind: 10, payload: assertId(talkId) });
 }
 
+export function encodePulseSetRecord({ value, expiresAt, ...identity }) {
+  const code = PULSE_VALUES.indexOf(value);
+  if (code < 0) throw new KinEngineError(2, "Choose a valid capacity.");
+  assertTimestamp(identity.timestamp);
+  assertTimestamp(expiresAt);
+  const payload = new Uint8Array(16);
+  payload[0] = code;
+  new DataView(payload.buffer).setBigInt64(8, BigInt(expiresAt), true);
+  return encodeEventRecord({ ...identity, eventVersion: 1, kind: 12, payload });
+}
+
+export function encodePulseClearedRecord(identity) {
+  assertTimestamp(identity.timestamp);
+  return encodeEventRecord({ ...identity, eventVersion: 1, kind: 13, payload: new Uint8Array(0) });
+}
+
+function assertTimestamp(value) {
+  if (!Number.isSafeInteger(value) || Math.abs(value) > MAX_TIMESTAMP) {
+    throw new KinEngineError(2, "Kin needs a valid evaluation time.");
+  }
+}
+
 function encodeEventRecord({
   eventId,
   householdId,
@@ -282,11 +306,11 @@ function encodeEventRecord({
   return record;
 }
 
-function applyEvents(exports, records) {
+function applyEvents(exports, records, asOf) {
   if (records.length > MAX_EVENT_COUNT) {
     throw new KinEngineError(5, USER_MESSAGES.get(5));
   }
-  const request = encodeRequest(records);
+  const request = encodeRequest(records, asOf);
   const inputPointer = exports.kin_alloc(request.length);
   if (inputPointer === 0) {
     throw new KinEngineError(5, USER_MESSAGES.get(5));
@@ -335,7 +359,8 @@ function applyEvents(exports, records) {
   return result;
 }
 
-function encodeRequest(records) {
+function encodeRequest(records, asOf) {
+  assertTimestamp(asOf);
   let length = REQUEST_HEADER_BYTES;
   for (const record of records) {
     length += asBytes(record).length;
@@ -350,6 +375,7 @@ function encodeRequest(records) {
   view.setUint16(4, PROTOCOL_VERSION, true);
   view.setUint16(6, 0, true);
   view.setUint32(8, records.length, true);
+  view.setBigInt64(12, BigInt(asOf), true);
   let offset = REQUEST_HEADER_BYTES;
   for (const record of records) {
     const eventBytes = asBytes(record);
@@ -380,7 +406,7 @@ function copyWasmBytes(memory, pointer, length) {
 
 function decodeError(bytes, status) {
   if (
-    bytes.length < REQUEST_HEADER_BYTES ||
+    bytes.length < 12 ||
     readAscii(bytes, 0, 4) !== "KERR"
   ) {
     return new KinEngineError(
@@ -393,9 +419,9 @@ function decodeError(bytes, status) {
   const code = view.getUint16(6, true);
   const messageLength = view.getUint32(8, true);
   if (
-    ![1, 2, 3, PROTOCOL_VERSION].includes(version) ||
+    ![1, 2, 3, 4, PROTOCOL_VERSION].includes(version) ||
     code !== status ||
-    bytes.length !== REQUEST_HEADER_BYTES + messageLength
+    bytes.length !== 12 + messageLength
   ) {
     return new KinEngineError(
       status,
@@ -422,25 +448,26 @@ function decodeState(bytes) {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const protocolVersion = view.getUint16(4, true);
   if (
-    ![1, 2, 3, PROTOCOL_VERSION].includes(protocolVersion) ||
+    ![1, 2, 3, 4, PROTOCOL_VERSION].includes(protocolVersion) ||
     view.getUint16(6, true) !== 0
   ) {
     throw new KinEngineError(6, "Kin received an unsupported state format.");
   }
-  if (bytes.length < (protocolVersion === 4 ? 20 : protocolVersion === 3 ? 16 : 12)) {
+  if (bytes.length < (protocolVersion === 5 ? 24 : protocolVersion === 4 ? 20 : protocolVersion === 3 ? 16 : 12)) {
     throw new KinEngineError(6, "Kin received a truncated state header.");
   }
   const handoffCount = protocolVersion >= 3 ? view.getUint32(12, true) : 0;
-  const talkCount = protocolVersion === 4 ? view.getUint32(16, true) : 0;
+  const talkCount = protocolVersion >= 4 ? view.getUint32(16, true) : 0;
+  const pulseCount = protocolVersion === 5 ? view.getUint32(20, true) : 0;
   const itemCount = view.getUint32(8, true);
-  if (itemCount + handoffCount + talkCount > MAX_EVENT_COUNT) {
+  if (itemCount + handoffCount + talkCount + pulseCount > MAX_EVENT_COUNT) {
     throw new KinEngineError(
       6,
       "Kin received too many items from its household engine.",
     );
   }
   const items = [];
-  let offset = protocolVersion === 4 ? 20 : protocolVersion === 3 ? 16 : RESULT_HEADER_BYTES;
+  let offset = protocolVersion === 5 ? 24 : protocolVersion === 4 ? 20 : protocolVersion === 3 ? 16 : RESULT_HEADER_BYTES;
   for (let index = 0; index < itemCount; index += 1) {
     const headerEnd = offset + ITEM_HEADER_BYTES;
     if (headerEnd > bytes.length) {
@@ -544,13 +571,33 @@ function decodeState(bytes) {
     });
     offset = end;
   }
+  const pulses = [];
+  let previousActor = null;
+  for (let index = 0; index < pulseCount; index += 1) {
+    if (offset + 40 > bytes.length) throw new KinEngineError(6, "Kin received a truncated pulse record.");
+    const actorId = idToHex(bytes.subarray(offset, offset + 16));
+    const setAt = Number(view.getBigInt64(offset + 16, true));
+    const expiresAt = Number(view.getBigInt64(offset + 24, true));
+    const value = bytes[offset + 32];
+    const status = bytes[offset + 33];
+    if (!Number.isSafeInteger(setAt) || !Number.isSafeInteger(expiresAt) ||
+        Math.abs(setAt) > MAX_TIMESTAMP || Math.abs(expiresAt) > MAX_TIMESTAMP ||
+        expiresAt <= setAt || value > 4 || status > 1 ||
+        bytes.subarray(offset + 34, offset + 40).some(byte => byte !== 0) ||
+        (previousActor !== null && actorId <= previousActor)) {
+      throw new KinEngineError(6, "Kin received an invalid pulse record.");
+    }
+    pulses.push({ actorId, setAt, expiresAt, value: PULSE_VALUES[value], status: ["active", "expired"][status] });
+    previousActor = actorId;
+    offset += 40;
+  }
   if (offset !== bytes.length) {
     throw new KinEngineError(
       6,
       "Kin received trailing bytes from its household engine.",
     );
   }
-  return { items, handoffs, talks };
+  return { items, handoffs, talks, pulses };
 }
 
 function assertId(value) {

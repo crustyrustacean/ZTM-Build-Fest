@@ -30,8 +30,29 @@ pub enum ItemClassification {
     Need,
 }
 
+// Protocol identifiers, never scores or severity levels.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[repr(u8)]
+pub enum PulseValue {
+    Good,
+    Okay,
+    Drained,
+    RoughDay,
+    NeedQuiet,
+}
+
+pub const MAX_TIMESTAMP: i64 = 8_640_000_000_000_000;
+pub fn valid_timestamp(value: i64) -> bool {
+    (-MAX_TIMESTAMP..=MAX_TIMESTAMP).contains(&value)
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum EventKind {
+    PulseSet {
+        value: PulseValue,
+        expires_at: i64,
+    },
+    PulseCleared,
     TalkAdded {
         talk_id: TalkId,
         text: String,

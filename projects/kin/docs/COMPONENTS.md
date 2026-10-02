@@ -1,6 +1,6 @@
 # Web Component Contract
 
-**Status:** Native custom elements present Today, Needs, Handoff and Talk. KinApp orchestrates atomic persistence, Rust replay and retry recovery.
+**Status:** Current through v0.5.0 Pulse; earlier version sections are historical contracts. See Pulse below.
 
 ## Component responsibilities
 
@@ -50,3 +50,7 @@ User-authorized follow-up patch: a failed canonical refresh retains the original
 ## v0.4.0 Talk
 
 kin-talk-list owns the single labeled input and semantic Open/Resolved lists. Bubbling/composed commands: kin:add-talk { text }, kin:resolve-talk { talkId }, kin:reopen-talk { talkId }, kin:archive-talk { talkId }. KinApp validates through Rust and persists; the component only renders and dispatches intent. See [V0.4.0](V0.4.0.md).
+
+## v0.5.0 Pulse
+
+kin-pulse provides native Current capacity/For selects and Set pulse/Change/Clear buttons. kin:set-pulse {value,hours} and kin:clear-pulse bubble/composed. KinApp freezes SET timestamp/expiry and owns persistence, time refresh and retry. Component renders Rust status only. See [V0.5.0](V0.5.0.md).

@@ -1,15 +1,16 @@
 use crate::error::KinError;
 use crate::event::{
-    ActorId, DeviceId, EventEnvelope, EventId, EventKind, HandoffId, HouseholdId,
-    ItemClassification, ItemId, TalkId,
+    valid_timestamp, ActorId, DeviceId, EventEnvelope, EventId, EventKind, HandoffId, HouseholdId,
+    ItemClassification, ItemId, PulseValue, TalkId,
 };
-use crate::state::{HandoffStatus, HouseholdState, ItemStatus, TalkStatus};
+use crate::state::{HandoffStatus, HouseholdState, ItemStatus, PulseStatus, TalkStatus};
 
 pub const PROTOCOL_V1: u16 = 1;
 pub const PROTOCOL_V2: u16 = 2;
 pub const PROTOCOL_V3: u16 = 3;
 pub const PROTOCOL_V4: u16 = 4;
-pub const PROTOCOL_VERSION: u16 = PROTOCOL_V4;
+pub const PROTOCOL_V5: u16 = 5;
+pub const PROTOCOL_VERSION: u16 = PROTOCOL_V5;
 pub const ERROR_PROTOCOL_VERSION: u16 = PROTOCOL_V1;
 pub const MAX_EVENT_COUNT: usize = 10_000;
 pub const MAX_PROTOCOL_BYTES: usize = 64 * 1024 * 1024;
@@ -19,7 +20,7 @@ const EVENT_HEADER_BYTES: usize = 88;
 const RESULT_HEADER_BYTES: usize = 12;
 const ITEM_HEADER_BYTES: usize = 48;
 
-pub fn decode_request(bytes: &[u8]) -> Result<(u16, Vec<EventEnvelope>), KinError> {
+pub fn decode_request(bytes: &[u8]) -> Result<(u16, Vec<EventEnvelope>, Option<i64>), KinError> {
     if bytes.len() > MAX_PROTOCOL_BYTES {
         return Err(KinError::SizeLimit);
     }
@@ -30,7 +31,7 @@ pub fn decode_request(bytes: &[u8]) -> Result<(u16, Vec<EventEnvelope>), KinErro
     let version = read_u16(bytes, 4)?;
     if !matches!(
         version,
-        PROTOCOL_V1 | PROTOCOL_V2 | PROTOCOL_V3 | PROTOCOL_V4
+        PROTOCOL_V1 | PROTOCOL_V2 | PROTOCOL_V3 | PROTOCOL_V4 | PROTOCOL_V5
     ) {
         return Err(KinError::UnsupportedVersion);
     }
@@ -42,11 +43,24 @@ pub fn decode_request(bytes: &[u8]) -> Result<(u16, Vec<EventEnvelope>), KinErro
         return Err(KinError::SizeLimit);
     }
 
+    let as_of = if version == PROTOCOL_V5 {
+        let value = read_i64(bytes, 12)?;
+        if !valid_timestamp(value) {
+            return Err(KinError::MalformedProtocol);
+        }
+        Some(value)
+    } else {
+        None
+    };
     let mut events = Vec::new();
     events
         .try_reserve_exact(event_count)
         .map_err(|_| KinError::SizeLimit)?;
-    let mut offset = REQUEST_HEADER_BYTES;
+    let mut offset = if version == PROTOCOL_V5 {
+        20
+    } else {
+        REQUEST_HEADER_BYTES
+    };
     for _ in 0..event_count {
         let header_end = offset
             .checked_add(EVENT_HEADER_BYTES)
@@ -67,13 +81,13 @@ pub fn decode_request(bytes: &[u8]) -> Result<(u16, Vec<EventEnvelope>), KinErro
     if offset != bytes.len() {
         return Err(KinError::MalformedProtocol);
     }
-    Ok((version, events))
+    Ok((version, events, as_of))
 }
 
 pub fn encode_state(state: &HouseholdState, protocol_version: u16) -> Result<Vec<u8>, KinError> {
     if !matches!(
         protocol_version,
-        PROTOCOL_V1 | PROTOCOL_V2 | PROTOCOL_V3 | PROTOCOL_V4
+        PROTOCOL_V1 | PROTOCOL_V2 | PROTOCOL_V3 | PROTOCOL_V4 | PROTOCOL_V5
     ) {
         return Err(KinError::UnsupportedVersion);
     }
@@ -83,11 +97,15 @@ pub fn encode_state(state: &HouseholdState, protocol_version: u16) -> Result<Vec
     if protocol_version < PROTOCOL_V4 && !state.talks.is_empty() {
         return Err(KinError::UnsupportedVersion);
     }
+    if protocol_version < PROTOCOL_V5 && !state.pulses.is_empty() {
+        return Err(KinError::UnsupportedVersion);
+    }
     if state
         .items
         .len()
         .saturating_add(state.handoffs.len())
         .saturating_add(state.talks.len())
+        .saturating_add(state.pulses.len())
         > MAX_EVENT_COUNT
     {
         return Err(KinError::SizeLimit);
@@ -106,6 +124,10 @@ pub fn encode_state(state: &HouseholdState, protocol_version: u16) -> Result<Vec
     }
     if protocol_version >= PROTOCOL_V4 {
         push_u32(&mut result, state.talks.len() as u32);
+    }
+
+    if protocol_version >= PROTOCOL_V5 {
+        push_u32(&mut result, state.pulses.len() as u32);
     }
 
     for item in &state.items {
@@ -208,6 +230,21 @@ pub fn encode_state(state: &HouseholdState, protocol_version: u16) -> Result<Vec
         push_u32(&mut result, text.len() as u32);
         result.extend_from_slice(text);
     }
+    for pulse in &state.pulses {
+        if result.len().checked_add(40).ok_or(KinError::SizeLimit)? > MAX_PROTOCOL_BYTES {
+            return Err(KinError::SizeLimit);
+        }
+        result.try_reserve(40).map_err(|_| KinError::SizeLimit)?;
+        result.extend_from_slice(&pulse.actor_id.0);
+        result.extend_from_slice(&pulse.set_at.to_le_bytes());
+        result.extend_from_slice(&pulse.expires_at.to_le_bytes());
+        result.push(pulse.value as u8);
+        result.push(match pulse.status {
+            PulseStatus::Active => 0,
+            PulseStatus::Expired => 1,
+        });
+        result.extend_from_slice(&[0; 6]);
+    }
     Ok(result)
 }
 
@@ -230,6 +267,30 @@ fn decode_event(record: &[u8], protocol_version: u16) -> Result<EventEnvelope, K
 
     let payload = &record[EVENT_HEADER_BYTES..];
     let kind = match (event_version, event_kind) {
+        (1, 12) if protocol_version >= PROTOCOL_V5 => {
+            if payload.len() != 16 || payload[1..8] != [0; 7] {
+                return Err(KinError::MalformedProtocol);
+            }
+            let value = match payload[0] {
+                0 => PulseValue::Good,
+                1 => PulseValue::Okay,
+                2 => PulseValue::Drained,
+                3 => PulseValue::RoughDay,
+                4 => PulseValue::NeedQuiet,
+                _ => return Err(KinError::MalformedProtocol),
+            };
+            let expires_at = read_i64(payload, 8)?;
+            if !valid_timestamp(expires_at) || !valid_timestamp(read_i64(record, 68)?) {
+                return Err(KinError::MalformedProtocol);
+            }
+            EventKind::PulseSet { value, expires_at }
+        }
+        (1, 13) if protocol_version >= PROTOCOL_V5 => {
+            if !payload.is_empty() || !valid_timestamp(read_i64(record, 68)?) {
+                return Err(KinError::MalformedProtocol);
+            }
+            EventKind::PulseCleared
+        }
         (1, 1) => {
             if payload.len() < 20 {
                 return Err(KinError::MalformedProtocol);
@@ -456,6 +517,9 @@ mod tests {
         bytes.extend_from_slice(&version.to_le_bytes());
         bytes.extend_from_slice(&0u16.to_le_bytes());
         bytes.extend_from_slice(&count.to_le_bytes());
+        if version == PROTOCOL_V5 {
+            bytes.extend_from_slice(&0i64.to_le_bytes());
+        }
         bytes.extend_from_slice(record);
         bytes
     }
@@ -513,7 +577,7 @@ mod tests {
     fn empty_request_rebuilds_empty_state() {
         for version in [PROTOCOL_V1, PROTOCOL_V2] {
             let request = request_with(&[], version, 0);
-            let (protocol_version, events) = decode_request(&request).unwrap();
+            let (protocol_version, events, _) = decode_request(&request).unwrap();
             let result = encode_state(&rebuild(&events).unwrap(), protocol_version).unwrap();
             assert_eq!(
                 result,
@@ -525,7 +589,7 @@ mod tests {
     #[test]
     fn protocol_v1_history_keeps_its_bytes_and_normalizes_to_today() {
         let request = request_with(&added_record(b"Milk"), PROTOCOL_V1, 1);
-        let (version, events) = decode_request(&request).unwrap();
+        let (version, events, _) = decode_request(&request).unwrap();
         assert_eq!(version, PROTOCOL_V1);
         assert_eq!(events[0].event_version, 1);
         assert!(matches!(
@@ -548,7 +612,7 @@ mod tests {
     #[test]
     fn protocol_v2_carries_classification_and_status() {
         let request = request_with(&added_record_v2(1, 0x22, b"Buy wipes", 1), PROTOCOL_V2, 1);
-        let (version, events) = decode_request(&request).unwrap();
+        let (version, events, _) = decode_request(&request).unwrap();
         assert_eq!(version, PROTOCOL_V2);
         assert!(matches!(
             events[0].kind,
@@ -574,7 +638,7 @@ mod tests {
         let current = added_record_v2(2, 0x22, b"Current item", 1);
         let mut request = request_with(&legacy, PROTOCOL_V2, 2);
         request.extend_from_slice(&current);
-        let (_, events) = decode_request(&request).unwrap();
+        let (_, events, _) = decode_request(&request).unwrap();
         let state = rebuild(&events).unwrap();
         assert_eq!(state.items.len(), 2);
         assert_eq!(state.items[0].classification, ItemClassification::Today);
@@ -595,7 +659,7 @@ mod tests {
         }
 
         assert!(request.len() <= MAX_PROTOCOL_BYTES);
-        let (_, events) = decode_request(&request).unwrap();
+        let (_, events, _) = decode_request(&request).unwrap();
         let state = rebuild(&events).unwrap();
         assert_eq!(state.items.len(), MAX_EVENT_COUNT);
         assert_eq!(state.items[0].text, "x");
@@ -746,7 +810,7 @@ mod tests {
 
     #[test]
     fn protocol_v1_cannot_serialize_unrepresentable_current_state() {
-        let (_, events) = decode_request(&request_with(
+        let (_, events, _) = decode_request(&request_with(
             &added_record_v2(1, 0x11, b"Milk", 1),
             PROTOCOL_V2,
             1,
@@ -809,7 +873,7 @@ mod tests {
     fn maximum_utf8_item_text_is_accepted() {
         let record = added_record(&vec![b'x'; MAX_ITEM_TEXT_BYTES]);
         let request = request_with(&record, PROTOCOL_VERSION, 1);
-        let (_, events) = decode_request(&request).unwrap();
+        let (_, events, _) = decode_request(&request).unwrap();
         assert!(
             matches!(&events[0].kind, EventKind::ItemAdded { text, .. } if text.len() == MAX_ITEM_TEXT_BYTES)
         );
@@ -820,7 +884,7 @@ mod tests {
         let text = "\u{feff}milk 🥛";
         let record = added_record(text.as_bytes());
         let request = request_with(&record, PROTOCOL_VERSION, 1);
-        let (_, events) = decode_request(&request).unwrap();
+        let (_, events, _) = decode_request(&request).unwrap();
         assert!(
             matches!(&events[0].kind, EventKind::ItemAdded { text: decoded, .. } if decoded == text)
         );
@@ -845,7 +909,7 @@ mod tests {
     }
 
     fn handoff_replay(records: &[Vec<u8>]) -> Result<HouseholdState, KinError> {
-        let (_, events) =
+        let (_, events, _) =
             decode_request(&request_with(&records.concat(), 3, records.len() as u32))?;
         rebuild(&events)
     }
@@ -930,7 +994,7 @@ mod tests {
             &bytes[..16],
             &[75, 73, 78, 83, 3, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0]
         );
-        let (_, events) = decode_request(&request_with(&records.concat(), 3, 3)).unwrap();
+        let (_, events, _) = decode_request(&request_with(&records.concat(), 3, 3)).unwrap();
         assert_eq!(events[0].canonical_bytes, added);
         assert_eq!(events[1].canonical_bytes, item);
         for version in [1, 2] {
@@ -995,7 +1059,7 @@ mod tests {
             if !same_actor {
                 ack[36..52].fill(0xdd);
             }
-            let (_, events) =
+            let (_, events, _) =
                 decode_request(&request_with(&[added, ack.clone()].concat(), 3, 2)).unwrap();
             assert_eq!(
                 events[1].actor_id,
@@ -1081,7 +1145,7 @@ mod tests {
     }
 
     fn talk_replay(records: &[Vec<u8>]) -> Result<HouseholdState, KinError> {
-        let (_, events) =
+        let (_, events, _) =
             decode_request(&request_with(&records.concat(), 4, records.len() as u32))?;
         rebuild(&events)
     }
@@ -1165,7 +1229,7 @@ mod tests {
             &bytes[..20],
             &[75, 73, 78, 83, 4, 0, 0, 0, 2, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0]
         );
-        let (_, events) = decode_request(&request_with(&records.concat(), 4, 4)).unwrap();
+        let (_, events, _) = decode_request(&request_with(&records.concat(), 4, 4)).unwrap();
         for (event, original) in events.iter().zip(records) {
             assert_eq!(event.canonical_bytes, original);
         }

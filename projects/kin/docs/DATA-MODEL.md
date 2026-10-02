@@ -1,6 +1,6 @@
 # Data Model
 
-**Status:** Items, Handoffs and Talks share immutable events with separate Rust domain types and projections. Later entities remain specifications.
+**Status:** Current through v0.5.0 Pulse; earlier version sections are historical contracts. See Pulse below.
 
 ## Event-oriented source of truth
 
@@ -55,3 +55,7 @@ Household members should be able to obtain a usable copy of their event data. Fu
 ## Why events
 
 An event history can support reconstruction after reload, household history, event-derived “Since You Last Looked,” offline changes, multiple devices, and later synchronization reconciliation. Those are future capabilities, not claims that history, sync, or conflict resolution exists today. Event retention and deletion also have privacy implications described in [PRIVACY](PRIVACY.md).
+
+## v0.5.0 Pulse
+
+PulseState has actor_id, fixed enum value, set_at, expires_at and active/expired status. No mutable persistent Pulse table; canonical events remain the sole authority. See [V0.5.0](V0.5.0.md).

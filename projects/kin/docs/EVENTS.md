@@ -1,6 +1,6 @@
 # Household Events
 
-**Status:** Item kinds 1–4, Handoff kinds 5–7 and Talk kinds 8–11 are implemented. Later kinds remain future work.
+**Status:** Current through v0.5.0 Pulse; earlier version sections are historical contracts. See Pulse below.
 
 ## Canonical record
 
@@ -106,3 +106,7 @@ Invalid input must not yield partially mutated visible state. The reducer return
 ## v0.4.0 Talk
 
 Stable schema-1 codes: 8 TALK_ADDED, 9 TALK_RESOLVED, 10 TALK_REOPENED, 11 TALK_ARCHIVED. Add payload is talk_id[16], text_length:u32, strict UTF-8 text (1–4096 bytes, nonblank). Lifecycle payloads are exactly talk_id[16]. Codes 1–7 and their canonical bytes are unchanged. Exact duplicate delivery is idempotent; conflicting event identity and duplicate Talk identity fail. See [V0.4.0](V0.4.0.md).
+
+## v0.5.0 Pulse
+
+Schema-1 codes 12 PULSE_SET (value:u8, reserved[7]=0, expires_at:i64; 16 bytes) and 13 PULSE_CLEARED (empty). Actor and set_at come from the envelope. Codes 1–11 unchanged; no expiry/acknowledgement event. See [V0.5.0](V0.5.0.md).

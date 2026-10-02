@@ -1,6 +1,6 @@
 # Entity Lifecycles
 
-**Status:** Item, Handoff and Talk lifecycles are implemented. Later lifecycles remain specifications.
+**Status:** Current through v0.5.0 Pulse; earlier version sections are historical contracts. See Pulse below.
 
 ## Item
 
@@ -74,8 +74,12 @@ PULSE_SET
     +-------------- PULSE_CLEARED -----------> cleared
 ```
 
-Setting a Pulse creates time-bounded context with an explicit expiry. Expiry is a derived condition evaluated against an explicit `as_of` time, not a background event or a permanent member attribute. Clearing appends `PULSE_CLEARED`. A later `PULSE_SET` supersedes the current context through event order. Pulse is planned for v0.5.0.
+Setting a Pulse creates time-bounded context with an explicit expiry. Expiry is a derived condition evaluated against an explicit `as_of` time, not a background event or a permanent member attribute. Clearing appends `PULSE_CLEARED`. A later `PULSE_SET` supersedes the current context through event order. Pulse is implemented in v0.5.0.
 
 ## Future entity lifecycles
 
 Routine occurrences, Agreements, Household membership, credentials, and trusted devices need explicit transitions before their respective implementation milestones. They must not inherit Item transitions by analogy. Member invitation/removal and device revocation are planned for the v0.0.5 identity and pairing specifications.
+
+## v0.5.0 Pulse
+
+SET replaces its actor’s context; CLEAR removes it (absent clear is valid). Expiry derives from as_of >= expires_at, never an event. Latest expired records remain projected until replaced/cleared; no history UI. See [V0.5.0](V0.5.0.md).

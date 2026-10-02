@@ -1,6 +1,6 @@
 # Architecture
 
-**Status:** Today, Needs, Handoff and Talk are implemented locally. Rust owns deterministic domain replay; browser components capture intents and render projection. No runtime dependency or remote service exists.
+**Status:** Current through v0.5.0 Pulse; earlier version sections are historical contracts. See Pulse below.
 
 ## System shape
 
@@ -105,3 +105,7 @@ The goal is not “dependencies are bad.” The goal is to understand and use Ru
 ## Decisions still open
 
 The domain event envelope, event naming, ordering requirements, and replay behavior are specified in [Events](EVENTS.md) and [State](STATE.md). The v0.0.6 [implementation](IMPLEMENTATION.md), [ABI](ABI.md), and [storage](STORAGE.md) contracts define module responsibilities, browser support, buffer protocol, and initial IndexedDB shape. Persistent contract versioning and non-destructive evolution are specified in [VERSIONING](VERSIONING.md) and [MIGRATIONS](MIGRATIONS.md). The examples in this document are not a wire format.
+
+## v0.5.0 Pulse
+
+Pulse adds Rust rebuild_at(events, as_of). Timers request canonical reprojection; Rust never reads ambient time. Same events plus same explicit time yield identical state. See [V0.5.0](V0.5.0.md).

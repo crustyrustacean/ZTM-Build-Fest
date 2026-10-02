@@ -1,6 +1,6 @@
 # Data Migrations
 
-**Status:** No structural migration is required for Talk. Legacy Item/Handoff bytes and new Talk bytes coexist in IndexedDB schema 1 unchanged.
+**Status:** Current through v0.5.0 Pulse; earlier version sections are historical contracts. See Pulse below.
 
 ## Migration categories
 
@@ -50,3 +50,7 @@ Before a migration that rewrites or removes user information, require a verified
 ## Test obligations
 
 Migration implementations must have tests for supported old versions, malformed input, unknown newer versions, interrupted/aborted transaction behavior, preservation of original event bytes, deterministic output, successful replay after migration, and recovery from failure. No migration implementation is part of v0.1.0 beyond creating schema version 1 from an empty database.
+
+## v0.5.0 Pulse
+
+No migration is required. New Pulse events coexist with unchanged historical bytes in IndexedDB schema 1. See [V0.5.0](V0.5.0.md).

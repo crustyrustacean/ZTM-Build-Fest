@@ -1,6 +1,6 @@
 # Local Event Storage
 
-**Status:** IndexedDB schema 1 remains canonical for Item, Handoff and Talk events. No persisted bytes are migrated; stores/indexes are unchanged.
+**Status:** Current through v0.5.0 Pulse; earlier version sections are historical contracts. See Pulse below.
 
 The compose input keeps a best-effort in-progress text and classification draft in the current tab's `sessionStorage`, retaining the existing text key for legacy drafts. This transient data is not an event or household-state source of truth, is cleared only when the exact submitted draft succeeds or the user clears text, and is unavailable across tabs.
 
@@ -74,3 +74,7 @@ The independent draft key is `kin.handoff.draft`; it is best-effort, tab-scoped,
 ## v0.4.0 Talk
 
 IndexedDB remains schema 1 without structural migration. Talk commands use the existing atomic event/counter transaction and Rust validation. Independent best-effort session draft kin.talk.draft clears only after its matching submission succeeds; older retry/completion preserves newer text. Content-free invalidation remains { type: "events-changed" }. See [V0.4.0](V0.4.0.md).
+
+## v0.5.0 Pulse
+
+IndexedDB remains schema 1; no migration or second authority. Pulse shares atomic event/counter transactions. Original failed SET retry preserves timestamp/value/expiry. BroadcastChannel remains exactly { type: "events-changed" }; peers reload canonical events through Rust with explicit time. See [V0.5.0](V0.5.0.md).
