@@ -2,7 +2,7 @@
 
 > A private, lightweight household coordination app for the little things families need to know, remember, hand off, or discuss.
 
-**Current status: `v0.0.5` — Trust, Identity, and Synchronization Design. No usable application has been implemented.** This release documents future identity, pairing, cryptographic, threat, and synchronization boundaries only. There is nothing to install or run yet; the first functional prototype remains planned for `v0.1.0`.
+**Current status: `v0.0.6` — implementation-ready planning milestone. No usable application has been implemented.** Product, domain, privacy, architecture, UX, trust, and implementation contracts are documented; the first coded prototype is planned next for `v0.1.0`. There is nothing to install or run yet.
 
 ## The problem
 
@@ -23,7 +23,7 @@ The intended technical direction is Rust compiled to WebAssembly, native Web Com
 - `v0.0.3` — UX flows and implementation planning (`kin-v0.0.3`)
 - `v0.0.4` — Household Domain Specification (`kin-v0.0.4`)
 - `v0.0.5` — Trust, Identity, and Synchronization Design (`kin-v0.0.5`)
-- `v0.0.6` — Implementation Contract
+- `v0.0.6` — Implementation Contract (`kin-v0.0.6`)
 - `v0.1.0` — First functional prototype
 
 ## Install and run
@@ -50,6 +50,12 @@ AI-assisted development tools are being used for brainstorming, product planning
 - [Synchronization design](docs/SYNC.md)
 - [Cryptographic posture](docs/CRYPTOGRAPHY.md)
 - [Threat model](docs/THREAT-MODEL.md)
+- [Implementation layout and responsibilities](docs/IMPLEMENTATION.md)
+- [JavaScript/WASM ABI](docs/ABI.md)
+- [IndexedDB storage contract](docs/STORAGE.md)
+- [Web Component contract](docs/COMPONENTS.md)
+- [Testing contract](docs/TESTING.md)
+- [Accessibility contract](docs/ACCESSIBILITY.md)
 - [UX flows](docs/UX.md)
 - [Roadmap](docs/ROADMAP.md)
 - [v0.1.0 implementation specification](docs/V0.1.0.md)

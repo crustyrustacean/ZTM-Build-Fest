@@ -1,6 +1,6 @@
 # Roadmap
 
-This roadmap is a planning baseline, not a promise of delivery dates. Releases may change as the product is tested. Kin is currently in documentation-only `v0.0.5`; no application code exists. Planning continues through `v0.0.6`.
+This roadmap is a planning baseline, not a promise of delivery dates. Releases may change as the product is tested. Kin is currently at the completed documentation-only `v0.0.6` milestone; no application code exists. Planning is complete and v0.1.0 is the next, first coded release.
 
 ## Planning releases
 
@@ -26,7 +26,7 @@ Specify household/member/device/credential identity, pairing and device revocati
 
 ### `v0.0.6` — Implementation Contract
 
-Freeze the v0.1.0 scope and specify its ABI, protocol, local storage, components, testing, accessibility, and release gate. This completes planning; it does not ship an app.
+Freeze the v0.1.0 scope and specify its ABI, protocol, local storage, components, testing, accessibility, and release gate. This completes planning; it does not ship an app. See [IMPLEMENTATION](IMPLEMENTATION.md), [ABI](ABI.md), [STORAGE](STORAGE.md), [COMPONENTS](COMPONENTS.md), [TESTING](TESTING.md), [ACCESSIBILITY](ACCESSIBILITY.md), and [V0.1.0](V0.1.0.md).
 
 ## First coded release
 

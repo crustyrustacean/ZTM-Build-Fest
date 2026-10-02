@@ -117,6 +117,8 @@ All releases through `v0.0.6` are **planning and documentation releases only**.
 
 No functional application code should be introduced during these versions.
 
+Planning through `v0.0.6` is complete. `v0.1.0` is the first coded milestone. When implementation is explicitly authorized, follow [docs/V0.1.0.md](docs/V0.1.0.md) and its linked ABI, storage, component, test, and accessibility contracts. Do not allow features assigned to later versions to leak into v0.1.0.
+
 The first implementation release is:
 
 ```text
