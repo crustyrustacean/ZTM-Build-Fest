@@ -392,6 +392,13 @@ async function regressions() {
     );
     if (changed) edit("Buy bread", "today");
     if (changed) {
+      const retry = app.retryAction;
+      const load = app.store.loadEvents.bind(app.store);
+      app.store.loadEvents = async () => { throw new Error("Synthetic item refresh failure"); };
+      try { await app.refreshFromEvents(); await app.refreshFromEvents(); }
+      finally { app.store.loadEvents = load; }
+      await app.retryAction();
+      check(app.retryAction === retry, "Item retry survives repeated refresh failure");
       app.handlePeerMessage({ data: { type: "events-changed" } });
       await idle();
       check(

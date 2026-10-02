@@ -2,6 +2,20 @@
 
 This file records completed Kin releases. The `v0.0.x` releases are planning and documentation milestones; they do not represent implemented application features. The first implementation milestone remains `v0.1.0`.
 
+## [0.3.4] — Handoff Retry Recovery
+
+### Fixed
+
+- A failed canonical refresh could replace and lose an earlier failed save/action retry. Preserve the original command, intent and feedback through repeated refresh failures; restore it only after successful canonical replay. Recovery does not automatically append anything.
+- Stale actions still clear against Rust-derived state. A newly submitted command supersedes the suspended retry. The shared fix also preserves Item retries and keeps newer capture drafts intact.
+- Added a browser regression that failed before the fix, plus repeated-failure, add/action recovery, stale cross-tab acknowledgement/archive, Item retry and superseding-command coverage.
+
+### Validation
+
+- Passed 51 Rust tests, 13 Node bridge/real-WASM tests, formatting, Clippy with warnings denied, release WASM build, both build scripts, version consistency and the full browser runner.
+- Tested with Windows x64, Node 22.12.0, headless Chrome 154.0.8037.59; POSIX build ran in WSL Ubuntu 22.04. Existing 320px/accessibility-mode, storage, protocol, CSP and same-origin regressions remain passing. Firefox, Safari, native desktop zoom, NVDA and VoiceOver remain unverified.
+- No new product capability, persisted event change, IndexedDB migration, protocol change, or dependency. Earlier release tags remain unchanged.
+
 ## [0.3.3] — Handoff Hardening & Polish
 
 - Added deterministic Handoff header/extreme-length checks, 10,000-event mixed replay, every truncated result boundary, trailing result rejection, and real WASM memory growth with repeated success/error/empty replay.

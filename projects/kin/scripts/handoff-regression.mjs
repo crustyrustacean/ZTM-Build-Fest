@@ -46,6 +46,19 @@ export async function handoffRegressions() {
   try { await submit(); } finally { IDBObjectStore.prototype.add = originalAdd; }
   check(!app.retryButton.hidden && capture.input.value === "Original handoff", "failed add retains draft/retry");
   edit("Newer handoff draft");
+  const originalRetry = app.retryAction;
+  const originalMessage = app.alert.textContent;
+  const loadEvents = app.store.loadEvents.bind(app.store);
+  app.store.loadEvents = async () => { throw new Error("Synthetic refresh failure"); };
+  try {
+    await app.refreshFromEvents();
+    await app.refreshFromEvents();
+    check(app.retryAction === app.retryRefresh, "failed refresh offers refresh recovery first");
+  } finally { app.store.loadEvents = loadEvents; }
+  await app.retryAction();
+  check(app.retryAction === originalRetry && app.alert.textContent === originalMessage,
+    "recovered refresh restores original failed Handoff command");
+  check((await count()) === before + 3, "refresh recovery must not append automatically");
   app.retryButton.click(); app.retryButton.click();
   await idle();
   check((await count()) === before + 4 && app.state.handoffs.at(-1).text === "Original handoff", "retry original exactly once");
@@ -115,6 +128,12 @@ export async function handoffRegressions() {
     finally { IDBObjectStore.prototype.add = originalAdd; }
     check((await count()) === beforeAction && !app.retryButton.hidden, "failed Handoff action keeps retry");
     check(document.activeElement === capture.input && app.alert.getAttribute("role") === "alert", "action error focus/announcement");
+    const actionRetry = app.retryAction;
+    app.store.loadEvents = async () => { throw new Error("Synthetic action refresh failure"); };
+    try { await app.refreshFromEvents(); await app.refreshFromEvents(); }
+    finally { app.store.loadEvents = loadEvents; }
+    await app.retryAction();
+    check(app.retryAction === actionRetry, "refresh recovery retains Handoff action retry");
     app.retryButton.click(); app.retryButton.click(); app.retryButton.click();
     await idle();
     check((await count()) === beforeAction + 1 && app.state.handoffs.find(row=>row.handoffId===target).status===status, "rapid action retries persist once");
@@ -126,6 +145,17 @@ export async function handoffRegressions() {
     edit("Handoff storage unavailable"); await submit();
     check(capture.input.value === "", "session storage denial permits Handoff capture");
   } finally { Storage.prototype.setItem = originalSet; Storage.prototype.removeItem = originalRemove; }
+  const realAppend = app.store.append;
+  app.store.append = async () => { throw new Error("Synthetic save failure"); };
+  try { await app.handleAddHandoff({detail:{text:"Superseded retry"}}); }
+  finally { app.store.append = realAppend; }
+  app.store.loadEvents = async () => { throw new Error("Synthetic refresh failure"); };
+  try { await app.refreshFromEvents(); }
+  finally { app.store.loadEvents = loadEvents; }
+  await app.handleAddHandoff({detail:{text:"New command after refresh failure"}});
+  await app.refreshFromEvents();
+  check(app.retryAction === null && app.suspendedRetry === null &&
+    !app.state.handoffs.some(row=>row.text==="Superseded retry"), "new command supersedes suspended retry");
   edit("Newer handoff draft");
   const events = (await app.store.loadEvents()).map(row => row.encoded_event);
   check(JSON.stringify(app.engine.applyEvents(events)) === JSON.stringify(app.state), "mixed deterministic replay");
@@ -174,6 +204,13 @@ export async function handoffPeerRegressions(first, second, until) {
       try { await app.handleHandoffAction('${action}','${id}'); }
       finally { IDBObjectStore.prototype.add=original; }
     })()`);
+    await second.evaluate(`(async()=>{
+      const app=document.querySelector('kin-app');
+      const load=app.store.loadEvents.bind(app.store);
+      app.store.loadEvents=async()=>{throw new Error('Synthetic refresh failure');};
+      try { await app.refreshFromEvents(); await app.refreshFromEvents(); }
+      finally { app.store.loadEvents=load; }
+    })()`);
     const count = await first.evaluate('(async()=>(await document.querySelector("kin-app").store.loadEvents()).length)()');
     await first.evaluate(`document.querySelector('kin-app').handleHandoffAction('archive-handoff','${id}')`);
     await second.evaluate('document.querySelector("kin-app").retryButton.click()');
@@ -185,5 +222,5 @@ export async function handoffPeerRegressions(first, second, until) {
   await first.evaluate("document.querySelector('kin-app').handleAddHandoff({detail:{text:'Focus refresh Handoff'}})");
   await until(() => second.evaluate("document.querySelector('kin-app').state.handoffs.some(row=>row.text==='Focus refresh Handoff')"));
   assert.equal(await second.evaluate('document.activeElement===document.querySelector("#handoff-text")'),true);
-  console.log("PASS Handoff cross-tab canonical convergence, content-free invalidation, stale acknowledgement/archive retries with and without notification, peer focus");
+  console.log("PASS Handoff cross-tab canonical convergence, content-free invalidation, stale acknowledgement/archive retries after refresh failures with and without notification, peer focus");
 }

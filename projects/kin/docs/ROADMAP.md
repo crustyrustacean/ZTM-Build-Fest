@@ -1,6 +1,6 @@
 # Roadmap
 
-This roadmap is a planning baseline, not a promise of dates. The current release is `v0.3.3 — Handoff Hardening & Polish`. The approved v0.3.0–v0.3.3 line is complete. Stop for user evaluation before another patch or v0.4.0 Talk. Historical planning releases remain preserved.
+This roadmap is a planning baseline, not a promise of dates. The current release is `v0.3.4 — Handoff Retry Recovery`. The planned v0.3.0–v0.3.3 line and user-authorized v0.3.4 recovery patch are complete. Stop for user evaluation before another patch or v0.4.0 Talk. Historical planning releases remain preserved.
 
 ## Planning releases
 
@@ -119,6 +119,10 @@ Completed: interrupted capture, drafts, failed-action retries, stale peers, focu
 ### `v0.3.3` — Handoff Hardening & Polish
 
 Completed: parser boundaries, 10,000-event replay, real WASM memory growth, architecture/privacy audit and documentation reconciliation. Stop for evaluation.
+
+### `v0.3.4` — Handoff Retry Recovery
+
+Completed: preserve failed command retries through repeated canonical-refresh failures. Reconcile stale actions after recovery and discard superseded retries. No new capability. Stop for evaluation.
 
 ### `v0.4.0` — Talk
 

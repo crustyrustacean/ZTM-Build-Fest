@@ -24,6 +24,7 @@ class KinApp extends HTMLElement {
     this.pendingRefresh = false;
     this.retryAction = null;
     this.retryIntent = null;
+    this.suspendedRetry = null;
     this.retryRefresh = () => this.refreshFromEvents();
     this.onAddItem = (event) => this.handleAddItem(event);
     this.onCompleteItem = (event) => this.handleCompleteItem(event);
@@ -328,10 +329,15 @@ class KinApp extends HTMLElement {
     }
     this.refreshing = true;
     this.setBusy(true);
-    const previousRetry =
-      this.retryAction !== this.retryRefresh ? this.retryAction : null;
-    const previousRetryIntent = this.retryIntent;
-    const previousAlert = this.alert.textContent;
+    // A failed refresh must not replace the command awaiting recovery.
+    const previousFailure = this.suspendedRetry ?? {
+      action: this.retryAction !== this.retryRefresh ? this.retryAction : null,
+      intent: this.retryIntent,
+      message: this.alert.textContent,
+    };
+    const previousRetry = previousFailure.action;
+    const previousRetryIntent = previousFailure.intent;
+    const previousAlert = previousFailure.message;
     const restoreComposeFocus = this.today.contains(document.activeElement);
     const restoreHandoffFocus = this.handoffs.lists.contains(document.activeElement);
     this.clearAlert();
@@ -363,6 +369,7 @@ class KinApp extends HTMLElement {
           "Kin could not refresh from local household storage. Your saved information was not deleted.",
         this.retryRefresh,
       );
+      this.suspendedRetry = previousRetry ? previousFailure : null;
       this.setStatus("");
     } finally {
       this.refreshing = false;
@@ -407,6 +414,7 @@ class KinApp extends HTMLElement {
     this.retryButton.hidden = true;
     this.retryAction = null;
     this.retryIntent = null;
+    this.suspendedRetry = null;
   }
 
   showAlert(message, retryAction = null, retryIntent = null) {
