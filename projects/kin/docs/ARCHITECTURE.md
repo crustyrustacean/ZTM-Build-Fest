@@ -1,6 +1,6 @@
 # Architecture
 
-**Status:** the v0.2.0 Today + Needs architecture is implemented. Rust owns classification normalization and item transitions; JavaScript remains a browser adapter. Later product areas are future work.
+**Status:** Today, Needs, and Handoff are implemented. Rust owns domain replay; browser components capture intents and render projection. No runtime dependency or remote service exists.
 
 ## System shape
 
@@ -86,7 +86,7 @@ The v0.1.x core is intended to be extended, not treated as proof that later feat
 | Future capability     | Foundation already present                           | Extendable without replacing the core? | Still required                                                     |
 | --------------------- | ---------------------------------------------------- | -------------------------------------- | ------------------------------------------------------------------ |
 | Today / Needs         | Versioned event pipeline and Rust-derived projection | Implemented in v0.2.0                  | Stabilization and accessibility audit in v0.2.1–v0.2.3             |
-| Handoff               | Actor-aware immutable event envelope                 | Yes                                    | Handoff-specific events and lifecycle                              |
+| Handoff | Actor-aware immutable event envelope | Implemented in v0.3.0 | Stabilization through v0.3.3 |
 | Talk                  | Identified events and deterministic replay           | Yes                                    | Talk-specific lifecycle events and UI                              |
 | Pulse                 | Actor IDs and timestamps                             | Yes                                    | Time-bounded domain, explicit evaluation time, and expiry rules    |
 | Since You Last Looked | Ordered immutable event history                      | Yes                                    | Last-seen marker and derived summary                               |

@@ -1,6 +1,6 @@
 # Contributing to Kin
 
-Thanks for considering a contribution. Kin is an open-source project for lightweight household coordination. The current implementation is the local-first Household Heartbeat prototype; contributions should follow its frozen v0.1.x scope and preserve the project's privacy, accessibility, and repository-boundary requirements.
+Thanks for considering a contribution. Kin is an open-source project for lightweight household coordination. The current implementation is the local-first Today, Needs, and Handoff prototype; contributions should follow the frozen v0.3.0 contract and approved stabilization scope and preserve the project's privacy, accessibility, and repository-boundary requirements.
 
 ## Project purpose
 

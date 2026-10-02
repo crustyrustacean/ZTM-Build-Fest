@@ -1,6 +1,6 @@
 # Development Workflow
 
-**Status:** current workflow for the v0.2.x Today + Needs prototype.
+**Status:** current workflow for the v0.3.5 Today + Needs + Handoff prototype.
 
 ## Build and run
 
@@ -26,11 +26,10 @@ open the supported browser and exercise Today + Needs
 From the repository root in PowerShell:
 
 ```powershell
-.\projects\kin\build-wasm.ps1
-py -m http.server 8000 --directory projects/kin/web
+./projects/kin/run.ps1
 ```
 
-Open `http://localhost:8000`. On macOS/Linux, build from the repository root with `sh projects/kin/build-wasm.sh`, then serve with `python3 -m http.server 8000 --directory projects/kin/web`. Never run Cargo from the Build Fest repository root for Kin; generated artifacts belong under `projects/kin/`.
+The launcher builds the WASM module and serves the web app at `http://localhost:8000`; press Ctrl+C to stop it. On macOS/Linux, run `sh projects/kin/run.sh` from the repository root. Never run Cargo from the Build Fest repository root for Kin; generated artifacts belong under `projects/kin/`.
 
 ## First-class operating systems
 
@@ -43,7 +42,7 @@ Windows developers should be able to use PowerShell and standard Rust tooling. m
 - Rust toolchain (`rustup`, `cargo`) and the `wasm32-unknown-unknown` target
 - A modern browser with the platform APIs in [IMPLEMENTATION](IMPLEMENTATION.md)
 - A lightweight static-file server bound to localhost during development
-- Optional system Python for serving static files (`py -m http.server` on Windows or `python3 -m http.server` on macOS/Linux); this is not an application dependency
+- Python 3 for the launchers' static server; this is not an application runtime dependency
 - Optional Node.js for the built-in bridge regression tests; no npm packages are required
 - Python 3.11 or later for the built-in TOML-based version consistency check
 
@@ -51,7 +50,7 @@ No npm dependency tree or framework runtime is planned. If static serving later 
 
 ## Browser capabilities
 
-The application requires WebAssembly, ES modules, Custom Elements, IndexedDB, `CustomEvent`, text encoders/decoders, and secure-context browser APIs. WebAuthn and Web Crypto for content security belong to later identity/sync work, not v0.2.x. Browser validation is recorded per release and does not certify the full browser support target.
+The application requires WebAssembly, ES modules, Custom Elements, IndexedDB, `CustomEvent`, text encoders/decoders, and secure-context browser APIs. WebAuthn and Web Crypto for content security belong to later identity/sync work, not v0.3.x. Browser validation is recorded per release and does not certify the full browser support target.
 
 ## Development data
 

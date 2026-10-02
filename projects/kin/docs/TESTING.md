@@ -1,6 +1,6 @@
 # v0.1.0 Testing Contract
 
-**Status:** v0.2.3 completes the approved v0.2.x regression line. It retains the v0.1.x/v0.2.1/v0.2.2 dependency-free Rust, Node bridge, and browser-native coverage, including architecture/privacy checks and a maximum 10,000-event replay through Rust and real WASM. Accessibility requirements are in [ACCESSIBILITY](ACCESSIBILITY.md); event/protocol behavior is in [EVENTS](EVENTS.md) and [ABI](ABI.md).
+**Status:** The complete prior regression suite is retained and extended for Handoff. See V0.3.0 for the release gate and CHANGELOG for actual results/environments.
 
 ## Rust domain tests
 
@@ -82,3 +82,27 @@ The following platforms/assistive technologies are not certified by the Windows/
 - [ ] VoiceOver with Safari: labels, status/error announcements, completion, and focus restoration.
 
 Do not introduce an external test framework just for convenience. Record tested browser/runtime versions and manual steps in the release notes when implementation begins.
+
+## Handoff
+
+Coverage in protocol.rs, kin-engine.test.mjs, and scripts/handoff-regression.mjs (called by the browser runner) exercises mixed replay, lifecycle, legacy rejection, immutable storage, inert text, drafts/retries, and cross-tab canonical state.
+
+## v0.3.1 correctness evidence
+
+Handoff tests reject every shortened payload, overlong references, unsupported schemas, extreme lengths, invalid UTF-8 and whitespace-only domain text. Exact v3 result records and separate entity namespaces are checked. Actor provenance comes from envelopes; same and different acknowledging actors both succeed. Browser fault injection verifies event/counter rollback, retry once, and metadata mismatch preservation; Node tests reject malformed Handoff result fields and recover on the next call.
+
+## v0.3.2 resilience and accessibility
+
+The browser runner covers delayed Handoff persistence across reconnect/peer refresh, newer draft ownership, sessionStorage denial, acknowledgement/archive failure and abort retry, rapid repeated retry, and stale actions without invalidation delivery. Handoff semantics, focus, announcements, disabled controls and touch targets are checked under the existing accessibility modes. No screen-reader or native desktop zoom certification is claimed.
+
+## v0.3.3 hardening evidence
+
+Rust checks truncated Handoff request/event headers, reserved fields, extreme text lengths and a deterministic 10,000-event mixed projection. Real WASM tests reject every truncated Handoff result boundary and trailing bytes, observe memory growth during 10,000-Handoff replay, and verify independent host-owned results across success/error/empty/repeated calls. The complete earlier regression suite remains required.
+
+## v0.3.4 retry recovery
+
+User-authorized follow-up patch: a failed canonical refresh retains the original failed command and feedback in transient application memory. Repeated refresh failure offers refresh retry first; successful Rust replay restores the command retry unless canonical state invalidates it. No automatic append occurs on refresh recovery. New commands supersede suspended retries. Browser regressions cover Handoff add/acknowledge/archive, Item add, repeated failure, newer drafts, stale peer actions and supersession. This is not persisted household state or a new capability.
+
+## v0.3.5 build and run workflow
+
+Validate both launchers through the existing platform build scripts, confirm the server serves `web/` on loopback port 8000, and run the complete browser regression suite against the generated WASM. The launch workflow changes no application behavior.

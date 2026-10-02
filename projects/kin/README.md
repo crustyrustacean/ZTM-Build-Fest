@@ -2,7 +2,7 @@
 
 > A private, lightweight household coordination app for the little things families need to know, remember, hand off, or discuss.
 
-**Current status: `v0.2.4` — Today + Needs Compatibility Fixes.** Kin separates household items into Today and Needs, defaults fast capture to Needs, and supports completion, reopening, and archival. Rust remains the only domain reducer; IndexedDB schema 1 remains canonical, v0.1.x event bytes remain unchanged, and no runtime framework or remote service is present. The v0.2.x line adds no concepts beyond Today + Needs; `v0.3.0 — Handoff` remains future work.
+**Current status: `v0.3.5` — Build & Run Convenience.** Kin separates household items into Today and Needs, defaults fast capture to Needs, and supports completion, reopening, and archival. Rust remains the only domain reducer; IndexedDB schema 1 remains canonical, v0.1.x event bytes remain unchanged, and no runtime framework or remote service is present. Handoff adds short context capture, acknowledgement, and archival with protocol v3. Actor IDs remain local placeholders, not verified people.
 
 ## The problem
 
@@ -12,7 +12,7 @@ Kin aims to make useful household context easier to share and find. It is not a 
 
 ## Intended direction
 
-Kin is intended as a private, lightweight shared household operating layer. Today and Needs views, lightweight classification, capture, completion, reopening, and archival are implemented locally. Handoff, Talk, Pulse, Routines, and Since You Last Looked remain future concepts.
+Kin is intended as a private, lightweight shared household operating layer. Today and Needs views, lightweight classification, capture, completion, reopening, and archival are implemented locally. Handoff capture, acknowledgement, and recent context are implemented locally. Talk, Pulse, Routines, and Since You Last Looked remain future concepts.
 
 The intended technical direction is Rust compiled to WebAssembly, native Web Components, vanilla JavaScript, and browser APIs, with a local-first start and no external framework unless a demonstrated requirement justifies one.
 
@@ -41,21 +41,26 @@ The intended technical direction is Rust compiled to WebAssembly, native Web Com
 - `v0.2.2` — Today + Needs Resilience & Accessibility (`kin-v0.2.2`)
 - `v0.2.3` — Today + Needs Hardening & Polish (`kin-v0.2.3`)
 - `v0.2.4` — Today + Needs Compatibility Fixes (`kin-v0.2.4`)
+- `v0.3.0` — Handoff (`kin-v0.3.0`)
+- `v0.3.1` — Handoff Correctness (`kin-v0.3.1`)
+- `v0.3.2` — Handoff Resilience & Accessibility (`kin-v0.3.2`)
+- `v0.3.3` — Handoff Hardening & Polish (`kin-v0.3.3`)
+- `v0.3.4` — Handoff Retry Recovery (`kin-v0.3.4`)
+- `v0.3.5` — Build & Run Convenience (`kin-v0.3.5`)
 - See the [changelog](CHANGELOG.md) for the completed release history.
 
 ## Install, build, and run
 
-Requirements: Rust/Cargo with the `wasm32-unknown-unknown` target, Python 3 for the optional static server, and a modern browser with WebAssembly, ES modules, Custom Elements, and IndexedDB.
+Requirements: Rust/Cargo with the `wasm32-unknown-unknown` target, Python 3, and a modern browser with WebAssembly, ES modules, Custom Elements, and IndexedDB.
 
 From the repository root in PowerShell:
 
 ```powershell
 rustup target add wasm32-unknown-unknown
-.\projects\kin\build-wasm.ps1
-py -m http.server 8000 --directory projects/kin/web
+./projects/kin/run.ps1
 ```
 
-Then open `http://localhost:8000`. On macOS/Linux, build and copy the local WASM artifact with `sh projects/kin/build-wasm.sh`, then serve with `python3 -m http.server 8000 --directory projects/kin/web`.
+The script builds the WASM module and serves the web app at `http://localhost:8000`. On macOS/Linux, run `sh projects/kin/run.sh` from the repository root.
 
 Kin stores household events in the current browser profile's IndexedDB and may keep the in-progress compose draft in tab-scoped `sessionStorage`. It does not provide accounts, backup, encryption, pairing, or cross-device sync; browser storage is not a security boundary against device compromise or extensions. Use synthetic household text while evaluating this prototype.
 
@@ -115,3 +120,4 @@ Kin is nested in the ZTM Build Fest repository. Its community files and template
 - [UX flows](docs/UX.md)
 - [Roadmap](docs/ROADMAP.md)
 - [v0.1.0 implementation specification](docs/V0.1.0.md)
+- [Handoff release contract and final validation](docs/V0.3.0.md)

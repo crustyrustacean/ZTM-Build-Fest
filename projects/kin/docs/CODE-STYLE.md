@@ -1,6 +1,6 @@
 # Code Style Contract
 
-**Status:** conventions for the current v0.2.x implementation. Follow repository/tool defaults where they preserve clarity; this document is guidance, not a formatter configuration.
+**Status:** conventions for the current v0.3.x implementation. Follow repository/tool defaults where they preserve clarity; this document is guidance, not a formatter configuration.
 
 ## Rust
 

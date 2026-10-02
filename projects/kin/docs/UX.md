@@ -1,6 +1,6 @@
 # UX
 
-**Status:** Today and Needs, fixed classification, fast capture, and item lifecycle actions are implemented. Handoff, Talk, Pulse, and Since You Last Looked sections remain conceptual.
+**Status:** Today, Needs, and Handoff are implemented. Talk, Pulse, and Since You Last Looked remain conceptual.
 
 ## Primary question
 
@@ -12,7 +12,7 @@ The home view should make useful context scannable and keep capture close at han
 
 ## Current home hierarchy
 
-The implemented view presents Today and Needs as separate sections, with active and completed items grouped within each. Archived items are omitted. This is the current structure, not a commitment to the other concepts shown below.
+The implemented view presents Today and Needs as separate sections, with active and completed items grouped within each. Archived items are omitted. Handoff follows with dedicated capture, needs-attention context, and recent acknowledged context; archived rows are hidden.
 
 ## Future home concepts
 
@@ -68,7 +68,7 @@ The two classifications are fixed. Do not add category management or require mor
 
 ## Handoff
 
-A handoff should transfer actionable context in a few short entries, rather than demand a formal report:
+Handoff currently captures one short text entry and prioritizes unacknowledged context. Acknowledged entries stay in Recent until archived, newest additions first. There is no history browser or time-based expiry. The following earlier structured example is illustrative content only; it is not implemented categories or child records:
 
 ```text
 Kid
@@ -83,7 +83,7 @@ FYI
 Grandma called.
 ```
 
-The receiver should be able to understand what matters without reconstructing a long message thread. Acknowledgement, if added, should confirm receipt rather than grade the sender or receiver.
+The receiver should be able to understand what matters without reconstructing a long message thread. Acknowledgement confirms receipt without claiming a named person saw it, agreement, approval, completion, or responsibility. The current form has one short text field, with no categories or structured child records.
 
 ## Talk
 

@@ -1,6 +1,6 @@
 # Accessibility Contract
 
-**Status:** the v0.2.3 hardening pass completes the approved Today/Needs accessibility audit. The native controls and v0.1.x baseline remain; release-specific evidence and unverified environments are listed in the changelog.
+**Status:** Today/Needs accessibility is retained. Handoff uses semantic lists, a dedicated labeled form, visible actions, textual status, and focus restoration. Testing gaps are recorded in the changelog.
 
 ## Baseline requirements
 
@@ -38,3 +38,11 @@ Kin should remain usable one-handed on a phone and during interruptions:
 ## v0.1.0 acceptance
 
 Today/Needs capture and complete/reopen/archive controls work with keyboard alone, restore focus after asynchronous updates, announce result/error state, expose a busy state, and remain understandable without color. Release-specific browser evidence and unverified platforms are recorded in the changelog. Mobile usability and accessibility checks are release requirements, not optional polish.
+
+## Handoff
+
+Handoff add/acknowledge/archive restore its input focus. Peer refresh restores focus there when replacing a focused Handoff action. Busy state disables every Item/Handoff control plus retry. Semantic headings and textual acknowledgement communicate status without color or named identity.
+
+## v0.3.2 resilience and accessibility
+
+The browser runner covers delayed Handoff persistence across reconnect/peer refresh, newer draft ownership, sessionStorage denial, acknowledgement/archive failure and abort retry, rapid repeated retry, and stale actions without invalidation delivery. Handoff semantics, focus, announcements, disabled controls and touch targets are checked under the existing accessibility modes. No screen-reader or native desktop zoom certification is claimed.

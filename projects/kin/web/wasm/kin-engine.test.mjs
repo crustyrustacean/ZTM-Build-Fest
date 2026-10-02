@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
 
-import { encodeAddedRecord, loadKinEngine } from "./kin-engine.js";
+import { encodeAddedRecord, encodeHandoffAddedRecord, encodeHandoffAcknowledgedRecord, encodeHandoffArchivedRecord, loadKinEngine } from "./kin-engine.js";
 
 const zeroId = new Uint8Array(16);
 
@@ -171,7 +171,7 @@ test("real WASM ABI clears stale result and error buffers across versions", asyn
   const apply = await rawEngine();
   for (let iteration = 0; iteration < 8; iteration++) {
     assert.deepEqual(apply(1, [legacyRecord(1, 1), legacyRecord(2, 2)]), expectedState(1, 1));
-    apply(3, [], 3);
+    apply(99, [], 3);
     assert.deepEqual(apply(2, []), expectedState(2));
     apply(1, [legacyRecord(4, 2)], 3);
     assert.deepEqual(apply(1, []), expectedState(1));
@@ -182,7 +182,7 @@ test("real WASM ABI clears stale result and error buffers across versions", asyn
 test("bridge decodes real v1 and v2 completed results as Today, not Need", async (context) => {
   const instantiate = WebAssembly.instantiate;
   let requestedVersion = 1;
-  // The browser writes v2 only. A test transport shim requests v1 from the
+  // The browser writes v3 only. A test transport shim requests v1 from the
   // real encoder so the bridge's historical decoder is exercised as well.
   context.mock.method(WebAssembly, "instantiate", async (...args) => {
     const { instance } = await instantiate(...args);
@@ -202,7 +202,7 @@ test("bridge decodes real v1 and v2 completed results as Today, not Need", async
   const wasm = await readFile(new URL("./kin_engine.wasm", import.meta.url));
   const engine = await loadKinEngine(`data:application/wasm;base64,${wasm.toString("base64")}`);
   for (requestedVersion of [1, 2]) {
-    assert.deepEqual(engine.applyEvents([]), { items: [] });
+    assert.deepEqual(engine.applyEvents([]), { items: [], handoffs: [] });
     for (const completed of [false, true]) {
       const records = [legacyRecord(1, 1)];
       if (completed) records.push(legacyRecord(2, 2));
@@ -216,4 +216,119 @@ test("bridge decodes real v1 and v2 completed results as Today, not Need", async
       }]);
     }
   }
+});
+
+function handoff(sequence, kind = 5, text = "Dishwasher running") {
+  const identity = { eventId: new Uint8Array(16).fill(sequence), householdId: new Uint8Array(16).fill(0xaa),
+    actorId: new Uint8Array(16).fill(0xbb), deviceId: new Uint8Array(16).fill(0xcc),
+    timestamp: sequence, logicalTime: sequence, handoffId: new Uint8Array(16).fill(0x22), text };
+  return (kind === 5 ? encodeHandoffAddedRecord : kind === 6 ? encodeHandoffAcknowledgedRecord : encodeHandoffArchivedRecord)(identity);
+}
+
+test("protocol v3 mixed replay preserves legacy bytes and Handoff lifecycle", async () => {
+  const wasm = await readFile(new URL("./kin_engine.wasm", import.meta.url));
+  const engine = await loadKinEngine(`data:application/wasm;base64,${wasm.toString("base64")}`);
+  const legacy = legacyRecord(1, 1);
+  const snapshot = legacy.slice();
+  const records = [legacy, handoff(2)];
+  const state = engine.applyEvents(records);
+  assert.equal(state.items[0].classification, "today");
+  assert.equal(state.handoffs[0].status, "unacknowledged");
+  assert.equal(state.handoffs[0].createdBy, "bb".repeat(16));
+  assert.equal(state.handoffs[0].createdAt, 2);
+  records.push(handoff(3, 6));
+  assert.equal(engine.applyEvents(records).handoffs[0].status, "acknowledged");
+  records.push(handoff(4, 7));
+  assert.equal(engine.applyEvents(records).handoffs[0].status, "archived");
+  assert.throws(() => engine.applyEvents([...records,handoff(5,6)]), error => error.code === 4);
+  assert.deepEqual(legacy,snapshot);
+  const apply = await rawEngine();
+  for (const version of [1,2]) apply(version,[handoff(1)],3);
+  assert.deepEqual(apply(3,[]),new Uint8Array([75,73,78,83,3,0,0,0,0,0,0,0,0,0,0,0]));
+});
+
+test("Handoff text encoder preserves Unicode and enforces byte bounds", () => {
+  const text = "\uFEFF" + "🥛".repeat(1023) + "x";
+  const record = handoff(1, 5, text);
+  assert.equal(new TextDecoder("utf-8", { ignoreBOM: true }).decode(record.subarray(108)), text);
+  assert.equal(record.length, 108 + 4096);
+  assert.throws(() => handoff(1, 5, text + "x"), /4096/);
+  assert.throws(() => handoff(1, 5, "\uD800"), /valid Unicode/);
+});
+
+test("bridge rejects malformed Handoff result fields and recovers", async context => {
+  const instantiate = WebAssembly.instantiate;
+  let mutate = () => {};
+  context.mock.method(WebAssembly, "instantiate", async (...args) => {
+    const { instance } = await instantiate(...args);
+    const abi = instance.exports;
+    return { instance: { exports: { ...abi, kin_apply_events(pointer, length) {
+      const status = abi.kin_apply_events(pointer, length);
+      if (status === 0) mutate(new Uint8Array(abi.memory.buffer, abi.kin_result_ptr(), abi.kin_result_len()));
+      return status;
+    } } } };
+  });
+  const wasm = await readFile(new URL("./kin_engine.wasm", import.meta.url));
+  const engine = await loadKinEngine(`data:application/wasm;base64,${wasm.toString("base64")}`);
+  for (const mutation of [
+    bytes => bytes[56] = 3,
+    ...[57,58,59].map(offset => bytes => bytes[offset] = 1),
+    bytes => new DataView(bytes.buffer,bytes.byteOffset).setUint32(60,0,true),
+    bytes => new DataView(bytes.buffer,bytes.byteOffset).setUint32(60,0xffffffff,true),
+    bytes => new DataView(bytes.buffer,bytes.byteOffset).setUint32(12,10001,true),
+    bytes => bytes[64] = 255,
+    bytes => new DataView(bytes.buffer,bytes.byteOffset).setBigInt64(48,1n<<62n,true),
+  ]) {
+    mutate = mutation;
+    assert.throws(() => engine.applyEvents([handoff(1)]), error => error.code === 6);
+    mutate = () => {};
+    assert.equal(engine.applyEvents([handoff(1)]).handoffs[0].text, "Dishwasher running");
+  }
+});
+
+test("bridge fails closed at every truncated Handoff result boundary", async context => {
+  const instantiate = WebAssembly.instantiate;
+  let resultLength;
+  context.mock.method(WebAssembly, "instantiate", async (...args) => {
+    const { instance } = await instantiate(...args);
+    const abi = instance.exports;
+    return { instance: { exports: { ...abi, kin_result_len: () => resultLength ?? abi.kin_result_len() } } };
+  });
+  const wasm = await readFile(new URL("./kin_engine.wasm", import.meta.url));
+  const engine = await loadKinEngine(`data:application/wasm;base64,${wasm.toString("base64")}`);
+  for (resultLength = 0; resultLength < 16+48+18; resultLength++) {
+    assert.throws(() => engine.applyEvents([handoff(1)]), error => error.code === 6);
+  }
+  resultLength = 16+48+18+1;
+  assert.throws(() => engine.applyEvents([handoff(1)]), error => error.code === 6);
+  resultLength = undefined;
+  assert.equal(engine.applyEvents([handoff(1)]).handoffs.length,1);
+});
+
+test("large Handoff replay grows WASM memory and preserves independent repeated results", async context => {
+  const instantiate = WebAssembly.instantiate;
+  let memory;
+  context.mock.method(WebAssembly,"instantiate",async(...args)=>{
+    const result=await instantiate(...args); memory=result.instance.exports.memory; return result;
+  });
+  const wasm = await readFile(new URL("./kin_engine.wasm", import.meta.url));
+  const engine = await loadKinEngine(`data:application/wasm;base64,${wasm.toString("base64")}`);
+  const initial = memory.buffer.byteLength;
+  const id = number => { const bytes=new Uint8Array(16); new DataView(bytes.buffer).setUint32(0,number,true); return bytes; };
+  const records=Array.from({length:10000},(_,index)=>encodeHandoffAddedRecord({
+    eventId:id(index+1), handoffId:id(index+1), householdId:zeroId, actorId:zeroId, deviceId:zeroId,
+    timestamp:index,logicalTime:index+1,text:index<1000 ? "x".repeat(4096) : "x",
+  }));
+  const state=engine.applyEvents(records);
+  assert.ok(memory.buffer.byteLength>initial,"real memory growth occurred");
+  assert.equal(state.handoffs.length,10000);
+  assert.equal(state.handoffs[999].text.length,4096);
+  for(let iteration=0;iteration<4;iteration++) {
+    const bad=handoff(1);new DataView(bad.buffer).setUint16(2,99,true);
+    assert.throws(()=>engine.applyEvents([bad]),error=>error.code===3);
+    assert.deepEqual(engine.applyEvents([]),{items:[],handoffs:[]});
+    assert.deepEqual(engine.applyEvents(records),state);
+  }
+  assert.equal(state.handoffs[0].text.length,4096,"host-owned result survives later calls");
+  assert.throws(()=>engine.applyEvents([...records,records[0]]),error=>error.code===5);
 });

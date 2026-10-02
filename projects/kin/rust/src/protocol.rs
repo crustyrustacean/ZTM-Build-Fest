@@ -1,12 +1,14 @@
 use crate::error::KinError;
 use crate::event::{
-    ActorId, DeviceId, EventEnvelope, EventId, EventKind, HouseholdId, ItemClassification, ItemId,
+    ActorId, DeviceId, EventEnvelope, EventId, EventKind, HandoffId, HouseholdId,
+    ItemClassification, ItemId,
 };
-use crate::state::{HouseholdState, ItemStatus};
+use crate::state::{HandoffStatus, HouseholdState, ItemStatus};
 
 pub const PROTOCOL_V1: u16 = 1;
 pub const PROTOCOL_V2: u16 = 2;
-pub const PROTOCOL_VERSION: u16 = PROTOCOL_V2;
+pub const PROTOCOL_V3: u16 = 3;
+pub const PROTOCOL_VERSION: u16 = PROTOCOL_V3;
 pub const ERROR_PROTOCOL_VERSION: u16 = PROTOCOL_V1;
 pub const MAX_EVENT_COUNT: usize = 10_000;
 pub const MAX_PROTOCOL_BYTES: usize = 64 * 1024 * 1024;
@@ -25,7 +27,7 @@ pub fn decode_request(bytes: &[u8]) -> Result<(u16, Vec<EventEnvelope>), KinErro
     }
 
     let version = read_u16(bytes, 4)?;
-    if !matches!(version, PROTOCOL_V1 | PROTOCOL_V2) {
+    if !matches!(version, PROTOCOL_V1 | PROTOCOL_V2 | PROTOCOL_V3) {
         return Err(KinError::UnsupportedVersion);
     }
     if read_u16(bytes, 6)? != 0 {
@@ -65,8 +67,14 @@ pub fn decode_request(bytes: &[u8]) -> Result<(u16, Vec<EventEnvelope>), KinErro
 }
 
 pub fn encode_state(state: &HouseholdState, protocol_version: u16) -> Result<Vec<u8>, KinError> {
-    if !matches!(protocol_version, PROTOCOL_V1 | PROTOCOL_V2) {
+    if !matches!(protocol_version, PROTOCOL_V1 | PROTOCOL_V2 | PROTOCOL_V3) {
         return Err(KinError::UnsupportedVersion);
+    }
+    if protocol_version < PROTOCOL_V3 && !state.handoffs.is_empty() {
+        return Err(KinError::UnsupportedVersion);
+    }
+    if state.items.len().saturating_add(state.handoffs.len()) > MAX_EVENT_COUNT {
+        return Err(KinError::SizeLimit);
     }
     let item_count = u32::try_from(state.items.len()).map_err(|_| KinError::SizeLimit)?;
     let mut result = Vec::new();
@@ -77,6 +85,9 @@ pub fn encode_state(state: &HouseholdState, protocol_version: u16) -> Result<Vec
     push_u16(&mut result, protocol_version);
     push_u16(&mut result, 0);
     push_u32(&mut result, item_count);
+    if protocol_version == PROTOCOL_V3 {
+        push_u32(&mut result, state.handoffs.len() as u32);
+    }
 
     for item in &state.items {
         let text_bytes = item.text.as_bytes();
@@ -122,6 +133,34 @@ pub fn encode_state(state: &HouseholdState, protocol_version: u16) -> Result<Vec
         push_u32(&mut result, text_length);
         result.extend_from_slice(text_bytes);
     }
+    for handoff in &state.handoffs {
+        let text = handoff.text.as_bytes();
+        let additional = ITEM_HEADER_BYTES
+            .checked_add(text.len())
+            .ok_or(KinError::SizeLimit)?;
+        if result
+            .len()
+            .checked_add(additional)
+            .ok_or(KinError::SizeLimit)?
+            > MAX_PROTOCOL_BYTES
+        {
+            return Err(KinError::SizeLimit);
+        }
+        result
+            .try_reserve(additional)
+            .map_err(|_| KinError::SizeLimit)?;
+        result.extend_from_slice(&handoff.handoff_id.0);
+        result.extend_from_slice(&handoff.created_by.0);
+        result.extend_from_slice(&handoff.created_at.to_le_bytes());
+        result.push(match handoff.status {
+            HandoffStatus::Unacknowledged => 0,
+            HandoffStatus::Acknowledged => 1,
+            HandoffStatus::Archived => 2,
+        });
+        result.extend_from_slice(&[0; 3]);
+        push_u32(&mut result, text.len() as u32);
+        result.extend_from_slice(text);
+    }
     Ok(result)
 }
 
@@ -130,7 +169,7 @@ fn decode_event(record: &[u8], protocol_version: u16) -> Result<EventEnvelope, K
         return Err(KinError::MalformedProtocol);
     }
     let event_version = read_u16(record, 0)?;
-    if !(event_version == 1 || (event_version == 2 && protocol_version == PROTOCOL_V2)) {
+    if !(event_version == 1 || (event_version == 2 && protocol_version >= PROTOCOL_V2)) {
         return Err(KinError::UnsupportedVersion);
     }
     let event_kind = read_u16(record, 2)?;
@@ -170,7 +209,7 @@ fn decode_event(record: &[u8], protocol_version: u16) -> Result<EventEnvelope, K
             }
         }
         (2, 1) => {
-            if protocol_version != PROTOCOL_V2 || payload.len() < 24 {
+            if protocol_version < PROTOCOL_V2 || payload.len() < 24 {
                 return Err(KinError::MalformedProtocol);
             }
             let classification = match payload[16] {
@@ -210,7 +249,7 @@ fn decode_event(record: &[u8], protocol_version: u16) -> Result<EventEnvelope, K
                 item_id: ItemId(read_id(payload, 0)?),
             }
         }
-        (1, 3) if protocol_version == PROTOCOL_V2 => {
+        (1, 3) if protocol_version >= PROTOCOL_V2 => {
             if payload.len() != 16 {
                 return Err(KinError::MalformedProtocol);
             }
@@ -218,12 +257,43 @@ fn decode_event(record: &[u8], protocol_version: u16) -> Result<EventEnvelope, K
                 item_id: ItemId(read_id(payload, 0)?),
             }
         }
-        (1, 4) if protocol_version == PROTOCOL_V2 => {
+        (1, 4) if protocol_version >= PROTOCOL_V2 => {
             if payload.len() != 16 {
                 return Err(KinError::MalformedProtocol);
             }
             EventKind::ItemArchived {
                 item_id: ItemId(read_id(payload, 0)?),
+            }
+        }
+        (1, 5) if protocol_version == PROTOCOL_V3 => {
+            if payload.len() < 20 {
+                return Err(KinError::MalformedProtocol);
+            }
+            let length = read_u32(payload, 16)? as usize;
+            if !(1..=MAX_ITEM_TEXT_BYTES).contains(&length)
+                || payload.len()
+                    != 20usize
+                        .checked_add(length)
+                        .ok_or(KinError::MalformedProtocol)?
+            {
+                return Err(KinError::MalformedProtocol);
+            }
+            let text =
+                std::str::from_utf8(&payload[20..]).map_err(|_| KinError::MalformedProtocol)?;
+            EventKind::HandoffAdded {
+                handoff_id: HandoffId(read_id(payload, 0)?),
+                text: text.to_owned(),
+            }
+        }
+        (1, 6 | 7) if protocol_version == PROTOCOL_V3 => {
+            if payload.len() != 16 {
+                return Err(KinError::MalformedProtocol);
+            }
+            let handoff_id = HandoffId(read_id(payload, 0)?);
+            if event_kind == 6 {
+                EventKind::HandoffAcknowledged { handoff_id }
+            } else {
+                EventKind::HandoffArchived { handoff_id }
             }
         }
         _ => return Err(KinError::UnsupportedVersion),
@@ -495,7 +565,7 @@ mod tests {
 
     #[test]
     fn unsupported_protocol_is_rejected() {
-        let request = request_with(&[], 3, 0);
+        let request = request_with(&[], 99, 0);
         assert_eq!(decode_request(&request), Err(KinError::UnsupportedVersion));
     }
 
@@ -563,7 +633,7 @@ mod tests {
     #[test]
     fn unsupported_event_kind_is_rejected() {
         let mut record = added_record(b"Buy milk");
-        record[2..4].copy_from_slice(&5u16.to_le_bytes());
+        record[2..4].copy_from_slice(&99u16.to_le_bytes());
         let request = request_with(&record, PROTOCOL_VERSION, 1);
         assert_eq!(decode_request(&request), Err(KinError::UnsupportedVersion));
     }
@@ -681,5 +751,247 @@ mod tests {
         let record = added_record(&vec![b'x'; MAX_ITEM_TEXT_BYTES + 1]);
         let request = request_with(&record, PROTOCOL_VERSION, 1);
         assert_eq!(decode_request(&request), Err(KinError::MalformedProtocol));
+    }
+    fn handoff_record(kind: u16, sequence: u8) -> Vec<u8> {
+        let mut record = added_record(b"Dishwasher running");
+        record[2..4].copy_from_slice(&kind.to_le_bytes());
+        record[4..20].fill(sequence);
+        record[76..84].copy_from_slice(&u64::from(sequence).to_le_bytes());
+        if kind != 5 {
+            record.truncate(104);
+            record[84..88].copy_from_slice(&16u32.to_le_bytes());
+        }
+        record
+    }
+
+    fn handoff_replay(records: &[Vec<u8>]) -> Result<HouseholdState, KinError> {
+        let (_, events) =
+            decode_request(&request_with(&records.concat(), 3, records.len() as u32))?;
+        rebuild(&events)
+    }
+
+    #[test]
+    fn handoff_lifecycle_and_terminal_archive() {
+        for kinds in [
+            vec![5],
+            vec![5, 6],
+            vec![5, 6, 6],
+            vec![5, 7],
+            vec![5, 6, 7],
+        ] {
+            let records: Vec<_> = kinds
+                .iter()
+                .enumerate()
+                .map(|(i, k)| handoff_record(*k, i as u8 + 1))
+                .collect();
+            let state = handoff_replay(&records).unwrap();
+            let handoff = &state.handoffs[0];
+            assert_eq!(handoff.created_by, ActorId([0xbb; 16]));
+            assert_eq!(handoff.created_at, 1);
+            assert_eq!(handoff.text, "Dishwasher running");
+            assert_eq!(
+                handoff.status,
+                match kinds.last().unwrap() {
+                    5 => HandoffStatus::Unacknowledged,
+                    6 => HandoffStatus::Acknowledged,
+                    _ => HandoffStatus::Archived,
+                }
+            );
+            assert_eq!(handoff_replay(&records).unwrap(), state);
+            for version in [1, 2] {
+                assert_eq!(
+                    encode_state(&state, version),
+                    Err(KinError::UnsupportedVersion)
+                );
+            }
+            if handoff.status == HandoffStatus::Archived {
+                for kind in [5, 6, 7] {
+                    let mut invalid = records.clone();
+                    invalid.push(handoff_record(kind, invalid.len() as u8 + 1));
+                    assert_eq!(handoff_replay(&invalid), Err(KinError::InvalidEvent));
+                }
+            }
+        }
+        for kind in [6, 7] {
+            assert_eq!(
+                handoff_replay(&[handoff_record(kind, 1)]),
+                Err(KinError::InvalidEvent)
+            );
+        }
+    }
+
+    #[test]
+    fn handoff_identity_deduplication_and_mixed_replay() {
+        let added = handoff_record(5, 1);
+        assert_eq!(
+            handoff_replay(&[added.clone(), added.clone()])
+                .unwrap()
+                .handoffs
+                .len(),
+            1
+        );
+        let mut conflict = added.clone();
+        *conflict.last_mut().unwrap() = b'x';
+        assert_eq!(
+            handoff_replay(&[added.clone(), conflict]),
+            Err(KinError::InvalidEvent)
+        );
+        assert_eq!(
+            handoff_replay(&[added.clone(), handoff_record(5, 2)]),
+            Err(KinError::InvalidEvent)
+        );
+        let item = added_record_v2(2, 2, b"Milk", 1);
+        let records = vec![added.clone(), item.clone(), handoff_record(6, 3)];
+        let state = handoff_replay(&records).unwrap();
+        assert_eq!(state.items.len(), 1);
+        assert_eq!(state.handoffs.len(), 1);
+        let bytes = encode_state(&state, 3).unwrap();
+        assert_eq!(
+            &bytes[..16],
+            &[75, 73, 78, 83, 3, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0]
+        );
+        let (_, events) = decode_request(&request_with(&records.concat(), 3, 3)).unwrap();
+        assert_eq!(events[0].canonical_bytes, added);
+        assert_eq!(events[1].canonical_bytes, item);
+        for version in [1, 2] {
+            for kind in [5, 6, 7] {
+                assert_eq!(
+                    decode_request(&request_with(&handoff_record(kind, 1), version, 1)),
+                    Err(KinError::UnsupportedVersion)
+                );
+            }
+        }
+    }
+    #[test]
+    fn handoff_payload_boundaries_and_versions_fail_closed() {
+        for kind in [5, 6, 7] {
+            let record = handoff_record(kind, 1);
+            for length in 0..record.len() - 88 {
+                let mut truncated = record[..88 + length].to_vec();
+                truncated[84..88].copy_from_slice(&(length as u32).to_le_bytes());
+                assert_eq!(
+                    decode_request(&request_with(&truncated, 3, 1)),
+                    Err(KinError::MalformedProtocol)
+                );
+            }
+            let mut trailing = record.clone();
+            trailing.push(0);
+            let length = (trailing.len() - 88) as u32;
+            trailing[84..88].copy_from_slice(&length.to_le_bytes());
+            assert_eq!(
+                decode_request(&request_with(&trailing, 3, 1)),
+                Err(KinError::MalformedProtocol)
+            );
+            for version in [0u16, 2, 3, u16::MAX] {
+                let mut invalid = record.clone();
+                invalid[..2].copy_from_slice(&version.to_le_bytes());
+                assert_eq!(
+                    decode_request(&request_with(&invalid, 3, 1)),
+                    Err(KinError::UnsupportedVersion)
+                );
+            }
+            let mut extreme = record.clone();
+            extreme[84..88].copy_from_slice(&u32::MAX.to_le_bytes());
+            assert_eq!(
+                decode_request(&request_with(&extreme, 3, 1)),
+                Err(KinError::MalformedProtocol)
+            );
+        }
+    }
+
+    #[test]
+    fn handoff_text_validation_and_actor_provenance() {
+        for text in [vec![], vec![b'x'; 4097], vec![0xff]] {
+            let mut record = added_record(&text);
+            record[2..4].copy_from_slice(&5u16.to_le_bytes());
+            assert_eq!(handoff_replay(&[record]), Err(KinError::MalformedProtocol));
+        }
+        let mut blank = added_record(b" \t\n");
+        blank[2..4].copy_from_slice(&5u16.to_le_bytes());
+        assert_eq!(handoff_replay(&[blank]), Err(KinError::InvalidEvent));
+        for same_actor in [false, true] {
+            let added = handoff_record(5, 1);
+            let mut ack = handoff_record(6, 2);
+            if !same_actor {
+                ack[36..52].fill(0xdd);
+            }
+            let (_, events) =
+                decode_request(&request_with(&[added, ack.clone()].concat(), 3, 2)).unwrap();
+            assert_eq!(
+                events[1].actor_id,
+                ActorId(if same_actor { [0xbb; 16] } else { [0xdd; 16] })
+            );
+            assert_eq!(events[1].canonical_bytes, ack);
+            let state = rebuild(&events).unwrap();
+            assert_eq!(state.handoffs[0].created_by, ActorId([0xbb; 16]));
+            assert_eq!(state.handoffs[0].status, HandoffStatus::Acknowledged);
+        }
+    }
+
+    #[test]
+    fn handoff_ids_have_separate_namespace_and_exact_result_bytes() {
+        let legacy = added_record(b"Item");
+        let added = handoff_record(5, 2); // same raw entity ID; distinct typed namespace
+        let state = handoff_replay(&[legacy, added]).unwrap();
+        assert_eq!(state.items.len(), 1);
+        assert_eq!(state.handoffs.len(), 1);
+        let bytes = encode_state(&state, 3).unwrap();
+        let offset = 16 + 48 + 4;
+        assert_eq!(&bytes[offset..offset + 16], &[0x11; 16]);
+        assert_eq!(&bytes[offset + 16..offset + 32], &[0xbb; 16]);
+        assert_eq!(&bytes[offset + 32..offset + 40], &1i64.to_le_bytes());
+        assert_eq!(&bytes[offset + 40..offset + 44], &[0; 4]);
+        assert_eq!(&bytes[offset + 44..offset + 48], &18u32.to_le_bytes());
+        assert_eq!(&bytes[offset + 48..], b"Dishwasher running");
+    }
+    #[test]
+    fn handoff_request_header_and_length_hardening() {
+        let request = request_with(&handoff_record(5, 1), 3, 1);
+        for length in 0..100 {
+            assert_eq!(
+                decode_request(&request[..length]),
+                Err(KinError::MalformedProtocol)
+            );
+        }
+        for offset in [6, 7] {
+            let mut invalid = request.clone();
+            invalid[offset] = 1;
+            assert_eq!(decode_request(&invalid), Err(KinError::MalformedProtocol));
+        }
+        for length in [0u32, 4097, u32::MAX] {
+            let mut invalid = request.clone();
+            invalid[116..120].copy_from_slice(&length.to_le_bytes());
+            assert_eq!(decode_request(&invalid), Err(KinError::MalformedProtocol));
+        }
+        let mut trailing = request;
+        trailing.push(0);
+        assert_eq!(decode_request(&trailing), Err(KinError::MalformedProtocol));
+    }
+
+    #[test]
+    fn maximum_mixed_handoff_replay_is_deterministic() {
+        let mut records = Vec::new();
+        for number in 1..=MAX_EVENT_COUNT as u32 {
+            let mut record = if number % 2 == 0 {
+                added_record_v2(number, number, b"x", 1)
+            } else {
+                let mut row = added_record(b"x");
+                row[2..4].copy_from_slice(&5u16.to_le_bytes());
+                row
+            };
+            record[4..20].copy_from_slice(&numbered_id(number));
+            record[88..104].copy_from_slice(&numbered_id(number));
+            record[76..84].copy_from_slice(&u64::from(number).to_le_bytes());
+            records.push(record);
+        }
+        let state = handoff_replay(&records).unwrap();
+        assert_eq!(state.handoffs.len(), 5000);
+        assert_eq!(state.items.len(), 5000);
+        let result = encode_state(&state, 3).unwrap();
+        assert_eq!(result.len(), 16 + 10000 * 49);
+        assert_eq!(
+            result,
+            encode_state(&handoff_replay(&records).unwrap(), 3).unwrap()
+        );
     }
 }

@@ -1,6 +1,6 @@
 # Entity Lifecycles
 
-**Status:** Item lifecycle transitions are implemented in v0.2.0. Handoff, TalkItem, Pulse, and other lifecycle sections remain specifications. The domain definitions are in [Domain](DOMAIN.md); event names and versions are in [Events](EVENTS.md).
+**Status:** Item and Handoff lifecycles are implemented. Later lifecycles remain specifications.
 
 ## Item
 
@@ -43,7 +43,7 @@ unacknowledged -- HANDOFF_ACKNOWLEDGED --> acknowledged
                       archived
 ```
 
-A handoff is created as unacknowledged. Acknowledgement is a receipt signal, not approval. Archival removes it from the active handoff view while preserving history. Unknown handoff references and transitions from archived are invalid. Handoff is planned for v0.3.0.
+A handoff is created as unacknowledged. Acknowledgement is a receipt signal, not approval. Archival removes it from the active handoff view while preserving history. Unknown handoff references and transitions from archived are invalid. Handoff is implemented in v0.3.0. Repeated acknowledgement is a valid no-op; distinct addition of an existing Handoff ID fails. See [V0.3.0](V0.3.0.md) for the full matrix.
 
 ## TalkItem
 

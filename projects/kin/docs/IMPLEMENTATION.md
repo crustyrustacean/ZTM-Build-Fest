@@ -1,6 +1,6 @@
 # v0.1.0 Implementation Contract
 
-**Status:** the v0.2.0 Today + Needs implementation uses this project-local layout and ownership boundary; Handoff and later product capabilities remain future work.
+**Status:** Today, Needs, and Handoff are implemented; Rust is the sole reducer. Talk and later capabilities remain future work.
 
 ## Proposed project layout
 
@@ -42,8 +42,8 @@ The v0.1.0 implementation uses this layout. The generated `target/` tree and `we
 ## Module responsibilities
 
 - **`rust/src/event.rs`:** event kinds, typed classification, envelope representation, and normalized payloads.
-- **`rust/src/state.rs`:** deterministic reducer and projection of ordered events into classified active/completed/archived item state.
-- **`rust/src/protocol.rs`:** bounded protocol-v1/v2 parsing/results and explicit event-schema v1/v2 decoding.
+- **`rust/src/state.rs`:** deterministic reducer and projection of ordered events into classified Item state and dedicated Handoff state.
+- **`rust/src/protocol.rs`:** bounded protocol-v1/v2/v3 parsing/results and explicit event-schema v1/v2 decoding.
 - **`rust/src/abi.rs`:** exported C-ABI functions, pointer/length checks, buffer ownership, and status codes.
 - **`rust/src/error.rs`:** stable error categories and non-sensitive messages.
 - **`rust/src/lib.rs`:** module exports only; no DOM or browser API access.
@@ -59,10 +59,14 @@ See [ABI](ABI.md), [Storage](STORAGE.md), and [Components](COMPONENTS.md) for im
 
 ## Build boundary
 
-The target is `wasm32-unknown-unknown`. The local WASM artifact is loaded by the page; no remote code loader is used. Kin has no `wasm-bindgen`, `web-sys`, `js-sys`, `serde`, `serde_json`, UI framework, or runtime library dependency. `build-wasm.ps1` builds and copies the artifact for local static serving.
+The target is `wasm32-unknown-unknown`. The local WASM artifact is loaded by the page; no remote code loader is used. Kin has no `wasm-bindgen`, `web-sys`, `js-sys`, `serde`, `serde_json`, UI framework, or runtime library dependency. `build-wasm.ps1` and `build-wasm.sh` build and copy the artifact; `run.ps1` and `run.sh` reuse those scripts before serving the static web root on loopback for development.
 
 `web/index.html` applies a same-origin Content Security Policy. It allows `wasm-unsafe-eval` only for WebAssembly compilation/instantiation; scripts, styles, fetches, images, and fonts remain same-origin. The policy denies objects and restricts base/form targets. A meta-delivered policy cannot set `frame-ancestors`; production hosting should add that directive as an HTTP response header if framing must be prohibited.
 
 ## Browser support floor
 
 The target remains the latest two stable major releases of desktop and mobile Chrome, Firefox, and Safari. The browser must provide core WebAssembly, ES modules, Custom Elements, IndexedDB, `CustomEvent`, `TextEncoder`/`TextDecoder`, `crypto.getRandomValues`, and a secure context (including localhost for development). Do not target Internet Explorer or obsolete browsers. The v0.1.0 release was exercised in desktop Chrome through the integrated VS Code browser; the broader target is not certified by that check.
+
+## Handoff implementation
+
+`web/components/kin-handoff-list.js` owns capture/list presentation; kin-app owns command orchestration. The frozen domain and protocol contract is [V0.3.0](V0.3.0.md).

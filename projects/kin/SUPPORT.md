@@ -1,6 +1,6 @@
 # Support
 
-Kin currently has a local-first v0.1.x prototype. There are no accounts, remote service, staffed runtime support channel, or guaranteed response times.
+Kin currently has a local-first v0.3.x prototype. There are no accounts, remote service, staffed runtime support channel, or guaranteed response times.
 
 ## Questions and proposals
 

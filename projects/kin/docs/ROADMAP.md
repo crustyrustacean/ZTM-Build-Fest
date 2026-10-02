@@ -1,6 +1,6 @@
 # Roadmap
 
-This roadmap is a planning baseline, not a promise of delivery dates. Releases may change as the product is tested. Kin's current release is `v0.2.4` Today + Needs Compatibility Fixes. The approved v0.2.x stabilization line is complete; stop for user review before starting another patch or planning `v0.3.0 — Handoff`, which remains future work. The `v0.0.1`–`v0.0.12` planning and documentation history remains preserved.
+This roadmap is a planning baseline, not a promise of dates. The current release is `v0.3.5 — Build & Run Convenience`. The planned v0.3.0–v0.3.3 line, v0.3.4 recovery patch, and v0.3.5 developer workflow patch are complete. Stop for user evaluation before v0.3.6 or v0.4.0 Talk. Historical planning releases remain preserved.
 
 ## Planning releases
 
@@ -106,7 +106,27 @@ Completed: corrected protocol-v1 result headers without changing the historical 
 
 ### `v0.3.0` — Handoff
 
-Add short parent-to-parent handoffs, acknowledgement, recent handoff state, and household context transfer.
+Implemented locally: short Handoff capture, acknowledgement, recent context, and terminal archival. Protocol v3 preserves Item history and adds Handoff projection; actors remain local placeholders. Stabilization through v0.3.3 is complete; stop for user evaluation.
+
+### `v0.3.1` — Handoff Correctness
+
+Completed: lifecycle, protocol/payload/result boundaries, actor provenance, event/counter rollback and canonical-byte preservation.
+
+### `v0.3.2` — Handoff Resilience & Accessibility
+
+Completed: interrupted capture, drafts, failed-action retries, stale peers, focus, keyboard, busy state and accessibility modes.
+
+### `v0.3.3` — Handoff Hardening & Polish
+
+Completed: parser boundaries, 10,000-event replay, real WASM memory growth, architecture/privacy audit and documentation reconciliation. Stop for evaluation.
+
+### `v0.3.4` — Handoff Retry Recovery
+
+Completed: preserve failed command retries through repeated canonical-refresh failures. Reconcile stale actions after recovery and discard superseded retries. No new capability. Stop for evaluation.
+
+### `v0.3.5` — Build & Run Convenience
+
+Completed: add project-local PowerShell and POSIX shell launchers that build the WASM module through the established scripts and serve the web app on loopback port 8000. No product capability or runtime dependency added.
 
 ### `v0.4.0` — Talk
 
@@ -138,4 +158,4 @@ Focus on polish, reliability, accessibility, mobile UX, privacy documentation, o
 
 ## Scope discipline
 
-Each roadmap item is future work unless explicitly marked as completed. Authentication, passkeys, encryption, remote services, pairing, and synchronization remain unimplemented and out of scope for v0.2.x. Releases through `v0.0.12` were documentation-only; v0.1.0 is the first coded release. Handoff remains assigned to v0.3.0 and has not started.
+Each roadmap item is future work unless explicitly marked as completed. Authentication, passkeys, encryption, remote services, pairing, and synchronization remain unimplemented and out of scope for v0.3.x. Releases through `v0.0.12` were documentation-only; v0.1.0 is the first coded release. Handoff is implemented in v0.3.0; v0.4.0 Talk remains future work.

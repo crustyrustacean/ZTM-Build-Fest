@@ -1,6 +1,6 @@
 # Household Domain
 
-**Status:** the v0.2.0 Item and Event subset is implemented, including fixed classification and complete/reopen/archive transitions. Handoff and other entities remain future specifications. Kin continues to use local identity placeholders only.
+**Status:** Items and Handoffs are implemented locally. Later entities remain future specifications; actors are local placeholders, not verified people.
 
 ## Scope and relationships
 
@@ -51,7 +51,7 @@ v0.2.0 includes adding an item as Today or Need, completion, reopening, and arch
 
 ## Handoff
 
-A Handoff is a short context transfer one household member wants another to know. Its conceptual lifecycle is created, unacknowledged, acknowledged, and archived. Acknowledgement means receipt, not agreement, approval, or evaluation. Handoffs are planned for v0.3.0 and are not implemented.
+A Handoff is a short context transfer one household member wants another to know. Its conceptual lifecycle is created, unacknowledged, acknowledged, and archived. Acknowledgement means receipt, not agreement, approval, or evaluation. Handoffs are implemented in v0.3.0 as a separate typed entity; see [V0.3.0](V0.3.0.md). Repeated acknowledgement is a valid no-op. Creator and acknowledger may be the same local actor; no verified identity is inferred.
 
 ## TalkItem
 
