@@ -538,6 +538,39 @@ mod tests {
     }
 
     #[test]
+    fn reopen_and_archive_payload_lengths_are_exact() {
+        for kind in [3u16, 4u16] {
+            for payload_length in (0..=17).filter(|length| *length != 16) {
+                let mut record = added_record(b"Milk");
+                record[2..4].copy_from_slice(&kind.to_le_bytes());
+                record[84..88].copy_from_slice(&(payload_length as u32).to_le_bytes());
+                record.resize(EVENT_HEADER_BYTES + payload_length, 0);
+                let request = request_with(&record, PROTOCOL_V2, 1);
+                assert_eq!(
+                    decode_request(&request),
+                    Err(KinError::MalformedProtocol),
+                    "kind {kind}, payload length {payload_length}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn protocol_v1_cannot_serialize_unrepresentable_current_state() {
+        let (_, events) = decode_request(&request_with(
+            &added_record_v2(1, 0x11, b"Milk", 1),
+            PROTOCOL_V2,
+            1,
+        ))
+        .unwrap();
+        let state = rebuild(&events).unwrap();
+        assert_eq!(
+            encode_state(&state, PROTOCOL_V1),
+            Err(KinError::UnsupportedVersion)
+        );
+    }
+
+    #[test]
     fn malformed_text_length_is_rejected() {
         let mut record = added_record(b"hi");
         record[EVENT_HEADER_BYTES + 16..EVENT_HEADER_BYTES + 20]

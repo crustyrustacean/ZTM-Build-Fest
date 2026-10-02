@@ -317,10 +317,16 @@ async function regressions() {
 
   for (const changed of [false, true]) {
     const before = await count();
+    const logicalTimeBefore = (await app.store.ensureContext())
+      .next_logical_time;
     edit("Buy milk");
     await failOnce(changed ? "async-quota" : "quota");
     draft("Buy milk");
     check((await count()) === before, "failed add must not persist");
+    check(
+      (await app.store.ensureContext()).next_logical_time === logicalTimeBefore,
+      "failed append must not advance logical time",
+    );
     if (changed) edit("Buy bread", "today");
     if (changed) {
       app.handlePeerMessage({ data: { type: "events-changed" } });
@@ -338,6 +344,11 @@ async function regressions() {
     check(
       (await count()) === before + 1,
       "repeated retry persists exactly once",
+    );
+    check(
+      (await app.store.ensureContext()).next_logical_time ===
+        logicalTimeBefore + 1n,
+      "event and logical counter commit once together",
     );
     check(
       app.state.items.at(-1).text === "Buy milk",
@@ -361,16 +372,28 @@ async function regressions() {
   }
 
   const beforeAbort = await count();
+  const logicalTimeBeforeAbort = (await app.store.ensureContext())
+    .next_logical_time;
   edit("Aborted write");
   await failOnce("abort");
   check(
     (await count()) === beforeAbort,
     "abort after request success must roll back",
   );
+  check(
+    (await app.store.ensureContext()).next_logical_time ===
+      logicalTimeBeforeAbort,
+    "aborted write must roll back logical counter",
+  );
   draft("Aborted write");
   app.retryButton.click();
   await idle();
   check((await count()) === beforeAbort + 1, "abort retry once");
+  check(
+    (await app.store.ensureContext()).next_logical_time ===
+      logicalTimeBeforeAbort + 1n,
+    "successful retry commits event and counter once",
+  );
   draft("");
   passed.push("transaction abort after request success, recovery");
 
@@ -694,10 +717,88 @@ try {
     await new Promise((r,j)=>{cleanup.oncomplete=r;cleanup.onabort=j;});
     await a.refreshFromEvents();
     if(!a.retryButton.hidden || a.retryAction!==null) throw Error('Recovered refresh left stale retry');
+    const goodRead=a.store.database.transaction('events','readonly').objectStore('events').getAll();
+    await new Promise((r,j)=>{goodRead.onsuccess=r;goodRead.onerror=j;});
+    const original=goodRead.result.find(row=>row.kind==='ITEM_ADDED');
+    const originalBytes=[...new Uint8Array(original.encoded_event)];
+    const corrupted={...original,kind:'ITEM_COMPLETED'};
+    const corruptTx=a.store.database.transaction('events','readwrite');
+    corruptTx.objectStore('events').put(corrupted);
+    await new Promise((r,j)=>{corruptTx.oncomplete=r;corruptTx.onabort=j;});
+    await a.refreshFromEvents();
+    if(a.alert.hidden || a.busy) throw Error('Metadata mismatch must fail safely');
+    const persistedRead=a.store.database.transaction('events','readonly').objectStore('events').get(original.local_sequence);
+    await new Promise((r,j)=>{persistedRead.onsuccess=r;persistedRead.onerror=j;});
+    if(persistedRead.result.kind!=='ITEM_COMPLETED') throw Error('Corrupt metadata was changed');
+    if([...new Uint8Array(persistedRead.result.encoded_event)].some((byte,index)=>byte!==originalBytes[index])) throw Error('Canonical event bytes changed');
+    const restoreTx=a.store.database.transaction('events','readwrite');
+    restoreTx.objectStore('events').put(original);
+    await new Promise((r,j)=>{restoreTx.oncomplete=r;restoreTx.onabort=j;});
+    await a.refreshFromEvents();
+    if(!a.retryButton.hidden || a.retryAction!==null) throw Error('Metadata recovery left stale retry');
   })()`);
   console.log(
-    "PASS malformed row preservation, failure busy state, refresh recovery clears retry",
+    "PASS malformed row and metadata preservation, canonical-byte integrity, refresh recovery",
   );
+  const eventLimitResult = await first.evaluate(`(async()=>{
+    const app=document.querySelector('kin-app');
+    const context=await app.store.ensureContext();
+    const database=app.store.database;
+    const transaction=database.transaction(['events','local_context'],'readwrite');
+    const events=transaction.objectStore('events');
+    events.clear();
+    const textBytes=Uint8Array.of(0x78);
+    const textLength=new Uint8Array(4);
+    new DataView(textLength.buffer).setUint32(0,1,true);
+    const nextLogicalTime=10001n;
+    for(let index=0;index<10000;index++){
+      const eventId=new Uint8Array(16);
+      const itemId=new Uint8Array(16);
+      new DataView(eventId.buffer).setUint32(12,index+1,true);
+      new DataView(itemId.buffer).setUint32(12,index+1,true);
+      const payload=new Uint8Array(21);
+      payload.set(itemId);
+      payload.set(textLength,16);
+      payload.set(textBytes,20);
+      const encoded=new Uint8Array(88+payload.length);
+      const view=new DataView(encoded.buffer);
+      view.setUint16(0,1,true);
+      view.setUint16(2,1,true);
+      encoded.set(eventId,4);
+      encoded.set(context.household_id,20);
+      encoded.set(context.actor_id,36);
+      encoded.set(context.device_id,52);
+      const timestamp=1760000000000+index;
+      const logicalTime=BigInt(index+1);
+      view.setBigInt64(68,BigInt(timestamp),true);
+      view.setBigUint64(76,logicalTime,true);
+      view.setUint32(84,payload.length,true);
+      encoded.set(payload,88);
+      events.add({event_id:eventId,household_id:context.household_id,actor_id:context.actor_id,
+        device_id:context.device_id,timestamp,logical_time:logicalTime,kind:'ITEM_ADDED',
+        event_version:1,encoded_event:encoded});
+    }
+    transaction.objectStore('local_context').put({...context,next_logical_time:nextLogicalTime});
+    await new Promise((resolve,reject)=>{
+      transaction.oncomplete=resolve;
+      transaction.onabort=()=>reject(transaction.error);
+    });
+    let rejected=false;
+    try{
+      await app.store.append({type:'add',text:'Beyond the limit',classification:'need'},app.engine);
+    }catch(error){
+      rejected=error.userMessage?.includes('event limit')===true;
+    }
+    const stored=await app.store.loadEvents();
+    const finalContext=await app.store.ensureContext();
+    return {rejected,count:stored.length,nextLogicalTime:finalContext.next_logical_time.toString()};
+  })()`);
+  assert.deepEqual(eventLimitResult, {
+    rejected: true,
+    count: 10000,
+    nextLogicalTime: "10001",
+  });
+  console.log("PASS 10,000-event limit preserves history and logical counter");
   assert.deepEqual(problems, [], "Uncaught errors or CSP/console errors");
   assert.ok(
     requests.length > 0 &&

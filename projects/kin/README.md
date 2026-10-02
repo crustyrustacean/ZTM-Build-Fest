@@ -2,7 +2,7 @@
 
 > A private, lightweight household coordination app for the little things families need to know, remember, hand off, or discuss.
 
-**Current status: `v0.2.0` — Today + Needs.** Kin now separates household items into Today and Needs, defaults fast capture to Needs, and supports completion, reopening, and archival. Immutable IndexedDB events remain canonical; Rust/WASM validates and reconstructs state after reload. Legacy v0.1.x items remain visible in Today. The v0.2.1 correctness, v0.2.2 resilience/accessibility, and v0.2.3 hardening releases are stabilization work, not additional product capabilities.
+**Current status: `v0.2.1` — Today + Needs Correctness.** Kin separates household items into Today and Needs, defaults fast capture to Needs, and supports completion, reopening, and archival. The correctness patch strengthens protocol boundaries and transactional event/counter guarantees without adding a product concept. Immutable IndexedDB events remain canonical; Rust/WASM validates and reconstructs state after reload. Legacy v0.1.x items remain visible in Today. Resilience/accessibility and hardening remain scheduled for v0.2.2 and v0.2.3.
 
 ## The problem
 
@@ -37,6 +37,7 @@ The intended technical direction is Rust compiled to WebAssembly, native Web Com
 - `v0.1.4` — Household Heartbeat Maintenance (`kin-v0.1.4`)
 - `v0.1.5` — Final 0.1.x Stabilization (`kin-v0.1.5`)
 - `v0.2.0` — Today + Needs (`kin-v0.2.0`)
+- `v0.2.1` — Today + Needs Correctness (`kin-v0.2.1`)
 - See the [changelog](CHANGELOG.md) for the completed release history.
 
 ## Install, build, and run

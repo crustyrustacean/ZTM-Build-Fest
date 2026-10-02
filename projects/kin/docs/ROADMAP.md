@@ -1,6 +1,6 @@
 # Roadmap
 
-This roadmap is a planning baseline, not a promise of delivery dates. Releases may change as the product is tested. Kin's current release is `v0.2.0` Today + Needs. The v0.2.1–v0.2.3 entries are the approved stabilization line; `v0.3.0 — Handoff` remains future work. The `v0.0.1`–`v0.0.12` planning and documentation history remains preserved.
+This roadmap is a planning baseline, not a promise of delivery dates. Releases may change as the product is tested. Kin's current release is `v0.2.1` Today + Needs Correctness. v0.2.2–v0.2.3 remain the approved stabilization line; `v0.3.0 — Handoff` remains future work. The `v0.0.1`–`v0.0.12` planning and documentation history remains preserved.
 
 ## Planning releases
 
@@ -90,7 +90,7 @@ Implemented: Today and Needs views, lightweight fixed classification, fast captu
 
 ### `v0.2.1` — Today + Needs Correctness
 
-Audit event/version compatibility, transition validity, browser storage atomicity, and deterministic replay without adding product concepts.
+Completed: added exact reopen/archive payload-boundary tests, ensured protocol v1 fails closed for unrepresentable state, and checked event/logical-counter atomicity through failures, aborts, and retries. No product concept was added.
 
 ### `v0.2.2` — Today + Needs Resilience & Accessibility
 

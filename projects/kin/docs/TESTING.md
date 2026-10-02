@@ -1,6 +1,6 @@
 # v0.1.0 Testing Contract
 
-**Status:** the v0.2.0 gate extends v0.1.x Rust, built-in Node bridge, and browser-native regressions for classification and the full Item lifecycle. Continue using these dependency-free contracts. Accessibility requirements are in [ACCESSIBILITY](ACCESSIBILITY.md); event/protocol behavior is in [EVENTS](EVENTS.md) and [ABI](ABI.md).
+**Status:** v0.2.1 correctness coverage extends v0.1.x Rust, built-in Node bridge, and browser-native regressions for classification, all Item transitions, exact event payload lengths, and transactional counter integrity. Continue using these dependency-free contracts. Accessibility requirements are in [ACCESSIBILITY](ACCESSIBILITY.md); event/protocol behavior is in [EVENTS](EVENTS.md) and [ABI](ABI.md).
 
 ## Rust domain tests
 
@@ -16,6 +16,8 @@ Before v0.1.0 is considered complete, cover at least:
 8. Malformed event envelope or payload fails safely.
 9. Unsupported protocol and event-schema versions fail with stable error categories.
 10. Cross-household input and bounds/length violations fail without partial state.
+11. Reopen/archive payloads are exactly one item ID; every shorter or longer payload fails as malformed protocol data.
+12. Protocol v1 cannot encode state that has Needs classification or archived status; it fails closed instead of dropping fields.
 
 The Rust reducer must be testable without a browser or WebAssembly runtime. Use the standard Rust test harness; no third-party test framework is required.
 
@@ -41,7 +43,7 @@ It starts a loopback static server and an isolated headless browser profile, run
 
 Regression cases include unchanged/edited drafts after failed add, exact original-command retry, rapid and stale retry clicks, delayed add completion, reconnect during a pending save, and peer refresh retaining a failed-command retry. Both synchronous and asynchronous quota categories are injected without exhausting disk space. A separate real transaction abort after request success verifies rollback and retry. The remaining checks cover the existing add/complete/replay, storage, cross-tab, Unicode, rendering, focus, and narrow-layout flows below. Automated focus checks assert focus ownership and a 3px outline; they do not certify screen-reader announcements or visual contrast.
 
-The v0.2.0 regression suite retains Rust as the authoritative validator/reducer, IndexedDB schema 1 as the canonical event source, and content-free BroadcastChannel invalidations. It covers Today/Needs classification, legacy/current event replay, classification-aware retry ownership, and complete/reopen/archive transitions in addition to v0.1.x regressions.
+The v0.2.1 regression suite retains Rust as the authoritative validator/reducer, IndexedDB schema 1 as the canonical event source, and content-free BroadcastChannel invalidations. It covers Today/Needs classification, legacy/current event replay with exact source-byte preservation, classification-aware retry ownership, complete/reopen/archive transitions, exact lifecycle payload lengths, event/logical-counter commit or rollback, metadata/canonical-byte mismatch preservation, and the 10,000-event limit in addition to v0.1.x regressions.
 
 Manually exercise or use a lightweight browser-native harness to verify:
 

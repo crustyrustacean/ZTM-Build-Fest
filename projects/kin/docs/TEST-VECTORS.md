@@ -222,3 +222,9 @@ Expected: deterministic invalid-domain-event error (ABI status code 4), no parti
 Use a valid protocol-v1 result/request and set any reserved protocol-v1 byte to a nonzero value.
 
 Expected: deterministic malformed-protocol error. Protocol v2 does not reinterpret any protocol-v1 reserved byte as classification or status.
+
+### Vector 017 — Exact lifecycle payload lengths
+
+For protocol v2, encode each of `ITEM_REOPENED` and `ITEM_ARCHIVED` with schema version 1. Try payload lengths 0 through 17, excluding 16, with the same valid event envelope.
+
+Expected: every record fails with malformed-protocol status (ABI status code 2). The supported payload is exactly the referenced `item_id[16]`; no truncated or trailing payload bytes are reinterpreted.
