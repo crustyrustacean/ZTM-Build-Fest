@@ -1,6 +1,6 @@
 # Roadmap
 
-Current release: `v0.5.1 — Pulse Correctness`. Authorized Pulse line stops after v0.5.3 for evaluation.
+Current release: `v0.5.2 — Pulse Resilience & Accessibility`. Authorized Pulse line stops after v0.5.3 for evaluation.
 
 ## Planning releases
 

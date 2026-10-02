@@ -1,6 +1,6 @@
 // Node 22+ and a Chromium-family executable; no npm packages required.
 // Uses a fresh temporary profile and loopback server, never an existing Kin DB.
-import { pulseRegressions, pulsePeerRegressions } from "./pulse-regression.mjs";
+import { pulseRegressions, pulsePeerRegressions, pulseResilienceRegressions, pulseKeyboardRegressions } from "./pulse-regression.mjs";
 import { talkRegressions, talkPeerRegressions } from "./talk-regression.mjs";
 import assert from "node:assert/strict";
 import { handoffRegressions, handoffPeerRegressions } from "./handoff-regression.mjs";
@@ -792,6 +792,7 @@ try {
   console.log(await first.evaluate(`(${handoffRegressions.toString()})()`));
   console.log(await first.evaluate(`(${talkRegressions.toString()})()`));
   console.log(await first.evaluate(`(${pulseRegressions.toString()})()`));
+  console.log(await first.evaluate(`(${pulseResilienceRegressions.toString()})()`));
   const state = await first.evaluate('JSON.stringify(document.querySelector("kin-app").state)');
   await first.send("Page.reload");
   await until(() => first.evaluate("window.kinExpectedState === undefined"));
@@ -1089,6 +1090,7 @@ try {
   await handoffPeerRegressions(first, second, until);
   await talkPeerRegressions(first, second, until);
   await pulsePeerRegressions(first, second, until);
+  await pulseKeyboardRegressions(first, until);
   await first.evaluate(`(()=>{
     const app=document.querySelector('kin-app');
     const item=[...app.querySelectorAll('kin-item')]
@@ -1206,6 +1208,14 @@ try {
       app.status.getAttribute('aria-live')==='polite' && app.alert.getAttribute('role')==='alert' &&
       [...capture.querySelectorAll('button')].every(button=>button.textContent && button.getBoundingClientRect().height>=48);
   })()`),true,"Talk semantics, announcements, focus and targets in forced colors");
+  assert.equal(await first.evaluate(`(()=>{
+    const p=document.querySelector('kin-app').pulse;p.valueSelect.focus();
+    return p.querySelector('h2').textContent==='Pulse' &&
+      p.valueSelect.labels[0].textContent.startsWith('Current capacity') &&
+      p.durationSelect.labels[0].textContent.startsWith('For') &&
+      getComputedStyle(p.valueSelect).outlineWidth==='3px' &&
+      [...p.querySelectorAll('button,select')].filter(c=>c.getClientRects().length).every(c=>c.getBoundingClientRect().height>=48);
+  })()`),true,"Pulse semantics, native labels, focus and targets in forced colors");
   const spacingResult = await first.evaluate(`(()=>{
     const sheet=[...document.styleSheets].find(candidate=>candidate.href?.endsWith('/styles/app.css'));
     const ruleIndex=sheet.cssRules.length;

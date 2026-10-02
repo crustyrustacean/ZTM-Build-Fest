@@ -482,6 +482,7 @@ class KinApp extends HTMLElement {
       this.refreshing = false;
       this.setBusy(false);
       if (focusedControl?.isConnected && !focusedControl.closest("[hidden]")) focusedControl.focus();
+      else if (focusedControl && this.pulse.contains(focusedControl)) this.pulse.focusInput();
       if (restoreHandoffFocus) this.handoffs.focusInput();
       if (restoreTalkFocus) this.talks.focusInput();
       if (restoreComposeFocus) {

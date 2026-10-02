@@ -2,6 +2,10 @@
 
 This file records completed Kin releases. The `v0.0.x` releases are planning and documentation milestones; they do not represent implemented application features. The first implementation milestone remains `v0.1.0`.
 
+## [0.5.2] — Pulse Resilience & Accessibility
+
+Restored capacity-selector focus when expiry hides an active Pulse control. Added late timer, simulated sleep/wake, focus/visibility, clock forward/backward, missed invalidation, original SET/CLEAR quota/abort retry, repeated refresh failures, supersession, rapid intent, reconnect/busy, native keyboard and accessibility-mode coverage. No new capability; evidence is in docs/V0.5.0.md.
+
 ## [0.5.1] — Pulse Correctness
 
 Added exhaustive Pulse payload lengths, schemas, reserved/value codes, timestamp bounds, mixed entity invariance, exact v5 layouts, malformed results and combined count limits. Legacy byte fixtures remain unchanged. No new capability or production defect found; validation evidence is in docs/V0.5.0.md.
