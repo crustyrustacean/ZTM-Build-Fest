@@ -1,6 +1,6 @@
 # v0.1.0 Implementation Contract
 
-**Status:** Talk is implemented alongside Today, Needs and Handoff. See [V0.4.0](V0.4.0.md) for the current scope, compatibility contract and release evidence.
+**Status:** Today, Needs, Handoff and Talk are implemented; Rust is the sole reducer. Pulse and later capabilities remain future work.
 
 ## Proposed project layout
 
@@ -42,8 +42,8 @@ The v0.1.0 implementation uses this layout. The generated `target/` tree and `we
 ## Module responsibilities
 
 - **`rust/src/event.rs`:** event kinds, typed classification, envelope representation, and normalized payloads.
-- **`rust/src/state.rs`:** deterministic reducer and projection of ordered events into classified Item state and dedicated Handoff state.
-- **`rust/src/protocol.rs`:** bounded protocol-v1/v2/v3 parsing/results and explicit event-schema v1/v2 decoding.
+- **`rust/src/state.rs`:** deterministic reducer and projection of ordered events into classified Item state and dedicated Handoff and Talk state.
+- **`rust/src/protocol.rs`:** bounded protocol-v1/v2/v3/v4 parsing/results and explicit event-schema v1/v2 decoding.
 - **`rust/src/abi.rs`:** exported C-ABI functions, pointer/length checks, buffer ownership, and status codes.
 - **`rust/src/error.rs`:** stable error categories and non-sensitive messages.
 - **`rust/src/lib.rs`:** module exports only; no DOM or browser API access.

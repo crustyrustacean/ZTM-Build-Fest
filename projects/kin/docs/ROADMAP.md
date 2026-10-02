@@ -1,6 +1,6 @@
 # Roadmap
 
-Current release: `v0.4.2 — Talk`. Continue through v0.4.1 correctness, v0.4.2 resilience/accessibility, and v0.4.3 hardening/polish, then stop for evaluation. Pulse remains future work.
+Current release: `v0.4.3 — Talk Hardening & Polish`. The planned Talk capability and stabilization line is complete. Stop for user evaluation before any additional patch or v0.5.0 Pulse.
 
 ## Planning releases
 
@@ -132,6 +132,18 @@ Completed: add project-local PowerShell and POSIX shell launchers that build the
 
 Implemented: short Talk capture, Open/Resolved lists, resolve, reopen and terminal archive. Resolution is workflow state only. See [V0.4.0](V0.4.0.md).
 
+### `v0.4.1` — Talk Correctness
+
+Completed: lifecycle/payload/result/compatibility audit, exact legacy bytes, combined limits and atomic storage regressions.
+
+### `v0.4.2` — Talk Resilience & Accessibility
+
+Completed: keyboard lifecycle/focus, semantic controls, native focus order, independent drafts and stale retries with/without invalidation or refresh recovery.
+
+### `v0.4.3` — Talk Hardening & Polish
+
+Completed: parser truncation/length boundaries, maximum mixed replay, real WASM growth/copied results, architecture/privacy review and documentation reconciliation. No further capability is authorized.
+
 ### `v0.5.0` — Pulse
 
 Explore a lightweight current-capacity signal with expiration and acknowledgement only if useful. No scoring or historical ranking.
@@ -158,4 +170,4 @@ Focus on polish, reliability, accessibility, mobile UX, privacy documentation, o
 
 ## Scope discipline
 
-Each roadmap item is future work unless explicitly marked as completed. Authentication, passkeys, encryption, remote services, pairing, and synchronization remain unimplemented and out of scope for v0.3.x. Releases through `v0.0.12` were documentation-only; v0.1.0 is the first coded release. Handoff is implemented in v0.3.0; Talk is implemented; Pulse remains future work.
+Each roadmap item is future work unless explicitly marked as completed. Authentication, passkeys, encryption, remote services, pairing, and synchronization remain unimplemented and out of scope for v0.4.x. Releases through `v0.0.12` were documentation-only; v0.1.0 is the first coded release. Handoff is implemented in v0.3.0; Talk is implemented; Pulse remains future work.

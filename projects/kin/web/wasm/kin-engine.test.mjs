@@ -293,7 +293,11 @@ test("bridge fails closed at every truncated Handoff result boundary", async con
   context.mock.method(WebAssembly, "instantiate", async (...args) => {
     const { instance } = await instantiate(...args);
     const abi = instance.exports;
-    return { instance: { exports: { ...abi, kin_result_len: () => resultLength ?? abi.kin_result_len() } } };
+    return { instance: { exports: { ...abi,
+      kin_apply_events(pointer,length) {
+        new DataView(abi.memory.buffer).setUint16(pointer+4,3,true);
+        return abi.kin_apply_events(pointer,length);
+      }, kin_result_len: () => resultLength ?? abi.kin_result_len() } } };
   });
   const wasm = await readFile(new URL("./kin_engine.wasm", import.meta.url));
   const engine = await loadKinEngine(`data:application/wasm;base64,${wasm.toString("base64")}`);
@@ -408,4 +412,55 @@ test("exact pre-Talk event writer bytes and v3 result remain unchanged",async()=
   const expectedV3=new Uint8Array(68);expectedV3.set([75,73,78,83,3,0,0,0,0,0,0,0,1,0,0,0]);
   expectedV3.fill(0x22,16,32);expectedV3.fill(0xbb,32,48);expectedV3[48]=1;expectedV3[60]=4;expectedV3.set([77,105,108,107],64);
   assert.deepEqual(apply(3,[handoff(1,5,"Milk")]),expectedV3);
+});
+
+test("bridge fails closed at every truncated Talk result boundary", async context => {
+  const instantiate = WebAssembly.instantiate;
+  let resultLength;
+  context.mock.method(WebAssembly, "instantiate", async (...args) => {
+    const { instance } = await instantiate(...args);
+    const abi = instance.exports;
+    return { instance: { exports: { ...abi,
+      kin_apply_events(pointer,length) {
+        new DataView(abi.memory.buffer).setUint16(pointer+4,4,true);
+        return abi.kin_apply_events(pointer,length);
+      }, kin_result_len: () => resultLength ?? abi.kin_result_len() } } };
+  });
+  const wasm = await readFile(new URL("./kin_engine.wasm", import.meta.url));
+  const engine = await loadKinEngine(`data:application/wasm;base64,${wasm.toString("base64")}`);
+  for (resultLength = 0; resultLength < 20+48+13; resultLength++) {
+    assert.throws(() => engine.applyEvents([talk(1)]), error => error.code === 6);
+  }
+  resultLength = 20+48+13+1;
+  assert.throws(() => engine.applyEvents([talk(1)]), error => error.code === 6);
+  resultLength = undefined;
+  assert.equal(engine.applyEvents([talk(1)]).talks.length,1);
+});
+
+test("large Talk replay grows WASM memory and preserves independent repeated results", async context => {
+  const instantiate = WebAssembly.instantiate;
+  let memory;
+  context.mock.method(WebAssembly,"instantiate",async(...args)=>{
+    const result=await instantiate(...args); memory=result.instance.exports.memory; return result;
+  });
+  const wasm = await readFile(new URL("./kin_engine.wasm", import.meta.url));
+  const engine = await loadKinEngine(`data:application/wasm;base64,${wasm.toString("base64")}`);
+  const initial = memory.buffer.byteLength;
+  const id = number => { const bytes=new Uint8Array(16); new DataView(bytes.buffer).setUint32(0,number,true); return bytes; };
+  const records=Array.from({length:10000},(_,index)=>encodeTalkAddedRecord({
+    eventId:id(index+1), talkId:id(index+1), householdId:zeroId, actorId:zeroId, deviceId:zeroId,
+    timestamp:index,logicalTime:index+1,text:index<1000 ? "x".repeat(4096) : "x",
+  }));
+  const state=engine.applyEvents(records);
+  assert.ok(memory.buffer.byteLength>initial,"real memory growth occurred");
+  assert.equal(state.talks.length,10000);
+  assert.equal(state.talks[999].text.length,4096);
+  for(let iteration=0;iteration<4;iteration++) {
+    const bad=talk(1);new DataView(bad.buffer).setUint16(2,99,true);
+    assert.throws(()=>engine.applyEvents([bad]),error=>error.code===3);
+    assert.deepEqual(engine.applyEvents([]),{items:[],handoffs:[],talks:[]});
+    assert.deepEqual(engine.applyEvents(records),state);
+  }
+  assert.equal(state.talks[0].text.length,4096,"host-owned result survives later calls");
+  assert.throws(()=>engine.applyEvents([...records,records[0]]),error=>error.code===5);
 });

@@ -1,6 +1,6 @@
 # Architecture
 
-**Status:** Talk is implemented alongside Today, Needs and Handoff. See [V0.4.0](V0.4.0.md) for the current scope, compatibility contract and release evidence.
+**Status:** Today, Needs, Handoff and Talk are implemented locally. Rust owns deterministic domain replay; browser components capture intents and render projection. No runtime dependency or remote service exists.
 
 ## System shape
 
@@ -87,7 +87,7 @@ The v0.1.x core is intended to be extended, not treated as proof that later feat
 | --------------------- | ---------------------------------------------------- | -------------------------------------- | ------------------------------------------------------------------ |
 | Today / Needs         | Versioned event pipeline and Rust-derived projection | Implemented in v0.2.0                  | Stabilization and accessibility audit in v0.2.1–v0.2.3             |
 | Handoff | Actor-aware immutable event envelope | Implemented in v0.3.0 | Stabilization through v0.3.3 |
-| Talk                  | Identified events and deterministic replay           | Yes                                    | Talk-specific lifecycle events and UI                              |
+| Talk | Identified events and deterministic replay | Implemented in v0.4.0 | Stabilization audited through v0.4.3; see V0.4.0 |
 | Pulse                 | Actor IDs and timestamps                             | Yes                                    | Time-bounded domain, explicit evaluation time, and expiry rules    |
 | Since You Last Looked | Ordered immutable event history                      | Yes                                    | Last-seen marker and derived summary                               |
 | Routines              | Event infrastructure and replay                      | Yes                                    | Recurrence model and occurrence semantics                          |

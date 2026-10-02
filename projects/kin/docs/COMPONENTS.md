@@ -1,6 +1,6 @@
 # Web Component Contract
 
-**Status:** Talk is implemented alongside Today, Needs and Handoff. See [V0.4.0](V0.4.0.md) for the current scope, compatibility contract and release evidence.
+**Status:** Native custom elements present Today, Needs, Handoff and Talk. KinApp orchestrates atomic persistence, Rust replay and retry recovery.
 
 ## Component responsibilities
 

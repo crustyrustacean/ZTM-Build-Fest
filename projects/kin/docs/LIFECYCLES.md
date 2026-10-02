@@ -1,6 +1,6 @@
 # Entity Lifecycles
 
-**Status:** Talk is implemented alongside Today, Needs and Handoff. See [V0.4.0](V0.4.0.md) for the current scope, compatibility contract and release evidence.
+**Status:** Item, Handoff and Talk lifecycles are implemented. Later lifecycles remain specifications.
 
 ## Item
 
@@ -45,7 +45,7 @@ unacknowledged -- HANDOFF_ACKNOWLEDGED --> acknowledged
 
 A handoff is created as unacknowledged. Acknowledgement is a receipt signal, not approval. Archival removes it from the active handoff view while preserving history. Unknown handoff references and transitions from archived are invalid. Handoff is implemented in v0.3.0. Repeated acknowledgement is a valid no-op; distinct addition of an existing Handoff ID fails. See [V0.3.0](V0.3.0.md) for the full matrix.
 
-## TalkItem
+## Talk
 
 ```text
 TALK_ADDED
@@ -61,7 +61,7 @@ TALK_ADDED
                archived
 ```
 
-A TalkItem begins open. It can be resolved, reopened from resolved, or archived. Archive is terminal absent a future explicit restore operation. These are workflow states only; they do not determine who is right or whether a topic is objectively settled. Talk is implemented; repeated resolve/reopen are valid no-ops and unknown/archived mutations fail.
+A Talk begins open. It can be resolved, reopened from resolved, or archived. Archive is terminal absent a future explicit restore operation. These are workflow states only; they do not determine who is right or whether a topic is objectively settled. Talk is implemented; repeated resolve/reopen are valid no-ops and unknown/archived mutations fail.
 
 ## Pulse
 

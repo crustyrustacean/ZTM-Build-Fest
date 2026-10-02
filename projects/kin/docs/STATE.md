@@ -1,6 +1,6 @@
 # Derived Household State
 
-**Status:** Talk is implemented alongside Today, Needs and Handoff. See [V0.4.0](V0.4.0.md) for the current scope, compatibility contract and release evidence.
+**Status:** Rust projects separate Items, Handoffs and Talks from one immutable event stream. Later projections remain future work.
 
 ## Projection pipeline
 
@@ -29,7 +29,8 @@ Keep the first projection small:
 HouseholdState
 ├── household_id: Option<HouseholdId>
 ├── items: Vec<ItemState> in original add-event order
-└── handoffs: Vec<HandoffState> in original add-event order
+├── handoffs: Vec<HandoffState> in original add-event order
+└── talks: Vec<TalkState> in original add-event order
 
 ItemState
 ├── item_id

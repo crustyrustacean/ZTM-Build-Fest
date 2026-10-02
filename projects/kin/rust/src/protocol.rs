@@ -1260,4 +1260,69 @@ mod tests {
         state.talks.push(state.talks[0].clone());
         assert_eq!(encode_state(&state, 4), Err(KinError::SizeLimit));
     }
+    #[test]
+    fn talk_request_header_and_length_hardening() {
+        let request = request_with(&talk_record(8, 1), 4, 1);
+        for length in 0..100 {
+            assert_eq!(
+                decode_request(&request[..length]),
+                Err(KinError::MalformedProtocol)
+            );
+        }
+        for offset in [6, 7] {
+            let mut invalid = request.clone();
+            invalid[offset] = 1;
+            assert_eq!(decode_request(&invalid), Err(KinError::MalformedProtocol));
+        }
+        for length in [0u32, 4097, u32::MAX] {
+            let mut invalid = request.clone();
+            invalid[116..120].copy_from_slice(&length.to_le_bytes());
+            assert_eq!(decode_request(&invalid), Err(KinError::MalformedProtocol));
+        }
+        let mut trailing = request;
+        trailing.push(0);
+        assert_eq!(decode_request(&trailing), Err(KinError::MalformedProtocol));
+    }
+
+    #[test]
+    fn maximum_mixed_talk_replay_is_deterministic() {
+        let mut records = Vec::new();
+        for number in 1..=MAX_EVENT_COUNT as u32 {
+            let mut record = match number % 3 {
+                0 => added_record_v2(number, number, b"x", 1),
+                1 => handoff_record(5, 1),
+                _ => talk_record(8, 1),
+            };
+            record[4..20].copy_from_slice(&numbered_id(number));
+            record[88..104].copy_from_slice(&numbered_id(number));
+            record[76..84].copy_from_slice(&u64::from(number).to_le_bytes());
+            records.push(record);
+        }
+        let state = talk_replay(&records).unwrap();
+        assert_eq!(
+            (state.items.len(), state.handoffs.len(), state.talks.len()),
+            (3333, 3334, 3333)
+        );
+        let result = encode_state(&state, 4).unwrap();
+        assert!(result.len() < MAX_PROTOCOL_BYTES);
+        assert_eq!(
+            result,
+            encode_state(&talk_replay(&records).unwrap(), 4).unwrap()
+        );
+        for collection in [
+            state
+                .items
+                .iter()
+                .map(|row| row.item_id.0)
+                .collect::<Vec<_>>(),
+            state.handoffs.iter().map(|row| row.handoff_id.0).collect(),
+            state.talks.iter().map(|row| row.talk_id.0).collect(),
+        ] {
+            assert!(collection.windows(2).all(|pair| u32::from_le_bytes(
+                pair[0][..4].try_into().unwrap()
+            ) < u32::from_le_bytes(
+                pair[1][..4].try_into().unwrap()
+            )));
+        }
+    }
 }

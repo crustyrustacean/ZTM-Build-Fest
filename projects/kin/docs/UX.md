@@ -1,6 +1,6 @@
 # UX
 
-**Status:** Talk is implemented alongside Today, Needs and Handoff. See [V0.4.0](V0.4.0.md) for the current scope, compatibility contract and release evidence.
+**Status:** Today, Needs, Handoff and Talk are implemented. Pulse and Since You Last Looked remain conceptual.
 
 ## Primary question
 
@@ -12,7 +12,7 @@ The home view should make useful context scannable and keep capture close at han
 
 ## Current home hierarchy
 
-The implemented view presents Today and Needs as separate sections, with active and completed items grouped within each. Archived items are omitted. Handoff follows with dedicated capture, needs-attention context, and recent acknowledged context; archived rows are hidden.
+The implemented view presents Today and Needs as separate sections, with active and completed items grouped within each. Archived items are omitted. Handoff follows with dedicated capture, needs-attention context, and recent acknowledged context; archived rows are hidden. Talk follows with one short topic field and Open/Resolved groups, newest additions first. Resolve/Reopen change workflow state; Archive hides the topic while retaining its history.
 
 ## Future home concepts
 

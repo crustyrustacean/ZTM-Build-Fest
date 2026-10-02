@@ -1,6 +1,6 @@
 # Release Process
 
-**Status:** Talk is implemented alongside Today, Needs and Handoff. See [V0.4.0](V0.4.0.md) for the current scope, compatibility contract and release evidence.
+**Status:** The approved v0.4.0–v0.4.3 Talk line is complete on kin-v0.4.0-development. Stop for evaluation. Do not begin another patch/Pulse, push or merge automatically.
 
 ## Release sequence
 

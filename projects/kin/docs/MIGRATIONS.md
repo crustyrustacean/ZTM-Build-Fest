@@ -1,6 +1,6 @@
 # Data Migrations
 
-**Status:** Talk is implemented alongside Today, Needs and Handoff. See [V0.4.0](V0.4.0.md) for the current scope, compatibility contract and release evidence.
+**Status:** No structural migration is required for Talk. Legacy Item/Handoff bytes and new Talk bytes coexist in IndexedDB schema 1 unchanged.
 
 ## Migration categories
 

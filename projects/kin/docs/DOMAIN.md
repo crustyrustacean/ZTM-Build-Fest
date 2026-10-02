@@ -1,6 +1,6 @@
 # Household Domain
 
-**Status:** Talk is implemented alongside Today, Needs and Handoff. See [V0.4.0](V0.4.0.md) for the current scope, compatibility contract and release evidence.
+**Status:** Items, Handoffs and Talks are implemented as distinct entities. Actors remain local placeholders, not verified people. Later entities remain future specifications.
 
 ## Scope and relationships
 
@@ -53,9 +53,9 @@ v0.2.0 includes adding an item as Today or Need, completion, reopening, and arch
 
 A Handoff is a short context transfer one household member wants another to know. Its conceptual lifecycle is created, unacknowledged, acknowledged, and archived. Acknowledgement means receipt, not agreement, approval, or evaluation. Handoffs are implemented in v0.3.0 as a separate typed entity; see [V0.3.0](V0.3.0.md). Repeated acknowledgement is a valid no-op. Creator and acknowledger may be the same local actor; no verified identity is inferred.
 
-## TalkItem
+## Talk
 
-A TalkItem captures “This matters, but right now may not be the right moment.” It can be open, resolved, reopened, and eventually archived. It is a coordination reminder, not therapy, diagnosis, mediation, or a verdict. Kin must not add blame scores, sentiment scores, winner/loser logic, or automated interpretation. Talk is implemented; resolution makes no claim of agreement or objective solution.
+A Talk captures “This matters, but right now may not be the right moment.” It can be open, resolved, reopened, and eventually archived. It is a coordination reminder, not therapy, diagnosis, mediation, or a verdict. Kin must not add blame scores, sentiment scores, winner/loser logic, or automated interpretation. Talk is implemented; resolution makes no claim of agreement or objective solution.
 
 ## Pulse
 

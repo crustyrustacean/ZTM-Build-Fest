@@ -1135,7 +1135,7 @@ try {
   });
   await first.evaluate('document.querySelector("input").focus()');
   assert.equal(
-    await first.evaluate("document.documentElement.scrollWidth <= innerWidth"),
+    await first.evaluate("document.documentElement.scrollWidth <= document.documentElement.clientWidth"),
     true,
   );
   assert.equal(
@@ -1170,7 +1170,7 @@ try {
         reducedMotion:matchMedia('(prefers-reduced-motion: reduce)').matches,
         undersized:controls.some(control=>control.getClientRects().length>0&&control.getBoundingClientRect().height<48),
         focusWidth:getComputedStyle(document.querySelector('select')).outlineWidth,
-        overflow:document.documentElement.scrollWidth>innerWidth,
+        overflow:document.documentElement.scrollWidth>document.documentElement.clientWidth,
       };
     })()`),
     {
@@ -1207,7 +1207,7 @@ try {
     const sheet=[...document.styleSheets].find(candidate=>candidate.href?.endsWith('/styles/app.css'));
     const ruleIndex=sheet.cssRules.length;
     sheet.insertRule('*{letter-spacing:.12em!important;word-spacing:.16em!important;line-height:1.5!important}',ruleIndex);
-    const overflow=document.documentElement.scrollWidth>innerWidth;
+    const overflow=document.documentElement.scrollWidth>document.documentElement.clientWidth;
     sheet.deleteRule(ruleIndex);
     return overflow;
   })()`);
