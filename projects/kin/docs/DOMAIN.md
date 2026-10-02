@@ -1,6 +1,6 @@
 # Household Domain
 
-**Status:** domain specification for future implementation. These entities and behaviors are not implemented. Trust and multi-device details are planned for v0.0.5; v0.1.0 uses local placeholders only.
+**Status:** the v0.1.x Item and Event subset is implemented; remaining domain entities and lifecycles are specifications. Trust and multi-device details were designed in v0.0.5; v0.1.x uses local identity placeholders only.
 
 ## Scope and relationships
 
@@ -23,13 +23,13 @@ A household is one private coordination space with a stable, opaque `household_i
 
 The initial product assumption is two adult members. This is a scope constraint, not a role/permission system. A household is created, active, and eventually may be closed or deleted through an explicit lifecycle; there is no implicit transfer of ownership when a device changes.
 
-In v0.1.0, the household ID is a local placeholder created for the browser installation. It does not represent a remotely registered household and does not establish membership or authentication. Household creation, membership, closure, recovery, and deletion protocols remain future work.
+In v0.1.x, the household ID is a local placeholder created for the browser installation. It does not represent a remotely registered household and does not establish membership or authentication. Household creation, membership, closure, recovery, and deletion protocols remain future work.
 
 ## Member
 
 A member is a person participating in a household, identified by an opaque, stable `member_id`. The member ID is distinct from every device ID and credential ID. Replacing or revoking a device does not create a new person or rewrite prior event authorship.
 
-An event's `actor_id` identifies the member who initiated the action. In v0.1.0 it is a temporary local actor ID, not a verified identity. Membership may later have invited, active, and removed states; authorization and transitions are specified in v0.0.5. Kin does not infer a member's identity, relationship, capacity, or intent from event activity.
+An event's `actor_id` identifies the member who initiated the action. In v0.1.x it is a temporary local actor ID, not a verified identity. Membership may later have invited, active, and removed states; authorization and transitions are specified in v0.0.5. Kin does not infer a member's identity, relationship, capacity, or intent from event activity.
 
 ## Device
 
@@ -71,4 +71,4 @@ An Agreement, if introduced, represents an explicit understanding deliberately e
 
 ## Event
 
-An Event is an immutable, identified fact describing a domain change. Each event belongs to one household, has an actor and originating device identity, a timestamp, event kind/version, and validated payload. The canonical naming, identity, ordering, replay, and error rules are in [Events](EVENTS.md). No entity in this document implies an implemented feature.
+An Event is an immutable, identified fact describing a domain change. The v0.1.x item event subset is implemented with household, actor, and originating device placeholders, timestamp, event kind/version, and validated payload. The canonical naming, identity, ordering, replay, and error rules are in [Events](EVENTS.md). Other conceptual entities in this document remain unimplemented unless explicitly marked otherwise.

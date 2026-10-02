@@ -1,5 +1,3 @@
-import { idFromHex } from "../wasm/kin-engine.js";
-
 class KinItem extends HTMLElement {
   constructor() {
     super();

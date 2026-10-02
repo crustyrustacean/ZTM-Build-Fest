@@ -2,6 +2,20 @@
 
 This file records completed Kin releases. The `v0.0.x` releases are planning and documentation milestones; they do not represent implemented application features. The first implementation milestone remains `v0.1.0`.
 
+## [0.1.3]
+
+### Audited
+
+- Confirmed JavaScript remains a browser adapter and renderer; Rust remains the only authoritative event validator and item-state reducer.
+- Documented the event, identity, ordering, and protocol foundations that later capabilities can extend without implementing those capabilities.
+- Confirmed no npm runtime packages, frontend frameworks, WASM helper crates, or third-party network dependencies are present.
+- Rechecked local-only storage/requests, privacy-safe diagnostics, and the v0.0.10 community/security/support guidance.
+
+### Validation
+
+- Full Rust, bridge, WASM, reload, malformed-storage, Unicode, keyboard, and narrow-viewport regressions were run for the v0.1.x line.
+- The release review records remaining platform and assistive-technology gaps and makes no certification claim for untested environments.
+
 ## [0.1.2]
 
 ### Improved
@@ -50,13 +64,12 @@ This file records completed Kin releases. The `v0.0.x` releases are planning and
 
 ### Added
 
-- Established this project-scoped changelog and documented how release entries are maintained.
-
-### Changed
+- Corrected the preserved bug-report template's prototype status and updated the implementation file map without removing v0.0.10 community guidance.
 
 - Updated Kin's current release references through `v0.0.12`; `v0.0.9` remains the specification freeze and `v0.1.0` remains the first implementation milestone.
 
-## [0.0.11]
+- All 25 Rust tests and 3 built-in Node bridge tests passed; formatting, Clippy, the `wasm32-unknown-unknown` build, and the browser reload/persistence checks passed.
+- Browser checks covered malformed-row preservation, Unicode roundtrip, keyboard/draft recovery, 320px/360px/640px reflow, and same-origin-only requests.
 
 ### Added
 

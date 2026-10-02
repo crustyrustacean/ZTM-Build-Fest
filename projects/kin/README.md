@@ -2,7 +2,7 @@
 
 > A private, lightweight household coordination app for the little things families need to know, remember, hand off, or discuss.
 
-**Current status: `v0.1.2` — Resilience & Accessibility.** Kin provides a local household item loop: add items, complete items, persist immutable events in IndexedDB, and reconstruct state through a Rust/WASM engine after reload. The `.1.1` correctness patch hardened Unicode and storage validation; `.1.2` improves interrupted-draft recovery, keyboard focus, and narrow-layout resilience. Planning/specification through `v0.0.9` and community/release documentation through `v0.0.12` remain preserved in history.
+**Current status: `v0.1.3` — Household Heartbeat Hardening.** Kin provides a local household item loop: add items, complete items, persist immutable events in IndexedDB, and reconstruct state through a Rust/WASM engine after reload. The `.1.1` and `.1.2` patches hardened correctness, interruption recovery, and accessibility; `.1.3` audits the durable core, privacy, dependencies, and release documentation. Planning/specification through `v0.0.9` and community/release documentation through `v0.0.12` remain preserved in history.
 
 ## The problem
 
@@ -33,6 +33,7 @@ The intended technical direction is Rust compiled to WebAssembly, native Web Com
 - `v0.1.0` — Household Heartbeat (`kin-v0.1.0`)
 - `v0.1.1` — Core Correctness (`kin-v0.1.1`)
 - `v0.1.2` — Resilience & Accessibility (`kin-v0.1.2`)
+- `v0.1.3` — Household Heartbeat Hardening (`kin-v0.1.3`)
 - See the [changelog](CHANGELOG.md) for the completed release history.
 
 ## Install, build, and run

@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::sync::Mutex;
 
 use crate::error::KinError;
-use crate::protocol::{decode_request, encode_state, PROTOCOL_VERSION};
+use crate::protocol::{decode_request, encode_state, MAX_PROTOCOL_BYTES, PROTOCOL_VERSION};
 use crate::state::rebuild;
 
 struct AbiState {
@@ -41,6 +41,10 @@ fn range_is_valid(pointer: u32, length: u32, memory_length: u64) -> bool {
         .is_some_and(|end| end <= memory_length)
 }
 
+fn request_length_is_supported(length: u32) -> bool {
+    usize::try_from(length).is_ok_and(|size| size <= MAX_PROTOCOL_BYTES)
+}
+
 #[cfg(target_arch = "wasm32")]
 fn linear_memory_length() -> u64 {
     u64::from(core::arch::wasm32::memory_size(0) as u32) * 65_536
@@ -75,7 +79,7 @@ fn active_buffer_pointer(bytes: &[u8]) -> u32 {
 
 #[cfg_attr(target_arch = "wasm32", no_mangle)]
 pub extern "C" fn kin_alloc(length: u32) -> u32 {
-    if length == 0 {
+    if length == 0 || !request_length_is_supported(length) {
         return 0;
     }
     let Ok(capacity) = usize::try_from(length) else {
@@ -117,7 +121,9 @@ pub extern "C" fn kin_apply_events(pointer: u32, length: u32) -> i32 {
     state.result.clear();
     state.error.clear();
 
-    let outcome = if !range_is_valid(pointer, length, linear_memory_length()) {
+    let outcome = if !request_length_is_supported(length) {
+        Err(KinError::SizeLimit)
+    } else if !range_is_valid(pointer, length, linear_memory_length()) {
         Err(KinError::InvalidAbi)
     } else if length == 0 {
         Err(KinError::MalformedProtocol)
@@ -165,7 +171,8 @@ pub extern "C" fn kin_error_len() -> u32 {
 
 #[cfg(test)]
 mod tests {
-    use super::range_is_valid;
+    use super::{range_is_valid, request_length_is_supported};
+    use crate::protocol::MAX_PROTOCOL_BYTES;
 
     #[test]
     fn memory_ranges_reject_null_overflow_and_out_of_bounds() {
@@ -174,5 +181,11 @@ mod tests {
         assert!(!range_is_valid(0, 1, 20));
         assert!(!range_is_valid(19, 2, 20));
         assert!(!range_is_valid(u32::MAX, 2, u64::from(u32::MAX) + 1));
+    }
+
+    #[test]
+    fn request_size_is_bounded_before_pointer_dereference() {
+        assert!(request_length_is_supported(MAX_PROTOCOL_BYTES as u32));
+        assert!(!request_length_is_supported(MAX_PROTOCOL_BYTES as u32 + 1));
     }
 }

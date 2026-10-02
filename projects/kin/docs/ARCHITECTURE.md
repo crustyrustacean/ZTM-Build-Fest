@@ -22,7 +22,7 @@ Derived household state
       +------> Web Components render the result
 ```
 
-The v0.1.0 module layout and ABI are specified in [IMPLEMENTATION](IMPLEMENTATION.md) and [ABI](ABI.md); neither has been implemented. The boundary is the important part: browser concerns stay in the browser layer; authoritative, deterministic household-state rules live in Rust.
+The v0.1.0 module layout and ABI are implemented as documented in [IMPLEMENTATION](IMPLEMENTATION.md) and [ABI](ABI.md). The boundary is the important part: browser concerns stay in the browser layer; authoritative, deterministic household-state rules live in Rust.
 
 ## Browser and JavaScript responsibilities
 
@@ -53,13 +53,13 @@ Rust must not manipulate the DOM. It should be possible to test domain behavior 
 
 The v0.1.0 implementation targets `wasm32-unknown-unknown` and uses the explicit JavaScript-to-WASM ABI in [ABI](ABI.md). It has no `wasm-bindgen`, `web-sys`, `js-sys`, `serde`, or framework runtime dependency.
 
-A manual ABI is specified for v0.1.0 in [ABI](ABI.md), including exported function signatures, versioned request/result encoding, ownership and lifetimes, errors, bounds, and repeated-call behavior. JavaScript allocates/copies input and decodes output; Rust reads validated input ranges and returns a well-defined result. The browser layer retains ownership of DOM, storage, cryptographic APIs, networking, and lifecycle integration.
+A manual ABI is implemented for v0.1.0 in [ABI](ABI.md), including exported function signatures, versioned request/result encoding, ownership and lifetimes, errors, bounds, and repeated-call behavior. JavaScript allocates/copies input and decodes output; Rust reads validated input ranges and returns a well-defined result. The browser layer retains ownership of DOM, storage, cryptographic APIs, networking, and lifecycle integration.
 
 The manual boundary keeps the interface visible and avoids convenience bindings before a demonstrated need. A later requirement may justify revisiting that choice through an explicit architecture decision; the v0.1.0 implementation must follow the current contract.
 
 ## Local-first progression
 
-The first coded version should work locally:
+The current implementation works locally:
 
 ```text
 Browser UI
@@ -71,13 +71,32 @@ IndexedDB event log
 Rust reconstructs household state
 ```
 
-Only after the local-first release should implementation consider a remote sync service. Its trust and protocol design is documented before implementation in [SYNC](SYNC.md), with identity, pairing, cryptographic properties, and threats specified in [IDENTITY](IDENTITY.md), [PAIRING](PAIRING.md), [CRYPTOGRAPHY](CRYPTOGRAPHY.md), and [THREAT-MODEL](THREAT-MODEL.md):
+Remote sync remains future work. Its trust and protocol design is documented before implementation in [SYNC](SYNC.md), with identity, pairing, cryptographic properties, and threats specified in [IDENTITY](IDENTITY.md), [PAIRING](PAIRING.md), [CRYPTOGRAPHY](CRYPTOGRAPHY.md), and [THREAT-MODEL](THREAT-MODEL.md):
 
 ```text
 Device A <---- encrypted event sync ----> Service <---- encrypted event sync ----> Device B
 ```
 
 The service is intended as an authenticated encrypted-event relay, not a household source of truth or plaintext domain processor. Its protocol, conflict classes, and cryptographic design remain future implementation work. Design is documented in v0.0.5; sync is not part of v0.1.0.
+
+## Future capability leverage
+
+The v0.1.x core is intended to be extended, not treated as proof that later features already exist:
+
+| Future capability     | Foundation already present                           | Extendable without replacing the core? | Still required                                                     |
+| --------------------- | ---------------------------------------------------- | -------------------------------------- | ------------------------------------------------------------------ |
+| Today / Needs         | Event pipeline and Rust-derived item projection      | Yes                                    | Classification rules and their scoped UI/events                    |
+| Handoff               | Actor-aware immutable event envelope                 | Yes                                    | Handoff-specific events and lifecycle                              |
+| Talk                  | Identified events and deterministic replay           | Yes                                    | Talk-specific lifecycle events and UI                              |
+| Pulse                 | Actor IDs and timestamps                             | Yes                                    | Time-bounded domain, explicit evaluation time, and expiry rules    |
+| Since You Last Looked | Ordered immutable event history                      | Yes                                    | Last-seen marker and derived summary                               |
+| Routines              | Event infrastructure and replay                      | Yes                                    | Recurrence model and occurrence semantics                          |
+| Pairing               | Household/member/device identity fields              | Yes                                    | Authentication, authorization, pairing, recovery, and device trust |
+| Offline sync          | Random event IDs and immutable canonical event bytes | Yes                                    | Multi-device transport and conflict/reconciliation policy          |
+| Encrypted sync        | Deterministic, versioned event representation        | Yes                                    | Reviewed cryptographic protocol and key lifecycle                  |
+| Export/import         | Versioned event representation and preserved history | Yes                                    | Portable container, validation, and recovery UX                    |
+
+“Yes” means the existing infrastructure can be extended; it does not mean the capability is implemented, secure, or ready to ship without its listed domain and validation work.
 
 ## Dependency policy
 

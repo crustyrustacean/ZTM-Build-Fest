@@ -1,6 +1,6 @@
 # Roadmap
 
-This roadmap is a planning baseline, not a promise of delivery dates. Releases may change as the product is tested. Kin's current release is `v0.1.2` Resilience & Accessibility, strengthening the local Household Heartbeat prototype. The `v0.0.1`–`v0.0.12` planning and documentation history remains preserved; later product increments remain future work.
+This roadmap is a planning baseline, not a promise of delivery dates. Releases may change as the product is tested. Kin's current release is `v0.1.3` Household Heartbeat Hardening, the third stabilization patch for the local prototype. The `v0.0.1`–`v0.0.12` planning and documentation history remains preserved; later product increments remain future work.
 
 ## Planning releases
 
@@ -70,6 +70,10 @@ Hardened Unicode roundtripping, local storage startup cleanup, and stored-event 
 
 Preserves an in-progress compose draft across same-tab reloads using best-effort `sessionStorage`, restores keyboard focus after asynchronous add/complete operations, exposes `aria-busy`, and improves feedback when WASM or local storage is unavailable. Reflow and touch targets were checked at narrow widths. No new product capability was added.
 
+### `v0.1.3` — Household Heartbeat Hardening
+
+Audits the Rust/JavaScript ownership boundary, future-capability leverage, dependency surface, local-only privacy behavior, and v0.0.10 community documentation. Fixes only meaningful infrastructure or hardening gaps; introduces no new product capability.
+
 ## Product increments
 
 ### `v0.2.0` — Today + Needs
@@ -110,4 +114,4 @@ Focus on polish, reliability, accessibility, mobile UX, privacy documentation, o
 
 ## Scope discipline
 
-Each roadmap item is future work unless explicitly marked as a completed planning milestone. Authentication, passkeys, encryption, remote services, pairing, and synchronization remain unimplemented and out of scope for `v0.1.0`. Documentation and community planning through `v0.0.12` remains code-free; v0.1.0 is the first coded release and has not begun.
+Each roadmap item is future work unless explicitly marked as completed. Authentication, passkeys, encryption, remote services, pairing, and synchronization remain unimplemented and out of scope for the v0.1.x line. Releases through `v0.0.12` were documentation-only; v0.1.0 is the first coded release, and v0.1.3 remains solely its hardening line.

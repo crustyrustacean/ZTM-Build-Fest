@@ -30,7 +30,8 @@ projects/kin/
     │   ├── kin-compose.js
     │   └── kin-item.js
     ├── wasm/
-    │   └── kin-engine.js
+    │   ├── kin-engine.js
+    │   └── kin-engine.test.mjs
     ├── storage/
     │   └── event-store.js
     └── styles/
