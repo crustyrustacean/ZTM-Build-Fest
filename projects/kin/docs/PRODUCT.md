@@ -46,4 +46,4 @@ Kin is not couples therapy, a marriage score, a chore competition, a relationshi
 
 ## Current status
 
-The `v0.0.x` releases are product and technical planning only. The areas above are not available in a usable application. Implementation is planned to begin at `v0.1.0`.
+Kin implements the Today and Needs views, fixed lightweight classification, fast local capture, completion, reopening, and archival. Older v0.1.x items without classification remain visible in Today. Handoff, Talk, Pulse, Since You Last Looked, and Routines remain future concepts; `v0.3.0 — Handoff` has not started.

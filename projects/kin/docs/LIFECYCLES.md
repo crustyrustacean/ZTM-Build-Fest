@@ -1,6 +1,6 @@
 # Entity Lifecycles
 
-**Status:** transition specification only. No lifecycle implementation exists. The domain definitions are in [Domain](DOMAIN.md); planned event names are in [Events](EVENTS.md).
+**Status:** Item lifecycle transitions are implemented in v0.2.0. Handoff, TalkItem, Pulse, and other lifecycle sections remain specifications. The domain definitions are in [Domain](DOMAIN.md); event names and versions are in [Events](EVENTS.md).
 
 ## Item
 
@@ -16,18 +16,18 @@ active --------------------------------> completed
 completed -------- ITEM_ARCHIVED --------> archived
 ```
 
-| Current state       | Event                          | Next state | Rule                                                                                  |
-| ------------------- | ------------------------------ | ---------- | ------------------------------------------------------------------------------------- |
-| absent              | `ITEM_ADDED`                   | active     | Requires a new stable item ID and valid text.                                         |
-| active              | `ITEM_COMPLETED`               | completed  | Valid transition.                                                                     |
-| completed           | `ITEM_COMPLETED`               | completed  | Valid no-op for distinct event identity; exact duplicate delivery is deduplicated.    |
-| completed           | `ITEM_REOPENED`                | active     | Future transition, planned v0.2.0.                                                    |
-| active              | `ITEM_REOPENED`                | active     | Valid no-op, matching repeated completion behavior; planned with reopening in v0.2.0. |
-| active or completed | `ITEM_ARCHIVED`                | archived   | Future tombstone transition; planned v0.2.0.                                          |
-| absent              | completion, reopen, or archive | error      | Referenced item does not exist.                                                       |
-| archived            | any item mutation              | error      | Archived item is terminal unless a future explicit restore event is designed.         |
+| Current state       | Event                          | Next state | Rule                                                                               |
+| ------------------- | ------------------------------ | ---------- | ---------------------------------------------------------------------------------- |
+| absent              | `ITEM_ADDED`                   | active     | Requires a new stable item ID and valid text.                                      |
+| active              | `ITEM_COMPLETED`               | completed  | Valid transition.                                                                  |
+| completed           | `ITEM_COMPLETED`               | completed  | Valid no-op for distinct event identity; exact duplicate delivery is deduplicated. |
+| completed           | `ITEM_REOPENED`                | active     | Implemented in v0.2.0.                                                             |
+| active              | `ITEM_REOPENED`                | active     | Valid no-op, matching repeated completion behavior; implemented in v0.2.0.         |
+| active or completed | `ITEM_ARCHIVED`                | archived   | Terminal tombstone transition implemented in v0.2.0.                               |
+| absent              | completion, reopen, or archive | error      | Referenced item does not exist.                                                    |
+| archived            | any item mutation              | error      | Archived item is terminal unless a future explicit restore event is designed.      |
 
-v0.1.0 implements only absent → active → completed. Reopening and archival are excluded from that release. Duplicate `ITEM_ADDED` with a different event ID but existing item ID is invalid.
+v0.2.0 implements the full Item matrix above. Reopen-on-active is a valid no-op; archive from active or completed is a terminal tombstone; every subsequent ordinary mutation of an archived item is invalid. Duplicate `ITEM_ADDED` with a different event ID but existing item ID is invalid.
 
 ## Handoff
 

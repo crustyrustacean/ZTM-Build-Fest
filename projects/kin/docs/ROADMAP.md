@@ -1,6 +1,6 @@
 # Roadmap
 
-This roadmap is a planning baseline, not a promise of delivery dates. Releases may change as the product is tested. Kin's current release is `v0.1.5` Final 0.1.x Stabilization, closing the local prototype stabilization line without introducing a new product capability. The next development target is `v0.2.0`. The `v0.0.1`–`v0.0.12` planning and documentation history remains preserved; later product increments remain future work.
+This roadmap is a planning baseline, not a promise of delivery dates. Releases may change as the product is tested. Kin's current release is `v0.2.0` Today + Needs. The v0.2.1–v0.2.3 entries are the approved stabilization line; `v0.3.0 — Handoff` remains future work. The `v0.0.1`–`v0.0.12` planning and documentation history remains preserved.
 
 ## Planning releases
 
@@ -86,7 +86,19 @@ Associates draft clearing with the successfully persisted submission, preserves 
 
 ### `v0.2.0` — Today + Needs
 
-Add the Today and Needs views, fast capture, lightweight classification, and active/completed household items.
+Implemented: Today and Needs views, lightweight fixed classification, fast capture defaulting to Needs, complete/reopen/archive item transitions, and local deterministic replay. Legacy v0.1.x unclassified items appear in Today. Protocol v2 carries the new projection while protocol v1 and IndexedDB schema 1 remain unchanged.
+
+### `v0.2.1` — Today + Needs Correctness
+
+Audit event/version compatibility, transition validity, browser storage atomicity, and deterministic replay without adding product concepts.
+
+### `v0.2.2` — Today + Needs Resilience & Accessibility
+
+Harden drafts and item actions across failures, retries, tabs, interruption, keyboard use, narrow screens, and accessibility settings.
+
+### `v0.2.3` — Today + Needs Hardening & Polish
+
+Complete the architecture, privacy, protocol-boundary, performance, and user-facing clarity audit. No new capability.
 
 ### `v0.3.0` — Handoff
 
@@ -122,4 +134,4 @@ Focus on polish, reliability, accessibility, mobile UX, privacy documentation, o
 
 ## Scope discipline
 
-Each roadmap item is future work unless explicitly marked as completed. Authentication, passkeys, encryption, remote services, pairing, and synchronization remain unimplemented and out of scope for the v0.1.x line. Releases through `v0.0.12` were documentation-only; v0.1.0 is the first coded release, and v0.1.3 remains solely its hardening line.
+Each roadmap item is future work unless explicitly marked as completed. Authentication, passkeys, encryption, remote services, pairing, and synchronization remain unimplemented and out of scope for v0.2.x. Releases through `v0.0.12` were documentation-only; v0.1.0 is the first coded release. Handoff remains assigned to v0.3.0 and has not started.

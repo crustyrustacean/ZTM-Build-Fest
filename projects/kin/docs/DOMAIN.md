@@ -1,6 +1,6 @@
 # Household Domain
 
-**Status:** the v0.1.x Item and Event subset is implemented; remaining domain entities and lifecycles are specifications. Trust and multi-device details were designed in v0.0.5; v0.1.x uses local identity placeholders only.
+**Status:** the v0.2.0 Item and Event subset is implemented, including fixed classification and complete/reopen/archive transitions. Handoff and other entities remain future specifications. Kin continues to use local identity placeholders only.
 
 ## Scope and relationships
 
@@ -47,7 +47,7 @@ An Item is a lightweight household need or reminder. It has a stable opaque `ite
 
 Items are not project-management tasks. The initial model deliberately avoids priority, labels, project hierarchy, assignment requirements, and complex metadata. Adding, completing, reopening, and archiving are separate immutable events; an earlier event is not edited to change the item.
 
-v0.1.0 includes only adding and completing an item. Reopening and archival are future behavior, tentatively v0.2.0. Archive is a state transition/tombstone, not physical deletion of the historical event.
+v0.2.0 includes adding an item as Today or Need, completion, reopening, and archival. A legacy v0.1.x add has no classification and normalizes to Today without changing its stored bytes. Archive is a terminal state/tombstone, not physical deletion of historical events. Priority, labels, assignment, and project metadata are not part of the Item model.
 
 ## Handoff
 
@@ -71,4 +71,4 @@ An Agreement, if introduced, represents an explicit understanding deliberately e
 
 ## Event
 
-An Event is an immutable, identified fact describing a domain change. The v0.1.x item event subset is implemented with household, actor, and originating device placeholders, timestamp, event kind/version, and validated payload. The canonical naming, identity, ordering, replay, and error rules are in [Events](EVENTS.md). Other conceptual entities in this document remain unimplemented unless explicitly marked otherwise.
+An Event is an immutable, identified fact describing a domain change. The v0.2.0 item subset is implemented with household, actor, and originating device placeholders, timestamp, event kind/version, and validated payload. The canonical naming, identity, ordering, replay, and error rules are in [Events](EVENTS.md). Other conceptual entities in this document remain unimplemented unless explicitly marked otherwise.

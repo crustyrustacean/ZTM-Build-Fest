@@ -188,3 +188,37 @@ Use Vector 001 with text exactly:
 ```
 
 Expected domain state preserves the exact string as text. Browser acceptance verifies it is rendered inertly as text, never executed or interpreted as markup; see [TESTING](TESTING.md) and [ACCESSIBILITY](ACCESSIBILITY.md).
+
+## v0.2.0 Today + Needs vectors
+
+The original vectors above remain protocol-v1/schema-v1 compatibility fixtures. The following cases use protocol v2 unless noted.
+
+### Vector 012 — Classified add
+
+Use event envelope values from Vector 001 with protocol version 2, event schema version 2, kind `ITEM_ADDED`, item ID `11111111111111111111111111111111`, text `"Restock wipes"`, and classification byte `1` (`Need`). The schema-v2 payload is `item_id[16] | classification:u8 | reserved[3]=0 | text_length:u32 | text`.
+
+Expected: one active item with classification `Need`, exact text, and original add ordering.
+
+### Vector 013 — Legacy add normalization
+
+Replay the exact protocol-v1/schema-v1 bytes from Vector 001 using protocol v2.
+
+Expected: the item is represented as classification `Today`; the source bytes remain byte-identical and the result is deterministic across replay.
+
+### Vector 014 — Complete, reopen, archive
+
+Apply Vector 012, then distinct schema-v1 events in increasing logical/local order: `ITEM_COMPLETED`, `ITEM_REOPENED`, and `ITEM_ARCHIVED`, each with a 16-byte reference to the added item.
+
+Expected: final status `archived`, classification remains `Need`, and all four immutable source events remain in history.
+
+### Vector 015 — Archived item mutation
+
+Apply Vector 014 followed by a distinct `ITEM_REOPENED`, `ITEM_COMPLETED`, or `ITEM_ARCHIVED` event for the same item.
+
+Expected: deterministic invalid-domain-event error (ABI status code 4), no partial projection, and no append to IndexedDB.
+
+### Vector 016 — Protocol-v1 reserved bytes
+
+Use a valid protocol-v1 result/request and set any reserved protocol-v1 byte to a nonzero value.
+
+Expected: deterministic malformed-protocol error. Protocol v2 does not reinterpret any protocol-v1 reserved byte as classification or status.

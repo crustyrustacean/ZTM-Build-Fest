@@ -1,6 +1,6 @@
 # UX
 
-**Status:** conceptual interaction model. Nothing in this document is implemented.
+**Status:** Today and Needs, fixed classification, fast capture, and item lifecycle actions are implemented. Handoff, Talk, Pulse, and Since You Last Looked sections remain conceptual.
 
 ## Primary question
 
@@ -10,7 +10,11 @@ The main experience should answer:
 
 The home view should make useful context scannable and keep capture close at hand. Avoid turning household communication into administration.
 
-## Conceptual home screen
+## Current home hierarchy
+
+The implemented view presents Today and Needs as separate sections, with active and completed items grouped within each. Archived items are omitted. This is the current structure, not a commitment to the other concepts shown below.
+
+## Future home concepts
 
 ```text
 KIN
@@ -39,7 +43,7 @@ This is an example of possible content hierarchy, not a final visual design or i
 
 ## Add something
 
-Capture should be short and forgiving. A possible future flow:
+Capture is short and forgiving. The current form accepts text and defaults classification to Needs; a native selector can place it in Today with one additional action:
 
 ```text
 + Add
@@ -48,7 +52,7 @@ What should we remember?
 
 > buy milk
 
-[ Today ] [ Later ] [ Talk ] [ FYI ]
+[ Needs ] [ Today ]
 ```
 
 The target interaction is:
@@ -60,7 +64,7 @@ tap
 done
 ```
 
-The categories are conceptual. Do not require categorization when a plain item is enough.
+The two classifications are fixed. Do not add category management or require more metadata.
 
 ## Handoff
 

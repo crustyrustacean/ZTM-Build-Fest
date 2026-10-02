@@ -1,4 +1,4 @@
-const PROTOCOL_VERSION = 1;
+const PROTOCOL_VERSION = 2;
 const REQUEST_HEADER_BYTES = 12;
 const EVENT_HEADER_BYTES = 88;
 const RESULT_HEADER_BYTES = 12;
@@ -108,10 +108,17 @@ export function encodeAddedRecord({
   logicalTime,
   itemId,
   text,
+  classification = "need",
 }) {
   const textBytes = textEncoder.encode(text);
+  const classificationCode =
+    classification === "today" ? 0 : classification === "need" ? 1 : -1;
+  if (classificationCode < 0) {
+    throw new KinEngineError(2, "Choose a valid list.");
+  }
   if (
     strictTextDecoder.decode(textBytes) !== text ||
+    textBytes.length < 1 ||
     textBytes.length > MAX_ITEM_TEXT_BYTES
   ) {
     throw new KinEngineError(
@@ -119,10 +126,11 @@ export function encodeAddedRecord({
       "Item text must be valid Unicode and no more than 4096 UTF-8 bytes.",
     );
   }
-  const payload = new Uint8Array(20 + textBytes.length);
+  const payload = new Uint8Array(24 + textBytes.length);
   payload.set(assertId(itemId), 0);
-  new DataView(payload.buffer).setUint32(16, textBytes.length, true);
-  payload.set(textBytes, 20);
+  payload[16] = classificationCode;
+  new DataView(payload.buffer).setUint32(20, textBytes.length, true);
+  payload.set(textBytes, 24);
   return encodeEventRecord({
     eventId,
     householdId,
@@ -130,6 +138,7 @@ export function encodeAddedRecord({
     deviceId,
     timestamp,
     logicalTime,
+    eventVersion: 2,
     kind: 1,
     payload,
   });
@@ -151,7 +160,52 @@ export function encodeCompletedRecord({
     deviceId,
     timestamp,
     logicalTime,
+    eventVersion: 1,
     kind: 2,
+    payload: assertId(itemId),
+  });
+}
+
+export function encodeReopenedRecord({
+  eventId,
+  householdId,
+  actorId,
+  deviceId,
+  timestamp,
+  logicalTime,
+  itemId,
+}) {
+  return encodeEventRecord({
+    eventId,
+    householdId,
+    actorId,
+    deviceId,
+    timestamp,
+    logicalTime,
+    eventVersion: 1,
+    kind: 3,
+    payload: assertId(itemId),
+  });
+}
+
+export function encodeArchivedRecord({
+  eventId,
+  householdId,
+  actorId,
+  deviceId,
+  timestamp,
+  logicalTime,
+  itemId,
+}) {
+  return encodeEventRecord({
+    eventId,
+    householdId,
+    actorId,
+    deviceId,
+    timestamp,
+    logicalTime,
+    eventVersion: 1,
+    kind: 4,
     payload: assertId(itemId),
   });
 }
@@ -163,12 +217,13 @@ function encodeEventRecord({
   deviceId,
   timestamp,
   logicalTime,
+  eventVersion,
   kind,
   payload,
 }) {
   const record = new Uint8Array(EVENT_HEADER_BYTES + payload.length);
   const view = new DataView(record.buffer);
-  view.setUint16(0, 1, true);
+  view.setUint16(0, eventVersion, true);
   view.setUint16(2, kind, true);
   record.set(assertId(eventId), 4);
   record.set(assertId(householdId), 20);
@@ -292,7 +347,7 @@ function decodeError(bytes, status) {
   const code = view.getUint16(6, true);
   const messageLength = view.getUint32(8, true);
   if (
-    version !== PROTOCOL_VERSION ||
+    ![1, PROTOCOL_VERSION].includes(version) ||
     code !== status ||
     bytes.length !== REQUEST_HEADER_BYTES + messageLength
   ) {
@@ -319,8 +374,9 @@ function decodeState(bytes) {
     );
   }
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const protocolVersion = view.getUint16(4, true);
   if (
-    view.getUint16(4, true) !== PROTOCOL_VERSION ||
+    ![1, PROTOCOL_VERSION].includes(protocolVersion) ||
     view.getUint16(6, true) !== 0
   ) {
     throw new KinEngineError(6, "Kin received an unsupported state format.");
@@ -344,13 +400,20 @@ function decodeState(bytes) {
     }
     const textLength = view.getUint32(offset + 44, true);
     const recordEnd = headerEnd + textLength;
-    if (
-      recordEnd > bytes.length ||
-      view.getUint8(offset + 40) > 1 ||
-      view.getUint8(offset + 41) !== 0 ||
-      view.getUint8(offset + 42) !== 0 ||
-      view.getUint8(offset + 43) !== 0
-    ) {
+    const classificationCode = view.getUint8(offset + 40);
+    const statusCode =
+      protocolVersion === 1 ? classificationCode : view.getUint8(offset + 41);
+    const validStatus =
+      protocolVersion === 1
+        ? classificationCode <= 1 &&
+          view.getUint8(offset + 41) === 0 &&
+          view.getUint8(offset + 42) === 0 &&
+          view.getUint8(offset + 43) === 0
+        : classificationCode <= 1 &&
+          statusCode <= 2 &&
+          view.getUint8(offset + 42) === 0 &&
+          view.getUint8(offset + 43) === 0;
+    if (recordEnd > bytes.length || !validStatus) {
       throw new KinEngineError(
         6,
         "Kin received an invalid item record from its household engine.",
@@ -377,7 +440,9 @@ function decodeState(bytes) {
       itemId: idToHex(bytes.subarray(offset, offset + 16)),
       createdBy: idToHex(bytes.subarray(offset + 16, offset + 32)),
       createdAt: createdAtNumber,
-      status: view.getUint8(offset + 40) === 0 ? "active" : "completed",
+      classification:
+        protocolVersion === 1 || classificationCode === 0 ? "today" : "need",
+      status: ["active", "completed", "archived"][statusCode],
       text,
     });
     offset = recordEnd;

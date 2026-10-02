@@ -1,6 +1,6 @@
 # v0.1.0 Requirement Traceability
 
-**Status:** lightweight planning map. Rows identify the authority and the future validation; they do not mean the behavior is implemented.
+**Status:** the v0.1.0 table is a historical planning map; the v0.2.0 table records implemented Today + Needs requirements and their current regression coverage.
 
 | Requirement                                        | Specification authority                                                                 | v0.1.0 validation                                                                  |
 | -------------------------------------------------- | --------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
@@ -19,3 +19,16 @@
 | No runtime framework/dependency by default         | [AGENTS.md](../AGENTS.md), [IMPLEMENTATION](IMPLEMENTATION.md), ADR 0007                | Manifest/dependency review at release gate.                                        |
 | Future migrations preserve data                    | [VERSIONING](VERSIONING.md), [MIGRATIONS](MIGRATIONS.md)                                | Migration tests when migration code is introduced; not a v0.1.0 feature.           |
 | Export/deletion policy is explicit                 | [PORTABILITY](PORTABILITY.md), [RETENTION](RETENTION.md), [PRIVACY](PRIVACY.md)         | Documentation review now; no v0.1.0 export/delete behavior is claimed.             |
+
+## v0.2.0 Today + Needs
+
+| Requirement                                                         | Specification authority                                                       | v0.2.0 validation                                                                                                 |
+| ------------------------------------------------------------------- | ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Fixed Today/Need classification; Needs is capture default           | [V0.2.0](V0.2.0.md), [DOMAIN](DOMAIN.md), [COMPONENTS](COMPONENTS.md)         | Rust schema-v1/v2 replay tests and browser capture/classification/reload checks.                                  |
+| Legacy v0.1.x item remains visible in Today without rewriting bytes | [V0.2.0](V0.2.0.md), [VERSIONING](VERSIONING.md), [MIGRATIONS](MIGRATIONS.md) | Protocol-v1 history fixture and mixed-schema replay; compare canonical source bytes.                              |
+| Protocol v1 remains unchanged; v2 carries classification/status     | [ABI](ABI.md), [VERSIONING](VERSIONING.md)                                    | Rust protocol-v1/v2 vectors, malformed v2 boundaries, and browser WASM replay.                                    |
+| Rust owns complete Item lifecycle and deterministic projection      | [EVENTS](EVENTS.md), [STATE](STATE.md), [LIFECYCLES](LIFECYCLES.md), ADR 0002 | Rust transition matrix and browser complete/reopen/archive/reload checks.                                         |
+| Archive is terminal and preserves event history                     | [LIFECYCLES](LIFECYCLES.md), [STORAGE](STORAGE.md), [RETENTION](RETENTION.md) | Invalid post-archive transitions append nothing; archived record survives reload and is hidden from normal views. |
+| Draft completion belongs to exact text/classification submission    | [V0.2.0](V0.2.0.md), [ACCESSIBILITY](ACCESSIBILITY.md)                        | Browser delayed-save, failed-add, edited-draft, retry, and reconnect regression.                                  |
+| IndexedDB remains schema 1 and BroadcastChannel content-free        | [STORAGE](STORAGE.md), ADR 0004, ADR 0006                                     | Browser transaction/reload/two-tab checks and schema/version inspection.                                          |
+| Capture/actions remain accessible and mobile-usable                 | [ACCESSIBILITY](ACCESSIBILITY.md), [TESTING](TESTING.md)                      | Keyboard, focus, announcements, target/reflow checks at 320px; platform gaps reported.                            |

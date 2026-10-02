@@ -1,6 +1,6 @@
 # Derived Household State
 
-**Status:** v0.1.0 item state and deterministic replay are implemented in Rust. Later domain projections remain future work. Event rules are in [Events](EVENTS.md); entity meaning is in [Domain](DOMAIN.md).
+**Status:** v0.2.0 Item state, classification normalization, lifecycle transitions, and deterministic replay are implemented in Rust. Other domain projections remain future work. Event rules are in [Events](EVENTS.md); entity meaning is in [Domain](DOMAIN.md).
 
 ## Projection pipeline
 
@@ -21,25 +21,25 @@ The same valid ordered event stream must always derive the same household state.
 
 If replay later becomes expensive, a snapshot/checkpoint may accelerate reconstruction only as a verified derived projection. It is not authoritative and cannot justify deleting source events by itself. Optimization must not change observable household state; see [Retention](RETENTION.md) for the deferred event-compaction policy.
 
-## v0.1.0 HouseholdState
+## Current HouseholdState
 
 Keep the first projection small:
 
 ```text
 HouseholdState
-├── household_id
-├── items: map<ItemId, ItemState>
-└── replay metadata (supported version, applied event identities)
+├── household_id: Option<HouseholdId>
+└── items: Vec<ItemState> in original add-event order
 
 ItemState
 ├── item_id
 ├── text
 ├── created_by
 ├── created_at
-└── status: active | completed
+├── classification: today | need
+└── status: active | completed | archived
 ```
 
-The item map is keyed by stable item ID, never display text. Actor, household, and device IDs in v0.1.0 are local placeholders. Handoff, Talk, Pulse, Routine, Agreement, authentication, and remote device state are outside the v0.1.0 projection.
+Items are identified by stable item ID, never display text. Actor, household, and device IDs remain local placeholders. Schema-v1 `ITEM_ADDED` events normalize to `today`; schema-v2 events carry explicit classification. Handoff, Talk, Pulse, Routine, Agreement, authentication, and remote device state are outside the v0.2.x projection.
 
 ## Validation and errors
 
@@ -65,7 +65,7 @@ text = "Buy milk"
 status = active
 ```
 
-`ITEM_REOPENED` is a later-release event and is shown only to define intended future semantics. The v0.1.0 subset ends after `ITEM_COMPLETED`, producing `status = completed`.
+The same stream is supported in v0.2.x and produces `status = active`. A v0.1.x engine does not support `ITEM_REOPENED` and fails closed.
 
 Replaying the same supported event stream repeatedly produces structurally identical state. No reducer rule may depend on ambient current time, random values, network responses, DOM state, or iteration order of an unordered container.
 

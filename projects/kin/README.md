@@ -2,7 +2,7 @@
 
 > A private, lightweight household coordination app for the little things families need to know, remember, hand off, or discuss.
 
-**Current status: `v0.1.5` — Final 0.1.x Stabilization.** Kin provides a local household item loop: add items, complete items, persist immutable events in IndexedDB, and reconstruct state through a Rust/WASM engine after reload. The `v0.1.1` and `v0.1.2` patches hardened correctness, interruption recovery, and accessibility; `v0.1.3` audited the durable core, privacy, dependencies, and release documentation. `v0.1.4` improved resilience and tooling; `v0.1.5` fixes retry draft ownership and closes the stabilization line without adding a product capability. The next development target is `v0.2.0`.
+**Current status: `v0.2.0` — Today + Needs.** Kin now separates household items into Today and Needs, defaults fast capture to Needs, and supports completion, reopening, and archival. Immutable IndexedDB events remain canonical; Rust/WASM validates and reconstructs state after reload. Legacy v0.1.x items remain visible in Today. The v0.2.1 correctness, v0.2.2 resilience/accessibility, and v0.2.3 hardening releases are stabilization work, not additional product capabilities.
 
 ## The problem
 
@@ -12,7 +12,7 @@ Kin aims to make useful household context easier to share and find. It is not a 
 
 ## Intended direction
 
-Kin is intended as a private, lightweight shared household operating layer. Today’s simple item view and local add/complete loop are implemented. Needs classification, Handoff, Talk, Pulse, Routines, and Since You Last Looked remain future concepts.
+Kin is intended as a private, lightweight shared household operating layer. Today and Needs views, lightweight classification, capture, completion, reopening, and archival are implemented locally. Handoff, Talk, Pulse, Routines, and Since You Last Looked remain future concepts.
 
 The intended technical direction is Rust compiled to WebAssembly, native Web Components, vanilla JavaScript, and browser APIs, with a local-first start and no external framework unless a demonstrated requirement justifies one.
 
@@ -36,6 +36,7 @@ The intended technical direction is Rust compiled to WebAssembly, native Web Com
 - `v0.1.3` — Household Heartbeat Hardening (`kin-v0.1.3`)
 - `v0.1.4` — Household Heartbeat Maintenance (`kin-v0.1.4`)
 - `v0.1.5` — Final 0.1.x Stabilization (`kin-v0.1.5`)
+- `v0.2.0` — Today + Needs (`kin-v0.2.0`)
 - See the [changelog](CHANGELOG.md) for the completed release history.
 
 ## Install, build, and run

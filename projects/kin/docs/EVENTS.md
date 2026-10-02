@@ -1,6 +1,6 @@
 # Household Events
 
-**Status:** event contract implemented for the v0.1.0 `ITEM_ADDED` and `ITEM_COMPLETED` subset. All other event kinds remain future work. Related entity meanings are in [Domain](DOMAIN.md); projections and replay are in [State](STATE.md).
+**Status:** v0.2.0 implements `ITEM_ADDED` schemas 1 and 2, plus schema-1 `ITEM_COMPLETED`, `ITEM_REOPENED`, and `ITEM_ARCHIVED`. Other event kinds remain future work. Related entity meanings are in [Domain](DOMAIN.md); projections and replay are in [State](STATE.md).
 
 ## Canonical record
 
@@ -35,36 +35,36 @@ Fields are specified now to avoid casually changing identity semantics later. Th
 
 ## Event naming and availability
 
-Use uppercase entity/action-past-tense names consistently. Availability below is planned scope, not an implementation claim.
+Use uppercase entity/action-past-tense names consistently. The milestone column records assigned scope; v0.2.0 Item events are implemented, and later product events remain planned.
 
-| Event kind             | Planned milestone | Purpose                                                    |
-| ---------------------- | ----------------- | ---------------------------------------------------------- |
-| `ITEM_ADDED`           | v0.1.0            | Add an item with stable item ID and text.                  |
-| `ITEM_COMPLETED`       | v0.1.0            | Mark an existing item completed.                           |
-| `ITEM_REOPENED`        | v0.2.0            | Reopen a completed item.                                   |
-| `ITEM_ARCHIVED`        | v0.2.0            | Archive an item without deleting its history.              |
-| `HANDOFF_ADDED`        | v0.3.0            | Add a short household handoff.                             |
-| `HANDOFF_ACKNOWLEDGED` | v0.3.0            | Record receipt of a handoff.                               |
-| `HANDOFF_ARCHIVED`     | v0.3.0            | Archive a handoff.                                         |
-| `TALK_ADDED`           | v0.4.0            | Capture a topic for later discussion.                      |
-| `TALK_RESOLVED`        | v0.4.0            | Mark a Talk item resolved.                                 |
-| `TALK_REOPENED`        | v0.4.0            | Reopen a resolved Talk item.                               |
-| `TALK_ARCHIVED`        | v0.4.0            | Archive a Talk item.                                       |
-| `PULSE_SET`            | v0.5.0            | Set time-bounded capacity context, including expiry.       |
-| `PULSE_CLEARED`        | v0.5.0            | Clear current Pulse context.                               |
-| `ROUTINE_CREATED`      | v0.7.0            | Define a recurring household need.                         |
-| `ROUTINE_COMPLETED`    | v0.7.0            | Complete a routine occurrence.                             |
-| `HOUSEHOLD_CREATED`    | v0.8.0            | Establish a household identity when pairing is introduced. |
-| `MEMBER_INVITED`       | v0.8.0            | Record a member invitation.                                |
-| `MEMBER_JOINED`        | v0.8.0            | Record accepted household membership.                      |
-| `MEMBER_REMOVED`       | v0.8.0            | Record explicit member removal.                            |
-| `DEVICE_AUTHORIZED`    | v0.8.0            | Authorize a device for a member.                           |
-| `DEVICE_REVOKED`       | v0.8.0            | Revoke a device's future authorization.                    |
-| `AGREEMENT_CREATED`    | Unscheduled       | Record a deliberately created agreement.                   |
-| `AGREEMENT_REVISED`    | Unscheduled       | Record a deliberate revision.                              |
-| `AGREEMENT_ARCHIVED`   | Unscheduled       | Archive an agreement.                                      |
+| Event kind             | Planned milestone | Purpose                                                      |
+| ---------------------- | ----------------- | ------------------------------------------------------------ |
+| `ITEM_ADDED`           | v0.1.0            | Add an item with stable item ID and text.                    |
+| `ITEM_COMPLETED`       | v0.1.0            | Mark an existing item completed.                             |
+| `ITEM_REOPENED`        | v0.2.0            | Reopen a completed item; active is a valid no-op.            |
+| `ITEM_ARCHIVED`        | v0.2.0            | Tombstone an active/completed item without deleting history. |
+| `HANDOFF_ADDED`        | v0.3.0            | Add a short household handoff.                               |
+| `HANDOFF_ACKNOWLEDGED` | v0.3.0            | Record receipt of a handoff.                                 |
+| `HANDOFF_ARCHIVED`     | v0.3.0            | Archive a handoff.                                           |
+| `TALK_ADDED`           | v0.4.0            | Capture a topic for later discussion.                        |
+| `TALK_RESOLVED`        | v0.4.0            | Mark a Talk item resolved.                                   |
+| `TALK_REOPENED`        | v0.4.0            | Reopen a resolved Talk item.                                 |
+| `TALK_ARCHIVED`        | v0.4.0            | Archive a Talk item.                                         |
+| `PULSE_SET`            | v0.5.0            | Set time-bounded capacity context, including expiry.         |
+| `PULSE_CLEARED`        | v0.5.0            | Clear current Pulse context.                                 |
+| `ROUTINE_CREATED`      | v0.7.0            | Define a recurring household need.                           |
+| `ROUTINE_COMPLETED`    | v0.7.0            | Complete a routine occurrence.                               |
+| `HOUSEHOLD_CREATED`    | v0.8.0            | Establish a household identity when pairing is introduced.   |
+| `MEMBER_INVITED`       | v0.8.0            | Record a member invitation.                                  |
+| `MEMBER_JOINED`        | v0.8.0            | Record accepted household membership.                        |
+| `MEMBER_REMOVED`       | v0.8.0            | Record explicit member removal.                              |
+| `DEVICE_AUTHORIZED`    | v0.8.0            | Authorize a device for a member.                             |
+| `DEVICE_REVOKED`       | v0.8.0            | Revoke a device's future authorization.                      |
+| `AGREEMENT_CREATED`    | Unscheduled       | Record a deliberately created agreement.                     |
+| `AGREEMENT_REVISED`    | Unscheduled       | Record a deliberate revision.                                |
+| `AGREEMENT_ARCHIVED`   | Unscheduled       | Archive an agreement.                                        |
 
-“Since You Last Looked” is a derived view of events, not a new event kind. v0.1.0 supports exactly `ITEM_ADDED` and `ITEM_COMPLETED`; all other kinds are deferred. The unscheduled agreement events are not a release commitment.
+“Since You Last Looked” is a derived view of events, not a new event kind. v0.2.0 supports the four Item event kinds above; all other kinds are deferred. Event kind codes remain 1–4 respectively. Event schema v1 `ITEM_ADDED` contains no classification and normalizes to Today. Schema v2 `ITEM_ADDED` adds a fixed classification byte (`0 = Today`, `1 = Need`) and three zero reserved bytes before the text length. New instances write schema v2 for adds and schema v1 for the other Item events. Protocol and event version compatibility is specified in [ABI](ABI.md) and [VERSIONING](VERSIONING.md). The unscheduled agreement events are not a release commitment.
 
 ## Immutability and corrections
 
@@ -93,7 +93,8 @@ Wall clocks can drift, collide, or move backward, so timestamps are never the di
 - Re-delivery of an identical `event_id` and identical canonical event is ignored; replaying it has no additional effect.
 - Reuse of an `event_id` with different content is invalid and fails reconstruction deterministically.
 - A distinct `ITEM_COMPLETED` for an already-completed known item is a valid state no-op; both valid facts remain in history. This makes completion robust to repeated user intent without rewriting prior events.
-- `ITEM_COMPLETED` or a future `ITEM_REOPENED` for an unknown item is invalid.
+- `ITEM_COMPLETED`, `ITEM_REOPENED`, or `ITEM_ARCHIVED` for an unknown item is invalid.
+- `ITEM_REOPENED` on an active item is a valid state no-op; archival is terminal and every ordinary mutation of an archived item is invalid.
 - Duplicate `ITEM_ADDED` for an existing item ID is invalid unless it is the exact same event already deduplicated by event ID.
 - Malformed payloads, impossible field values, cross-household events, and unsupported event schema versions are invalid.
 - An unknown event kind is not silently skipped. A client that cannot interpret an event must stop reconstruction with a deterministic unsupported-event error and preserve stored bytes for recovery by compatible software.

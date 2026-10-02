@@ -1,8 +1,13 @@
 use crate::error::KinError;
-use crate::event::{ActorId, DeviceId, EventEnvelope, EventId, EventKind, HouseholdId, ItemId};
+use crate::event::{
+    ActorId, DeviceId, EventEnvelope, EventId, EventKind, HouseholdId, ItemClassification, ItemId,
+};
 use crate::state::{HouseholdState, ItemStatus};
 
-pub const PROTOCOL_VERSION: u16 = 1;
+pub const PROTOCOL_V1: u16 = 1;
+pub const PROTOCOL_V2: u16 = 2;
+pub const PROTOCOL_VERSION: u16 = PROTOCOL_V2;
+pub const ERROR_PROTOCOL_VERSION: u16 = PROTOCOL_V1;
 pub const MAX_EVENT_COUNT: usize = 10_000;
 pub const MAX_PROTOCOL_BYTES: usize = 64 * 1024 * 1024;
 pub const MAX_ITEM_TEXT_BYTES: usize = 4096;
@@ -11,7 +16,7 @@ const EVENT_HEADER_BYTES: usize = 88;
 const RESULT_HEADER_BYTES: usize = 12;
 const ITEM_HEADER_BYTES: usize = 48;
 
-pub fn decode_request(bytes: &[u8]) -> Result<Vec<EventEnvelope>, KinError> {
+pub fn decode_request(bytes: &[u8]) -> Result<(u16, Vec<EventEnvelope>), KinError> {
     if bytes.len() > MAX_PROTOCOL_BYTES {
         return Err(KinError::SizeLimit);
     }
@@ -20,7 +25,7 @@ pub fn decode_request(bytes: &[u8]) -> Result<Vec<EventEnvelope>, KinError> {
     }
 
     let version = read_u16(bytes, 4)?;
-    if version != PROTOCOL_VERSION {
+    if !matches!(version, PROTOCOL_V1 | PROTOCOL_V2) {
         return Err(KinError::UnsupportedVersion);
     }
     if read_u16(bytes, 6)? != 0 {
@@ -50,16 +55,19 @@ pub fn decode_request(bytes: &[u8]) -> Result<Vec<EventEnvelope>, KinError> {
         let record = bytes
             .get(offset..record_end)
             .ok_or(KinError::MalformedProtocol)?;
-        events.push(decode_event(record)?);
+        events.push(decode_event(record, version)?);
         offset = record_end;
     }
     if offset != bytes.len() {
         return Err(KinError::MalformedProtocol);
     }
-    Ok(events)
+    Ok((version, events))
 }
 
-pub fn encode_state(state: &HouseholdState) -> Result<Vec<u8>, KinError> {
+pub fn encode_state(state: &HouseholdState, protocol_version: u16) -> Result<Vec<u8>, KinError> {
+    if !matches!(protocol_version, PROTOCOL_V1 | PROTOCOL_V2) {
+        return Err(KinError::UnsupportedVersion);
+    }
     let item_count = u32::try_from(state.items.len()).map_err(|_| KinError::SizeLimit)?;
     let mut result = Vec::new();
     result
@@ -87,23 +95,42 @@ pub fn encode_state(state: &HouseholdState) -> Result<Vec<u8>, KinError> {
         result.extend_from_slice(&item.item_id.0);
         result.extend_from_slice(&item.created_by.0);
         result.extend_from_slice(&item.created_at.to_le_bytes());
-        result.push(match item.status {
-            ItemStatus::Active => 0,
-            ItemStatus::Completed => 1,
-        });
-        result.extend_from_slice(&[0; 3]);
+        if protocol_version == PROTOCOL_V1 {
+            if item.classification != ItemClassification::Today
+                || item.status == ItemStatus::Archived
+            {
+                return Err(KinError::UnsupportedVersion);
+            }
+            result.push(match item.status {
+                ItemStatus::Active => 0,
+                ItemStatus::Completed => 1,
+                ItemStatus::Archived => unreachable!(),
+            });
+            result.extend_from_slice(&[0; 3]);
+        } else {
+            result.push(match item.classification {
+                ItemClassification::Today => 0,
+                ItemClassification::Need => 1,
+            });
+            result.push(match item.status {
+                ItemStatus::Active => 0,
+                ItemStatus::Completed => 1,
+                ItemStatus::Archived => 2,
+            });
+            result.extend_from_slice(&[0; 2]);
+        }
         push_u32(&mut result, text_length);
         result.extend_from_slice(text_bytes);
     }
     Ok(result)
 }
 
-fn decode_event(record: &[u8]) -> Result<EventEnvelope, KinError> {
+fn decode_event(record: &[u8], protocol_version: u16) -> Result<EventEnvelope, KinError> {
     if record.len() < EVENT_HEADER_BYTES {
         return Err(KinError::MalformedProtocol);
     }
     let event_version = read_u16(record, 0)?;
-    if event_version != 1 {
+    if !(event_version == 1 || (event_version == 2 && protocol_version == PROTOCOL_V2)) {
         return Err(KinError::UnsupportedVersion);
     }
     let event_kind = read_u16(record, 2)?;
@@ -116,8 +143,8 @@ fn decode_event(record: &[u8]) -> Result<EventEnvelope, KinError> {
     }
 
     let payload = &record[EVENT_HEADER_BYTES..];
-    let kind = match event_kind {
-        1 => {
+    let kind = match (event_version, event_kind) {
+        (1, 1) => {
             if payload.len() < 20 {
                 return Err(KinError::MalformedProtocol);
             }
@@ -139,13 +166,63 @@ fn decode_event(record: &[u8]) -> Result<EventEnvelope, KinError> {
             EventKind::ItemAdded {
                 item_id: ItemId(read_id(payload, 0)?),
                 text,
+                classification: ItemClassification::Today,
             }
         }
-        2 => {
+        (2, 1) => {
+            if protocol_version != PROTOCOL_V2 || payload.len() < 24 {
+                return Err(KinError::MalformedProtocol);
+            }
+            let classification = match payload[16] {
+                0 => ItemClassification::Today,
+                1 => ItemClassification::Need,
+                _ => return Err(KinError::MalformedProtocol),
+            };
+            if payload[17..20] != [0; 3] {
+                return Err(KinError::MalformedProtocol);
+            }
+            let text_length = read_u32(payload, 20)? as usize;
+            if !(1..=MAX_ITEM_TEXT_BYTES).contains(&text_length)
+                || payload.len()
+                    != 24usize
+                        .checked_add(text_length)
+                        .ok_or(KinError::MalformedProtocol)?
+            {
+                return Err(KinError::MalformedProtocol);
+            }
+            let decoded_text =
+                std::str::from_utf8(&payload[24..]).map_err(|_| KinError::MalformedProtocol)?;
+            let mut text = String::new();
+            text.try_reserve_exact(text_length)
+                .map_err(|_| KinError::SizeLimit)?;
+            text.push_str(decoded_text);
+            EventKind::ItemAdded {
+                item_id: ItemId(read_id(payload, 0)?),
+                text,
+                classification,
+            }
+        }
+        (1, 2) => {
             if payload.len() != 16 {
                 return Err(KinError::MalformedProtocol);
             }
             EventKind::ItemCompleted {
+                item_id: ItemId(read_id(payload, 0)?),
+            }
+        }
+        (1, 3) if protocol_version == PROTOCOL_V2 => {
+            if payload.len() != 16 {
+                return Err(KinError::MalformedProtocol);
+            }
+            EventKind::ItemReopened {
+                item_id: ItemId(read_id(payload, 0)?),
+            }
+        }
+        (1, 4) if protocol_version == PROTOCOL_V2 => {
+            if payload.len() != 16 {
+                return Err(KinError::MalformedProtocol);
+            }
+            EventKind::ItemArchived {
                 item_id: ItemId(read_id(payload, 0)?),
             }
         }
@@ -164,6 +241,7 @@ fn decode_event(record: &[u8]) -> Result<EventEnvelope, KinError> {
         device_id: DeviceId(read_id(record, 52)?),
         timestamp: read_i64(record, 68)?,
         logical_time: read_u64(record, 76)?,
+        event_version,
         kind,
         canonical_bytes,
     })
@@ -250,18 +328,135 @@ mod tests {
         record
     }
 
+    fn added_record_v2(
+        event_number: u8,
+        item_number: u8,
+        text: &[u8],
+        classification: u8,
+    ) -> Vec<u8> {
+        let mut payload = vec![item_number; 16];
+        payload.push(classification);
+        payload.extend_from_slice(&[0; 3]);
+        payload.extend_from_slice(&(text.len() as u32).to_le_bytes());
+        payload.extend_from_slice(text);
+        let mut record = Vec::new();
+        record.extend_from_slice(&2u16.to_le_bytes());
+        record.extend_from_slice(&1u16.to_le_bytes());
+        record.extend_from_slice(&[event_number; 16]);
+        record.extend_from_slice(&[0xaa; 16]);
+        record.extend_from_slice(&[0xbb; 16]);
+        record.extend_from_slice(&[0xcc; 16]);
+        record.extend_from_slice(&i64::from(event_number).to_le_bytes());
+        record.extend_from_slice(&u64::from(event_number).to_le_bytes());
+        record.extend_from_slice(&(payload.len() as u32).to_le_bytes());
+        record.extend_from_slice(&payload);
+        record
+    }
+
     #[test]
     fn empty_request_rebuilds_empty_state() {
         let request = request_with(&[], PROTOCOL_VERSION, 0);
-        let events = decode_request(&request).unwrap();
-        let result = encode_state(&rebuild(&events).unwrap()).unwrap();
+        let (protocol_version, events) = decode_request(&request).unwrap();
+        let result = encode_state(&rebuild(&events).unwrap(), protocol_version).unwrap();
         assert_eq!(&result[..4], b"KINS");
         assert_eq!(result.len(), RESULT_HEADER_BYTES);
     }
 
     #[test]
+    fn protocol_v1_history_keeps_its_bytes_and_normalizes_to_today() {
+        let request = request_with(&added_record(b"Milk"), PROTOCOL_V1, 1);
+        let (version, events) = decode_request(&request).unwrap();
+        assert_eq!(version, PROTOCOL_V1);
+        assert_eq!(events[0].event_version, 1);
+        assert!(matches!(
+            events[0].kind,
+            EventKind::ItemAdded {
+                classification: ItemClassification::Today,
+                ..
+            }
+        ));
+        let state = rebuild(&events).unwrap();
+        let result = encode_state(&state, PROTOCOL_V1).unwrap();
+        assert_eq!(result[RESULT_HEADER_BYTES + 40], 0);
+        assert_eq!(
+            &result[RESULT_HEADER_BYTES + 41..RESULT_HEADER_BYTES + 44],
+            &[0; 3]
+        );
+    }
+
+    #[test]
+    fn protocol_v2_carries_classification_and_status() {
+        let request = request_with(&added_record_v2(1, 0x22, b"Buy wipes", 1), PROTOCOL_V2, 1);
+        let (version, events) = decode_request(&request).unwrap();
+        assert_eq!(version, PROTOCOL_V2);
+        assert!(matches!(
+            events[0].kind,
+            EventKind::ItemAdded {
+                classification: ItemClassification::Need,
+                ..
+            }
+        ));
+        let state = rebuild(&events).unwrap();
+        let result = encode_state(&state, PROTOCOL_V2).unwrap();
+        assert_eq!(result[RESULT_HEADER_BYTES + 40], 1);
+        assert_eq!(result[RESULT_HEADER_BYTES + 41], 0);
+        assert_eq!(
+            &result[RESULT_HEADER_BYTES + 42..RESULT_HEADER_BYTES + 44],
+            &[0; 2]
+        );
+    }
+
+    #[test]
+    fn protocol_v2_mixed_legacy_and_current_events_replay() {
+        let legacy = added_record(b"Legacy item");
+        let current = added_record_v2(2, 0x22, b"Current item", 1);
+        let mut request = request_with(&legacy, PROTOCOL_V2, 2);
+        request.extend_from_slice(&current);
+        let (_, events) = decode_request(&request).unwrap();
+        let state = rebuild(&events).unwrap();
+        assert_eq!(state.items.len(), 2);
+        assert_eq!(state.items[0].classification, ItemClassification::Today);
+        assert_eq!(state.items[1].classification, ItemClassification::Need);
+        assert_eq!(state.items[0].text, "Legacy item");
+        assert_eq!(state.items[1].text, "Current item");
+    }
+
+    #[test]
+    fn protocol_v2_rejects_invalid_classification_and_reserved_bytes() {
+        for invalid_field in [16usize, 17] {
+            let mut record = added_record_v2(1, 0x11, b"Milk", 0);
+            record[EVENT_HEADER_BYTES + invalid_field] = if invalid_field == 16 { 2 } else { 1 };
+            let request = request_with(&record, PROTOCOL_V2, 1);
+            assert_eq!(decode_request(&request), Err(KinError::MalformedProtocol));
+        }
+    }
+
+    #[test]
+    fn protocol_v2_truncated_add_payload_fails_at_every_boundary() {
+        let record = added_record_v2(1, 0x11, b"Milk", 1);
+        for record_length in EVENT_HEADER_BYTES..record.len() {
+            let request = request_with(&record[..record_length], PROTOCOL_V2, 1);
+            assert_eq!(
+                decode_request(&request),
+                Err(KinError::MalformedProtocol),
+                "length {record_length}"
+            );
+        }
+    }
+
+    #[test]
+    fn protocol_v1_rejects_new_lifecycle_kinds() {
+        let mut record = added_record(b"Milk");
+        record[2..4].copy_from_slice(&3u16.to_le_bytes());
+        record[84..88].copy_from_slice(&16u32.to_le_bytes());
+        record.truncate(EVENT_HEADER_BYTES + 16);
+        let request = request_with(&record, PROTOCOL_V1, 1);
+        assert_eq!(decode_request(&request), Err(KinError::UnsupportedVersion));
+    }
+
+    #[test]
     fn unsupported_protocol_is_rejected() {
-        let request = request_with(&[], 2, 0);
+        let request = request_with(&[], 3, 0);
         assert_eq!(decode_request(&request), Err(KinError::UnsupportedVersion));
     }
 
@@ -321,7 +516,7 @@ mod tests {
     #[test]
     fn unsupported_event_schema_is_rejected() {
         let mut record = added_record(b"Buy milk");
-        record[..2].copy_from_slice(&2u16.to_le_bytes());
+        record[..2].copy_from_slice(&3u16.to_le_bytes());
         let request = request_with(&record, PROTOCOL_VERSION, 1);
         assert_eq!(decode_request(&request), Err(KinError::UnsupportedVersion));
     }
@@ -329,7 +524,7 @@ mod tests {
     #[test]
     fn unsupported_event_kind_is_rejected() {
         let mut record = added_record(b"Buy milk");
-        record[2..4].copy_from_slice(&3u16.to_le_bytes());
+        record[2..4].copy_from_slice(&5u16.to_le_bytes());
         let request = request_with(&record, PROTOCOL_VERSION, 1);
         assert_eq!(decode_request(&request), Err(KinError::UnsupportedVersion));
     }
@@ -386,7 +581,7 @@ mod tests {
     fn maximum_utf8_item_text_is_accepted() {
         let record = added_record(&vec![b'x'; MAX_ITEM_TEXT_BYTES]);
         let request = request_with(&record, PROTOCOL_VERSION, 1);
-        let events = decode_request(&request).unwrap();
+        let (_, events) = decode_request(&request).unwrap();
         assert!(
             matches!(&events[0].kind, EventKind::ItemAdded { text, .. } if text.len() == MAX_ITEM_TEXT_BYTES)
         );
@@ -397,7 +592,7 @@ mod tests {
         let text = "\u{feff}milk 🥛";
         let record = added_record(text.as_bytes());
         let request = request_with(&record, PROTOCOL_VERSION, 1);
-        let events = decode_request(&request).unwrap();
+        let (_, events) = decode_request(&request).unwrap();
         assert!(
             matches!(&events[0].kind, EventKind::ItemAdded { text: decoded, .. } if decoded == text)
         );

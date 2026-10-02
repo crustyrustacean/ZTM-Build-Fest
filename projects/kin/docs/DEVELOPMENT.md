@@ -1,6 +1,6 @@
 # Development Workflow
 
-**Status:** current workflow for the v0.1.x local prototype.
+**Status:** current workflow for the v0.2.x Today + Needs prototype.
 
 ## Build and run
 
@@ -20,7 +20,7 @@ build the Rust/WASM module using the project-local manifest
 serve the static web files from localhost
         |
         v
-open the supported browser and exercise v0.1.0
+open the supported browser and exercise Today + Needs
 ```
 
 From the repository root in PowerShell:
@@ -51,7 +51,7 @@ No npm dependency tree or framework runtime is planned. If static serving later 
 
 ## Browser capabilities
 
-The application requires WebAssembly, ES modules, Custom Elements, IndexedDB, `CustomEvent`, text encoders/decoders, and secure-context browser APIs. WebAuthn and Web Crypto for content security belong to later identity/sync work, not v0.1.0 authentication or encryption. Desktop Chrome was exercised in the integrated VS Code browser; this does not certify the full browser support target.
+The application requires WebAssembly, ES modules, Custom Elements, IndexedDB, `CustomEvent`, text encoders/decoders, and secure-context browser APIs. WebAuthn and Web Crypto for content security belong to later identity/sync work, not v0.2.x. Browser validation is recorded per release and does not certify the full browser support target.
 
 ## Development data
 

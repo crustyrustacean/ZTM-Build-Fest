@@ -25,6 +25,8 @@ class KinApp extends HTMLElement {
     this.retryRefresh = () => this.refreshFromEvents();
     this.onAddItem = (event) => this.handleAddItem(event);
     this.onCompleteItem = (event) => this.handleCompleteItem(event);
+    this.onReopenItem = (event) => this.handleReopenItem(event);
+    this.onArchiveItem = (event) => this.handleArchiveItem(event);
     this.onPeerMessage = (event) => this.handlePeerMessage(event);
   }
 
@@ -35,6 +37,8 @@ class KinApp extends HTMLElement {
     }
     this.addEventListener("kin:add-item", this.onAddItem);
     this.addEventListener("kin:complete-item", this.onCompleteItem);
+    this.addEventListener("kin:reopen-item", this.onReopenItem);
+    this.addEventListener("kin:archive-item", this.onArchiveItem);
     this.openPeerChannel();
     if (this.store) {
       // Reconnecting must not restart the engine or unlock an in-flight save.
@@ -90,6 +94,8 @@ class KinApp extends HTMLElement {
   disconnectedCallback() {
     this.removeEventListener("kin:add-item", this.onAddItem);
     this.removeEventListener("kin:complete-item", this.onCompleteItem);
+    this.removeEventListener("kin:reopen-item", this.onReopenItem);
+    this.removeEventListener("kin:archive-item", this.onArchiveItem);
     this.closePeerChannel();
   }
 
@@ -140,24 +146,27 @@ class KinApp extends HTMLElement {
     if (this.busy || !this.store || !this.engine) {
       return;
     }
-    const submittedText = event.detail.text;
+    const submittedDraft = Object.freeze({
+      text: event.detail.text,
+      classification: event.detail.classification,
+    });
     this.setBusy(true);
     this.clearAlert();
     this.setStatus("Saving…");
     let restoreComposeFocus = false;
     try {
       this.state = await this.store.append(
-        { type: "add", text: submittedText },
+        { type: "add", ...submittedDraft },
         this.engine,
       );
       this.renderState();
-      this.compose.clearIfMatches(submittedText);
+      this.compose.clearIfMatches(submittedDraft);
       this.setStatus("Added.");
       this.broadcastEventChange();
       restoreComposeFocus = true;
     } catch (error) {
       this.showAlert(error.userMessage ?? SAVE_ERROR, () =>
-        this.handleAddItem({ detail: { text: submittedText } }),
+        this.handleAddItem({ detail: submittedDraft }),
       );
       this.setStatus("");
       restoreComposeFocus = true;
@@ -171,25 +180,44 @@ class KinApp extends HTMLElement {
   }
 
   async handleCompleteItem(event) {
+    return this.handleItemAction("complete", event.detail.itemId);
+  }
+
+  async handleReopenItem(event) {
+    return this.handleItemAction("reopen", event.detail.itemId);
+  }
+
+  async handleArchiveItem(event) {
+    return this.handleItemAction("archive", event.detail.itemId);
+  }
+
+  async handleItemAction(type, itemId) {
     if (this.busy || !this.store || !this.engine) {
       return;
     }
+    const submittedItemId = itemId;
     this.setBusy(true);
     this.clearAlert();
     this.setStatus("Saving…");
     let restoreComposeFocus = false;
     try {
       this.state = await this.store.append(
-        { type: "complete", itemId: event.detail.itemId },
+        { type, itemId: submittedItemId },
         this.engine,
       );
       this.renderState();
-      this.setStatus("Marked complete.");
+      this.setStatus(
+        type === "complete"
+          ? "Marked complete."
+          : type === "reopen"
+            ? "Reopened."
+            : "Archived.",
+      );
       this.broadcastEventChange();
       restoreComposeFocus = true;
     } catch (error) {
       this.showAlert(error.userMessage ?? SAVE_ERROR, () =>
-        this.handleCompleteItem({ detail: { itemId: event.detail.itemId } }),
+        this.handleItemAction(type, submittedItemId),
       );
       this.setStatus("");
       restoreComposeFocus = true;
@@ -203,7 +231,11 @@ class KinApp extends HTMLElement {
   }
 
   openPeerChannel() {
-    if (!this.isConnected || this.channel || !("BroadcastChannel" in globalThis)) {
+    if (
+      !this.isConnected ||
+      this.channel ||
+      !("BroadcastChannel" in globalThis)
+    ) {
       return;
     }
     try {

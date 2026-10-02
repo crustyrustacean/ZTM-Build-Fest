@@ -1,6 +1,6 @@
 # JavaScript–WASM ABI
 
-**Status:** implemented for v0.1.0. The manual WASM exports and protocol byte layout below define the current bridge; module responsibilities are in [IMPLEMENTATION](IMPLEMENTATION.md), and state semantics are in [EVENTS](EVENTS.md) and [STATE](STATE.md).
+**Status:** protocol v1 remains supported unchanged, and protocol v2 is implemented for v0.2.0. The manual WASM exports and versioned byte layouts below define the current bridge; module responsibilities are in [IMPLEMENTATION](IMPLEMENTATION.md), and state semantics are in [EVENTS](EVENTS.md) and [STATE](STATE.md).
 
 ## Target and exports
 
@@ -18,7 +18,7 @@ kin_error_len() -> length: u32
 
 Pointers are byte offsets into the current WebAssembly linear memory, represented as `u32`; JavaScript must not treat them as host pointers. `kin_apply_events` uses the stable status codes defined in the protocol section; `kin_free` returns `0` on success and `1` for an invalid range. Error text is diagnostic only; clients branch on codes.
 
-## Protocol version 1
+## Protocol version 1 (legacy)
 
 All multibyte integers are little-endian. IDs are exactly 16 opaque bytes; never parse or sort their internal bytes except for the explicit bytewise tie-break defined in [EVENTS](EVENTS.md). Text is strict UTF-8 with no terminator. Reserved fields must be zero. Reject truncated input, trailing bytes, integer overflow, unknown kind codes, invalid UTF-8, and unsupported versions; do not attempt to reinterpret a different layout.
 
@@ -83,6 +83,41 @@ ASCII "KERR" | protocol_version:u16 | error_code:u16 | message_length:u32 | UTF-
 
 The error code is also returned from `kin_apply_events`: `0` success, `1` invalid ABI pointer/range, `2` malformed protocol/payload, `3` unsupported protocol/event version or kind, `4` invalid domain event/state, `5` size/allocation limit, `6` internal error. The same failure must always produce the same category; the message is not a machine-readable contract and must not contain household text.
 
+Protocol v1 is retained byte-for-byte for legacy callers. Its event kinds are only `ITEM_ADDED` (1) and `ITEM_COMPLETED` (2), event schema is v1, result status is `0 = active` or `1 = completed`, and all its reserved bytes remain zero. It does not reinterpret reserved bytes as classification or archived status.
+
+## Protocol version 2 (current)
+
+Protocol v2 uses the same `KINE`/`KINS` signatures, 12-byte outer headers, 88-byte event headers, little-endian encoding, 10,000-event limit, and 64 MiB request/result limits. Its header version is `2`; event envelope fields retain the protocol-v1 byte offsets. It supports legacy schema-v1 records and current event kinds 1–4; `ITEM_ADDED` schema v2 is the only new payload version.
+
+The v2 `ITEM_ADDED` payload is:
+
+```text
+size  field
+16    item_id
+1     classification (0 = Today, 1 = Need)
+3     reserved = 0
+4     text_length in bytes
+N     strict UTF-8 text
+```
+
+Text length remains 1–4096 bytes. Schema-v1 `ITEM_ADDED` retains its original payload and normalizes to Today without changing its source bytes. Event schema v1 carries `ITEM_COMPLETED` (kind 2), `ITEM_REOPENED` (kind 3), and `ITEM_ARCHIVED` (kind 4), each with an exact 16-byte item ID payload.
+
+A v2 result record is 48 bytes plus UTF-8 text:
+
+```text
+size  field
+16    item_id
+16    created_by actor_id
+8     created_at UTC Unix milliseconds
+1     classification (0 = Today, 1 = Need)
+1     status (0 = active, 1 = completed, 2 = archived)
+2     reserved = 0
+4     text_length in bytes
+N     text bytes
+```
+
+Items remain serialized in original add-event order, including archived tombstones so the caller can make a filtered view without becoming a reducer. The browser hides archived items from ordinary lists. Protocol v2 is the only protocol written by new browser instances. `KERR` retains the v1 header/version and stable numeric error codes for both request versions.
+
 ## Ownership and lifetime
 
 - `kin_alloc(n)` allocates an input buffer owned by JavaScript. For `n == 0`, it returns `0`. Allocation failure returns `0`; the bridge treats that as failure and does not call apply.
@@ -97,7 +132,7 @@ The error code is also returned from `kin_apply_events`: `0` success, `1` invali
 
 ## Call behavior
 
-`kin_apply_events` accepts one complete, ordered event batch. It validates the entire request and reconstructs from scratch. On success it publishes exactly one complete result and returns zero. On failure it publishes an error and no partial result; stored IndexedDB bytes remain untouched. Unknown protocol/event versions fail with a stable unsupported-version code; malformed payload, bounds overflow, and invalid state transitions fail deterministically.
+`kin_apply_events` accepts one complete, ordered event batch using protocol version 1 or 2. It validates the entire request and reconstructs from scratch. On success it publishes a complete result in the requested protocol version and returns zero. On failure it publishes an error and no partial result; stored IndexedDB bytes remain untouched. Unknown protocol/event versions fail with a stable unsupported-version code; malformed payload, bounds overflow, and invalid state transitions fail deterministically.
 
 The function may grow memory while parsing or building output. JavaScript must reacquire `memory.buffer` after the call before copying result/error bytes. Length arithmetic is checked for overflow in both languages. Cap a request and result at 64 MiB, a request at 10,000 events, and individual item text at 4096 UTF-8 bytes for v0.1.0; reject larger input before unbounded allocation. The matching 10,000-event storage limit is specified in [STORAGE](STORAGE.md).
 
