@@ -38,4 +38,4 @@ Accessibility is a baseline, not a polish task. Preserve semantic HTML, keyboard
 
 ## Documentation-only stage
 
-Planning through v0.0.11 is documentation/community-readiness work. Read [AGENTS.md](AGENTS.md) and the current release documents before changing scope. The first functional implementation is v0.1.0 and must follow its frozen contract; later-version capabilities do not belong in that milestone.
+Planning through v0.0.12 is documentation/community-readiness work. Read [AGENTS.md](AGENTS.md) and the current release documents before changing scope. The first functional implementation is v0.1.0 and must follow its frozen contract; later-version capabilities do not belong in that milestone.

@@ -2,7 +2,7 @@
 
 > A private, lightweight household coordination app for the little things families need to know, remember, hand off, or discuss.
 
-**Current status: `v0.0.11` — Implementation Cycle Handoff. No usable application has been implemented.** Planning/specification through `v0.0.9` is complete; `v0.0.10` established GitHub community documentation and `v0.0.11` records the implementation-cycle release discipline. Rust/WASM, Web Components, and IndexedDB are specified but not implemented. `v0.1.0` remains the first implementation milestone and has not begun.
+**Current status: `v0.0.12` — Changelog & Release History. No usable application has been implemented.** Planning/specification through `v0.0.9` is complete; `v0.0.10` established GitHub community documentation, `v0.0.11` recorded the implementation-cycle release discipline, and `v0.0.12` established a project changelog. Rust/WASM, Web Components, and IndexedDB are specified but not implemented. `v0.1.0` remains the first implementation milestone and has not begun.
 
 ## The problem
 
@@ -29,11 +29,12 @@ The intended technical direction is Rust compiled to WebAssembly, native Web Com
 - `v0.0.9` — Implementation Preflight (`kin-v0.0.9`)
 - `v0.0.10` — GitHub Community & Project Documentation (`kin-v0.0.10`)
 - `v0.0.11` — Implementation Cycle Handoff (`kin-v0.0.11`)
+- `v0.0.12` — Changelog & Release History (`kin-v0.0.12`)
 - `v0.1.0` — First functional prototype
 
 ## Install, build, and run
 
-There is currently no application to install, build, or run. Releases through `v0.0.11` are documentation-only; no application source, build tooling, or runtime dependencies have been added. The future `v0.1.0` implementation specification is available at [V0.1.0](docs/V0.1.0.md), but it is not executable software.
+There is currently no application to install, build, or run. Releases through `v0.0.12` are documentation-only; no application source, build tooling, or runtime dependencies have been added. The future `v0.1.0` implementation specification is available at [V0.1.0](docs/V0.1.0.md), but it is not executable software.
 
 ## AI usage
 
@@ -55,6 +56,7 @@ Kin is nested in the ZTM Build Fest repository. Its community files and template
 
 ## Project documents
 
+- [Changelog](CHANGELOG.md)
 - [Product vision](docs/PRODUCT.md)
 - [Principles and non-goals](docs/PRINCIPLES.md)
 - [Architecture](docs/ARCHITECTURE.md)

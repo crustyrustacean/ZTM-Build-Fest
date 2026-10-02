@@ -116,13 +116,14 @@ v0.0.8
 v0.0.9
 v0.0.10
 v0.0.11
+v0.0.12
 ```
 
-All releases through `v0.0.11` are **planning and documentation releases only**.
+All releases through `v0.0.12` are **planning and documentation releases only**.
 
 No functional application code should be introduced during these versions.
 
-Planning/specification through `v0.0.9` is complete; `v0.0.10` added project community documentation and `v0.0.11` records the implementation-cycle handoff and general release discipline. `v0.1.0` is the first implementation release. Before implementation, read [V0.1.0](docs/V0.1.0.md), [PREFLIGHT](docs/PREFLIGHT.md), [TEST-VECTORS](docs/TEST-VECTORS.md), [TRACEABILITY](docs/TRACEABILITY.md), accepted ADRs under `docs/decisions/`, and the community/security policies. Do not allow features assigned to later versions to leak into v0.1.0.
+Planning/specification through `v0.0.9` is complete; `v0.0.10` added project community documentation, `v0.0.11` recorded the implementation-cycle handoff and release discipline, and `v0.0.12` established the project changelog. `v0.1.0` is the first implementation release. Before implementation, read [V0.1.0](docs/V0.1.0.md), [PREFLIGHT](docs/PREFLIGHT.md), [TEST-VECTORS](docs/TEST-VECTORS.md), [TRACEABILITY](docs/TRACEABILITY.md), accepted ADRs under `docs/decisions/`, and the community/security policies. Do not allow features assigned to later versions to leak into v0.1.0.
 
 The first implementation release is:
 
@@ -238,6 +239,12 @@ No functional application code, build tooling, or runtime dependencies.
 Record the v0.1.x release cadence, confirm v0.1.0 as the first implementation milestone, and reconcile current-version references without changing the frozen implementation architecture or adding application code.
 
 No functional application code, build tooling, or runtime dependencies.
+
+---
+
+## v0.0.12 — Changelog & Release History
+
+Add a project-scoped changelog based on tagged release history and keep current-version documentation aligned. No functional application code, build tooling, or runtime dependencies.
 
 ---
 
@@ -985,6 +992,7 @@ v0.0.8 — Developer & Contributor Experience
 v0.0.9 — Implementation Preflight
 v0.0.10 — GitHub Community & Project Documentation
 v0.0.11 — Implementation Cycle Handoff
+v0.0.12 — Changelog & Release History
 
 v0.1.0 — Household Heartbeat
 v0.2.0 — Today + Needs
@@ -1039,6 +1047,7 @@ kin-v0.0.8
 kin-v0.0.9
 kin-v0.0.10
 kin-v0.0.11
+kin-v0.0.12
 kin-v0.1.0
 kin-v1.0.0
 ```
@@ -1249,11 +1258,11 @@ A release should represent a functioning milestone.
 
 # Planning Release Rule
 
-Releases `v0.0.1` through `v0.0.11` are planning/documentation milestones only. `v0.1.0` is the first implementation release. Do not add functional application code while completing a planning release.
+Releases `v0.0.1` through `v0.0.12` are planning/documentation milestones only. `v0.1.0` is the first implementation release. Do not add functional application code while completing a planning release.
 
 # DO NOT WRITE FUNCTIONAL APPLICATION CODE.
 
-During `v0.0.1` through `v0.0.11`, acceptable changes include:
+During `v0.0.1` through `v0.0.12`, acceptable changes include:
 
 - Markdown documentation
 - diagrams

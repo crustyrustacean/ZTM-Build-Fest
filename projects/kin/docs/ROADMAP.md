@@ -1,6 +1,6 @@
 # Roadmap
 
-This roadmap is a planning baseline, not a promise of delivery dates. Releases may change as the product is tested. Kin is at the documentation-only `v0.0.11` implementation-cycle handoff; no application code or executable developer tooling exists. Planning/specification is complete through v0.0.9, and v0.1.0 remains the first coded release when authorized.
+This roadmap is a planning baseline, not a promise of delivery dates. Releases may change as the product is tested. Kin is at the documentation-only `v0.0.12` changelog and release-history milestone; no application code or executable developer tooling exists. Planning/specification is complete through v0.0.9, and v0.1.0 remains the first coded release when authorized.
 
 ## Planning releases
 
@@ -47,6 +47,10 @@ Align README with the Build Fest project requirements and add project-scoped con
 ### `v0.0.11` — Implementation Cycle Handoff
 
 Record the general release cadence for future implementation lines, reaffirm v0.1.0 as the first implementation milestone, and correct stale current-version wording. Preserve the v0.1.0 specification and v0.0.10 community-health work; this release adds no application code or build tooling.
+
+### `v0.0.12` — Changelog & Release History
+
+Establish a Kin-scoped changelog from actual tagged release history and document its maintenance. This is a documentation-only release; it does not begin v0.1.0 implementation.
 
 ## First coded release
 
@@ -98,4 +102,4 @@ Focus on polish, reliability, accessibility, mobile UX, privacy documentation, o
 
 ## Scope discipline
 
-Each roadmap item is future work unless explicitly marked as a completed planning milestone. Authentication, passkeys, encryption, remote services, pairing, and synchronization remain unimplemented and out of scope for `v0.1.0`. Documentation and community planning through `v0.0.11` remains code-free; v0.1.0 is the first coded release and has not begun.
+Each roadmap item is future work unless explicitly marked as a completed planning milestone. Authentication, passkeys, encryption, remote services, pairing, and synchronization remain unimplemented and out of scope for `v0.1.0`. Documentation and community planning through `v0.0.12` remains code-free; v0.1.0 is the first coded release and has not begun.
