@@ -1134,6 +1134,17 @@ try {
       overflow: false,
     },
   );
+  assert.equal(await first.evaluate(`(()=>{
+    const app=document.querySelector('kin-app');
+    const capture=app.handoffs;
+    capture.input.focus();
+    return capture.querySelector('h2').textContent==='Handoff' &&
+      capture.input.labels[0].textContent==='What would help to know?' &&
+      capture.querySelectorAll('ul > li').length>0 &&
+      getComputedStyle(capture.input).outlineWidth==='3px' &&
+      app.status.getAttribute('aria-live')==='polite' && app.alert.getAttribute('role')==='alert' &&
+      [...capture.querySelectorAll('button')].every(button=>button.textContent && button.getBoundingClientRect().height>=48);
+  })()`),true,"Handoff semantics, announcements, focus and targets in forced colors");
   const spacingResult = await first.evaluate(`(()=>{
     const sheet=[...document.styleSheets].find(candidate=>candidate.href?.endsWith('/styles/app.css'));
     const ruleIndex=sheet.cssRules.length;

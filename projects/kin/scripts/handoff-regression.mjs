@@ -85,6 +85,48 @@ export async function handoffRegressions() {
   });
   check(JSON.stringify([...new Uint8Array(raw.encoded_event)]) === JSON.stringify(canonical), "canonical Handoff bytes preserved");
   await writeRow(saved);
+  const append = app.store.append.bind(app.store);
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  app.store.append = async (...args) => { await gate; return append(...args); };
+  edit("Delayed handoff");
+  const pending = app.handleAddHandoff({detail:{text:capture.input.value}});
+  check([...app.querySelectorAll("input,select,button")].every(control => control.disabled), "all controls disabled during Handoff save");
+  app.remove(); document.body.append(app);
+  check(app.busy, "Handoff reconnect retains pending save");
+  edit("Newer handoff draft");
+  app.handlePeerMessage({data:{type:"events-changed"}});
+  check(app.pendingRefresh, "peer refresh waits for pending Handoff save");
+  release(); await pending; await idle();
+  app.store.append = append;
+  check(capture.input.value === "Newer handoff draft", "delayed Handoff keeps newer draft");
+  check(app.state.handoffs.at(-1).text === "Delayed handoff", "delayed original text persisted");
+  const target = app.state.handoffs.at(-1).handoffId;
+  for (const [type, mode, status] of [["acknowledge-handoff","quota","acknowledged"],["archive-handoff","abort","archived"]]) {
+    const beforeAction = await count();
+    IDBObjectStore.prototype.add = function (...args) {
+      if (this.name !== "events") return originalAdd.apply(this,args);
+      if (mode === "quota") throw new DOMException("Synthetic quota","QuotaExceededError");
+      const request = originalAdd.apply(this,args);
+      request.addEventListener("success", () => this.transaction.abort());
+      return request;
+    };
+    try { await app.handleHandoffAction(type,target); }
+    finally { IDBObjectStore.prototype.add = originalAdd; }
+    check((await count()) === beforeAction && !app.retryButton.hidden, "failed Handoff action keeps retry");
+    check(document.activeElement === capture.input && app.alert.getAttribute("role") === "alert", "action error focus/announcement");
+    app.retryButton.click(); app.retryButton.click(); app.retryButton.click();
+    await idle();
+    check((await count()) === beforeAction + 1 && app.state.handoffs.find(row=>row.handoffId===target).status===status, "rapid action retries persist once");
+  }
+  const originalSet = Storage.prototype.setItem;
+  const originalRemove = Storage.prototype.removeItem;
+  Storage.prototype.setItem = Storage.prototype.removeItem = () => { throw new DOMException("Blocked","SecurityError"); };
+  try {
+    edit("Handoff storage unavailable"); await submit();
+    check(capture.input.value === "", "session storage denial permits Handoff capture");
+  } finally { Storage.prototype.setItem = originalSet; Storage.prototype.removeItem = originalRemove; }
+  edit("Newer handoff draft");
   const events = (await app.store.loadEvents()).map(row => row.encoded_event);
   check(JSON.stringify(app.engine.applyEvents(events)) === JSON.stringify(app.state), "mixed deterministic replay");
   check(app.store.database.version === 1, "no IndexedDB migration");
@@ -114,5 +156,34 @@ export async function handoffPeerRegressions(first, second, until) {
     return app.handleHandoffAction('archive-handoff',app.state.handoffs.find(row=>row.text==='Peer Handoff').handoffId);
   })()`);
   await until(() => second.evaluate(`document.querySelector('kin-app').state.handoffs.find(row=>row.text==='Peer Handoff')?.status==='archived' && document.querySelector('kin-app').retryButton.hidden`));
-  console.log("PASS Handoff cross-tab canonical convergence, content-free invalidation, stale acknowledgement retry cleared");
+  for (const action of ["acknowledge-handoff", "archive-handoff"]) {
+    const id = await first.evaluate(`(async()=>{
+      const app=document.querySelector('kin-app');
+      await app.handleAddHandoff({detail:{text:'Missed Handoff invalidation'}});
+      return app.state.handoffs.at(-1).handoffId;
+    })()`);
+    await until(() => second.evaluate(`document.querySelector('kin-app').state.handoffs.some(row=>row.handoffId==='${id}')`));
+    await second.evaluate(`(async()=>{
+      const app=document.querySelector('kin-app');
+      app.channel.removeEventListener('message',app.onPeerMessage);
+      const original=IDBObjectStore.prototype.add;
+      IDBObjectStore.prototype.add=function(...args){
+        if(this.name==='events') throw new DOMException('Synthetic quota','QuotaExceededError');
+        return original.apply(this,args);
+      };
+      try { await app.handleHandoffAction('${action}','${id}'); }
+      finally { IDBObjectStore.prototype.add=original; }
+    })()`);
+    const count = await first.evaluate('(async()=>(await document.querySelector("kin-app").store.loadEvents()).length)()');
+    await first.evaluate(`document.querySelector('kin-app').handleHandoffAction('archive-handoff','${id}')`);
+    await second.evaluate('document.querySelector("kin-app").retryButton.click()');
+    await until(() => second.evaluate(`!document.querySelector('kin-app').busy && document.querySelector('kin-app').retryButton.hidden && document.querySelector('kin-app').state.handoffs.find(row=>row.handoffId==='${id}')?.status==='archived'`));
+    assert.equal(await second.evaluate('(async()=>(await document.querySelector("kin-app").store.loadEvents()).length)()'),count+1);
+    await second.evaluate(`{const app=document.querySelector('kin-app');app.channel.addEventListener('message',app.onPeerMessage);}`);
+  }
+  await second.evaluate('document.querySelector("kin-handoff-list .archive-button").focus()');
+  await first.evaluate("document.querySelector('kin-app').handleAddHandoff({detail:{text:'Focus refresh Handoff'}})");
+  await until(() => second.evaluate("document.querySelector('kin-app').state.handoffs.some(row=>row.text==='Focus refresh Handoff')"));
+  assert.equal(await second.evaluate('document.activeElement===document.querySelector("#handoff-text")'),true);
+  console.log("PASS Handoff cross-tab canonical convergence, content-free invalidation, stale acknowledgement/archive retries with and without notification, peer focus");
 }

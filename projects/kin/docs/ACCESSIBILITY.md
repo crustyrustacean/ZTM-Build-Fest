@@ -42,3 +42,7 @@ Today/Needs capture and complete/reopen/archive controls work with keyboard alon
 ## Handoff
 
 Handoff add/acknowledge/archive restore its input focus. Peer refresh restores focus there when replacing a focused Handoff action. Busy state disables every Item/Handoff control plus retry. Semantic headings and textual acknowledgement communicate status without color or named identity.
+
+## v0.3.2 resilience and accessibility
+
+The browser runner covers delayed Handoff persistence across reconnect/peer refresh, newer draft ownership, sessionStorage denial, acknowledgement/archive failure and abort retry, rapid repeated retry, and stale actions without invalidation delivery. Handoff semantics, focus, announcements, disabled controls and touch targets are checked under the existing accessibility modes. No screen-reader or native desktop zoom certification is claimed.
