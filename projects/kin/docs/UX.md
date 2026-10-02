@@ -98,7 +98,7 @@ Talk uses one short topic field. Resolve, Reopen and Archive manage workflow onl
 
 ## Pulse
 
-Pulse is a current, lightweight capacity signal. Possible labels include:
+Pulse is a current, lightweight capacity signal. The fixed labels are:
 
 ```text
 Good

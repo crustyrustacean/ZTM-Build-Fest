@@ -1,6 +1,6 @@
 # Development Workflow
 
-**Status:** Current through v0.5.0 Pulse; earlier version sections are historical contracts. See Pulse below.
+**Status:** Current through v0.5.3 Pulse; earlier version sections are historical contracts. See Pulse below.
 
 ## Build and run
 
@@ -20,7 +20,7 @@ build the Rust/WASM module using the project-local manifest
 serve the static web files from localhost
         |
         v
-open the supported browser and exercise Today + Needs + Handoff + Talk
+open the supported browser and exercise Today + Needs + Handoff + Talk + Pulse
 ```
 
 From the repository root in PowerShell:
@@ -50,7 +50,7 @@ No npm dependency tree or framework runtime is planned. If static serving later 
 
 ## Browser capabilities
 
-The application requires WebAssembly, ES modules, Custom Elements, IndexedDB, `CustomEvent`, text encoders/decoders, and secure-context browser APIs. WebAuthn and Web Crypto for content security belong to later identity/sync work, not v0.4.x. Browser validation is recorded per release and does not certify the full browser support target.
+The application requires WebAssembly, ES modules, Custom Elements, IndexedDB, `CustomEvent`, text encoders/decoders, and secure-context browser APIs. WebAuthn and Web Crypto for content security belong to later identity/sync work, not v0.5.x. Browser validation is recorded per release and does not certify the full browser support target.
 
 ## Development data
 

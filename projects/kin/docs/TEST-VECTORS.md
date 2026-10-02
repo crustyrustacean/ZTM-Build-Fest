@@ -1,6 +1,6 @@
 # v0.1.0 Canonical Test Vectors
 
-**Status:** Current through v0.5.0 Pulse; earlier version sections are historical contracts. See Pulse below.
+**Status:** Current through v0.5.3 Pulse; earlier version sections are historical contracts. See Pulse below.
 
 ## Common envelope values
 

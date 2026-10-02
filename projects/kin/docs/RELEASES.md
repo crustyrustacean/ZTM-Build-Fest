@@ -1,6 +1,6 @@
 # Release Process
 
-**Status:** v0.5.0 Pulse on kin-v0.5.0-development from merged Talk. Complete authorized stabilization through v0.5.3, then stop. No push or kin-main merge authorized.
+**Status:** The v0.5.0–v0.5.3 Pulse line is complete on kin-v0.5.0-development. Stop for evaluation. No v0.5.4, v0.6.0, push or kin-main merge is authorized.
 
 ## Release sequence
 

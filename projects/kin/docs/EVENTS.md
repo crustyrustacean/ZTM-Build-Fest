@@ -1,6 +1,6 @@
 # Household Events
 
-**Status:** Current through v0.5.0 Pulse; earlier version sections are historical contracts. See Pulse below.
+**Status:** Current through v0.5.3 Pulse; earlier version sections are historical contracts. See Pulse below.
 
 ## Canonical record
 

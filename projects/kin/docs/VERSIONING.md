@@ -1,6 +1,6 @@
 # Persistent Contract Versioning
 
-**Status:** Current through v0.5.0 Pulse; earlier version sections are historical contracts. See Pulse below.
+**Status:** Current through v0.5.3 Pulse; earlier version sections are historical contracts. See Pulse below.
 
 ## Independent version axes
 
@@ -10,7 +10,7 @@ Kin version numbers describe product releases; they do not version every persist
 | ------------------------ | --------------------------- | ------------------------------------------------------------------------ |
 | Application version      | `v0.1.0`, `v0.2.0`          | A Kin product release, source snapshot, and namespaced Git tag.          |
 | Event schema version     | `event_version = 1`         | The payload/envelope interpretation for one persisted event kind.        |
-| ABI/protocol version     | `protocol_version = 1, 2, 3, or 4` | The byte-level JavaScript ↔ WASM request/result contract.                |
+| ABI/protocol version     | `protocol_version = 1, 2, 3, 4, or 5` | The byte-level JavaScript ↔ WASM request/result contract.                |
 | IndexedDB schema version | database `version = 1`      | Object stores, indexes, and local record structure managed by IndexedDB. |
 | Export format version    | `format_version = 1`        | The portable archive manifest and event-container representation.        |
 

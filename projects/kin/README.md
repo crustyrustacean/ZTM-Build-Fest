@@ -2,7 +2,7 @@
 
 > A private, lightweight household coordination app for the little things families need to know, remember, hand off, or discuss.
 
-**Current status: `v0.5.2` — Pulse Resilience & Accessibility.** Kin separates household items into Today and Needs, defaults fast capture to Needs, and supports completion, reopening, and archival. Rust remains the only domain reducer; IndexedDB schema 1 remains canonical, v0.1.x event bytes remain unchanged, and no runtime framework or remote service is present. Handoff adds short context capture, acknowledgement, and archival with protocol v3. Talk adds short topics, Open/Resolved lists, resolve/reopen/archive and protocol v4. Resolution is workflow state only. Actor IDs remain local placeholders, not verified people.
+**Current status: `v0.5.3` — Pulse Hardening & Polish.** Kin separates household items into Today and Needs, defaults fast capture to Needs, and supports completion, reopening, and archival. Rust remains the only domain reducer; IndexedDB schema 1 remains canonical, v0.1.x event bytes remain unchanged, and no runtime framework or remote service is present. Handoff adds short context capture, acknowledgement, and archival with protocol v3. Talk adds short topics, Open/Resolved lists, resolve/reopen/archive and protocol v4. Resolution is workflow state only. Pulse adds fixed temporary capacity, set/replace/clear and deterministic explicit-time expiry through protocol v5. Actor IDs remain local placeholders, not verified people.
 
 ## The problem
 
@@ -54,6 +54,7 @@ The intended technical direction is Rust compiled to WebAssembly, native Web Com
 - `v0.5.0` — Pulse (`kin-v0.5.0`)
 - `v0.5.1` — Pulse Correctness (`kin-v0.5.1`)
 - `v0.5.2` — Pulse Resilience & Accessibility (`kin-v0.5.2`)
+- `v0.5.3` — Pulse Hardening & Polish (`kin-v0.5.3`)
 - See the [changelog](CHANGELOG.md) for the completed release history.
 
 ## Install, build, and run

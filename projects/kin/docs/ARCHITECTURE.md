@@ -1,6 +1,6 @@
 # Architecture
 
-**Status:** Current through v0.5.0 Pulse; earlier version sections are historical contracts. See Pulse below.
+**Status:** Current through v0.5.3 Pulse; earlier version sections are historical contracts. See Pulse below.
 
 ## System shape
 
@@ -88,7 +88,7 @@ The v0.1.x core is intended to be extended, not treated as proof that later feat
 | Today / Needs         | Versioned event pipeline and Rust-derived projection | Implemented in v0.2.0                  | Stabilization and accessibility audit in v0.2.1–v0.2.3             |
 | Handoff | Actor-aware immutable event envelope | Implemented in v0.3.0 | Stabilization through v0.3.3 |
 | Talk | Identified events and deterministic replay | Implemented in v0.4.0 | Stabilization audited through v0.4.3; see V0.4.0 |
-| Pulse                 | Actor IDs and timestamps                             | Yes                                    | Time-bounded domain, explicit evaluation time, and expiry rules    |
+| Pulse | Actor IDs and timestamps | Implemented in v0.5.0 | Explicit as_of, fixed enum, set/replace/clear; audited through v0.5.3 |
 | Since You Last Looked | Ordered immutable event history                      | Yes                                    | Last-seen marker and derived summary                               |
 | Routines              | Event infrastructure and replay                      | Yes                                    | Recurrence model and occurrence semantics                          |
 | Pairing               | Household/member/device identity fields              | Yes                                    | Authentication, authorization, pairing, recovery, and device trust |

@@ -1,6 +1,6 @@
 # Derived Household State
 
-**Status:** Current through v0.5.0 Pulse; earlier version sections are historical contracts. See Pulse below.
+**Status:** Current through v0.5.3 Pulse; earlier version sections are historical contracts. See Pulse below.
 
 ## Projection pipeline
 
@@ -30,7 +30,8 @@ HouseholdState
 ├── household_id: Option<HouseholdId>
 ├── items: Vec<ItemState> in original add-event order
 ├── handoffs: Vec<HandoffState> in original add-event order
-└── talks: Vec<TalkState> in original add-event order
+├── talks: Vec<TalkState> in original add-event order
+└── pulses: Vec<PulseState> ordered by actor_id
 
 ItemState
 ├── item_id

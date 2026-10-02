@@ -1,6 +1,6 @@
 # Local Event Storage
 
-**Status:** Current through v0.5.0 Pulse; earlier version sections are historical contracts. See Pulse below.
+**Status:** Current through v0.5.3 Pulse; earlier version sections are historical contracts. See Pulse below.
 
 The compose input keeps a best-effort in-progress text and classification draft in the current tab's `sessionStorage`, retaining the existing text key for legacy drafts. This transient data is not an event or household-state source of truth, is cleared only when the exact submitted draft succeeds or the user clears text, and is unavailable across tabs.
 
@@ -35,7 +35,7 @@ actor_id             16-byte local actor placeholder
 device_id            16-byte local installation placeholder
 timestamp            signed UTC epoch milliseconds
 logical_time         unsigned 64-bit local logical order value
-kind                 Item kinds 1–4, Handoff kinds 5–7 or Talk kinds 8–11 (see ABI)
+kind                 Item 1–4, Handoff 5–7, Talk 8–11, Pulse 12–13 (see ABI)
 event_version        ITEM_ADDED schema 1 or 2; all other supported kinds schema 1
 encoded_event        exact canonical event bytes used for Rust replay
 ```

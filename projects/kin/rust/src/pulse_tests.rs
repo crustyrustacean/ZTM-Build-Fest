@@ -255,3 +255,72 @@ fn explicit_time_does_not_change_legacy_entities() {
         assert_eq!(mixed.items, legacy.items);
     }
 }
+
+#[test]
+fn v5_every_truncated_request_header_envelope_and_pulse_payload() {
+    for kind in [Some(4), None] {
+        let valid = request(&[record(1, 1, kind, 2000)], 5, 1000);
+        for length in 0..valid.len() {
+            assert_eq!(
+                decode_request(&valid[..length]),
+                Err(KinError::MalformedProtocol),
+                "length {length}"
+            );
+        }
+        let mut extreme = valid.clone();
+        extreme[104..108].copy_from_slice(&u32::MAX.to_le_bytes());
+        assert_eq!(decode_request(&extreme), Err(KinError::MalformedProtocol));
+    }
+}
+
+#[test]
+fn v5_maximum_mixed_replay_is_deterministic_and_time_isolated() {
+    let mut records = Vec::new();
+    for sequence in 1..=10000u64 {
+        let mut bytes = record(sequence, 1, Some((sequence % 5) as u8), 2000);
+        if sequence % 4 == 0 {
+            bytes[36..44].copy_from_slice(&sequence.to_le_bytes());
+        } else {
+            bytes[2] = match sequence % 4 {
+                1 => 1,
+                2 => 5,
+                _ => 8,
+            };
+            bytes.resize(109, 0);
+            bytes[84..88].copy_from_slice(&21u32.to_le_bytes());
+            bytes[88..104].fill(0);
+            bytes[88..96].copy_from_slice(&sequence.to_le_bytes());
+            bytes[104] = 1;
+            bytes[108] = b'x';
+        }
+        records.push(bytes);
+    }
+    let active = project(&records, 1999).unwrap();
+    let expired = project(&records, 2000).unwrap();
+    assert_eq!(
+        (
+            active.items.len(),
+            active.handoffs.len(),
+            active.talks.len(),
+            active.pulses.len()
+        ),
+        (2500, 2500, 2500, 2500)
+    );
+    assert_eq!(active.items, expired.items);
+    assert_eq!(active.handoffs, expired.handoffs);
+    assert_eq!(active.talks, expired.talks);
+    assert!(active
+        .pulses
+        .iter()
+        .all(|p| p.status == PulseStatus::Active));
+    assert!(expired
+        .pulses
+        .iter()
+        .all(|p| p.status == PulseStatus::Expired));
+    let bytes = encode_state(&active, 5).unwrap();
+    assert!(bytes.len() < crate::protocol::MAX_PROTOCOL_BYTES);
+    assert_eq!(
+        bytes,
+        encode_state(&project(&records, 1999).unwrap(), 5).unwrap()
+    );
+}

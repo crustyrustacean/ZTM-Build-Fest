@@ -21,7 +21,7 @@ export async function pulseRegressions() {
   check(current.expiresAt-current.setAt===4*3600000, "one timestamp snapshot");
   check(pulse.current.textContent==="Drained" && pulse.until.textContent.startsWith("Until "), "current presentation");
   check(document.activeElement===pulse.changeButton, "set focus");
-  pulse.changeButton.click(); pulse.valueSelect.value="need-quiet";
+  pulse.changeButton.click(); check(pulse.valueSelect.value==="drained","Change starts from current capacity"); pulse.valueSelect.value="need-quiet";
   pulse.durationSelect.value="1"; pulse.form.requestSubmit(); await idle();
   check(app.state.pulses.length===1 && app.state.pulses[0].value==="need-quiet", "replacement");
   check(JSON.stringify([app.state.items,app.state.handoffs,app.state.talks])===others, "Pulse cannot change other features");

@@ -560,3 +560,67 @@ test("Pulse real WASM rejects malformed schema, payload, reserved and duration",
   for(let offset=89;offset<96;offset++){const bad=pulseRecord(1);bad[offset]=1;apply(5,[bad],2);}
   for(const expiry of [999,1000])apply(5,[pulseRecord(1,"good",expiry)],4);
 });
+
+
+test("v5 bridge rejects every truncated header and Pulse record boundary",async context=>{
+  const instantiate=WebAssembly.instantiate;let resultLength;
+  context.mock.method(WebAssembly,"instantiate",async(...args)=>{
+    const {instance}=await instantiate(...args),abi=instance.exports;
+    return {instance:{exports:{...abi,kin_result_len:()=>resultLength??abi.kin_result_len()}}};
+  });
+  const engine=await pulseEngine();
+  for(resultLength=0;resultLength<64;resultLength++)assert.throws(()=>engine.applyEvents([pulseRecord(1)],0),e=>e.code===6);
+  resultLength=65;assert.throws(()=>engine.applyEvents([pulseRecord(1)],0),e=>e.code===6);
+  resultLength=undefined;assert.equal(engine.applyEvents([pulseRecord(1)],0).pulses.length,1);
+});
+
+test("v5 rejects duplicate or unordered actor records",async context=>{
+  const instantiate=WebAssembly.instantiate;let reverse=false;
+  context.mock.method(WebAssembly,"instantiate",async(...args)=>{
+    const {instance}=await instantiate(...args),abi=instance.exports;
+    return {instance:{exports:{...abi,kin_apply_events(pointer,length){
+      const status=abi.kin_apply_events(pointer,length);
+      if(status===0){const bytes=new Uint8Array(abi.memory.buffer,abi.kin_result_ptr(),abi.kin_result_len());
+        bytes.copyWithin(64,24,40);if(reverse)bytes.fill(0xff,24,40);}
+      return status;
+    }}}};
+  });
+  const engine=await pulseEngine();
+  for(reverse of [false,true])assert.throws(()=>engine.applyEvents([pulseRecord(1,"good",2000,1),pulseRecord(2,"okay",2000,2)],0),e=>e.code===6);
+});
+
+test("10,000 mixed v5 events grow memory and retain copied results across success error empty",async context=>{
+  const instantiate=WebAssembly.instantiate;let memory;
+  context.mock.method(WebAssembly,"instantiate",async(...args)=>{const result=await instantiate(...args);memory=result.instance.exports.memory;return result;});
+  const engine=await pulseEngine();const initialBytes=memory.buffer.byteLength;
+  const records=[];
+  for(let n=1;n<=10000;n++){
+    const id=new Uint8Array(16);new DataView(id.buffer).setUint32(0,n,true);
+    const identity={eventId:id,householdId:zeroId,actorId:id,deviceId:zeroId,timestamp:1000,logicalTime:n};
+    const text=n<=1000?"x".repeat(4096):"x";
+    records.push(n%4===0?encodePulseSetRecord({...identity,value:"need-quiet",expiresAt:2000}):
+      n%4===1?encodeAddedRecord({...identity,itemId:id,text}):
+      n%4===2?encodeHandoffAddedRecord({...identity,handoffId:id,text}):encodeTalkAddedRecord({...identity,talkId:id,text}));
+  }
+  const state=engine.applyEvents(records,1999),snapshot=structuredClone(state);
+  assert.deepEqual([state.items.length,state.handoffs.length,state.talks.length,state.pulses.length],[2500,2500,2500,2500]);
+  assert.ok(memory.buffer.byteLength>initialBytes,"real memory growth observed");
+  const expired=engine.applyEvents(records,2000);assert.ok(expired.pulses.every(p=>p.status==="expired"));
+  assert.deepEqual(state,snapshot,"old host-owned state survives next call");
+  for(let n=0;n<8;n++){
+    const bad=pulseRecord(1);bad[2]=99;assert.throws(()=>engine.applyEvents([bad],0),e=>e.code===3);
+    assert.deepEqual(engine.applyEvents([],0),{items:[],handoffs:[],talks:[],pulses:[]});
+    assert.deepEqual(engine.applyEvents(records,1999),snapshot);
+  }
+  assert.throws(()=>engine.applyEvents([...records,records[0]],0),e=>e.code===5);
+  assert.deepEqual(state,snapshot);
+});
+
+
+test("v5 copied result bytes outlive subsequent success error and empty calls",async()=>{
+  const apply=await rawEngine(),copy=apply(5,[pulseRecord(1)],0,1999),snapshot=copy.slice();
+  for(let n=0;n<8;n++){
+    apply(5,[pulseRecord(1)],0,2000);apply(5,[pulseRecord(1,"good",1000)],4);
+    assert.equal(apply(5,[]).length,24);assert.deepEqual(copy,snapshot);
+  }
+});

@@ -1,6 +1,6 @@
 # Roadmap
 
-Current release: `v0.5.2 — Pulse Resilience & Accessibility`. Authorized Pulse line stops after v0.5.3 for evaluation.
+Current release: `v0.5.3 — Pulse Hardening & Polish`. Authorized Pulse line stops after v0.5.3 for evaluation.
 
 ## Planning releases
 
@@ -170,4 +170,4 @@ Focus on polish, reliability, accessibility, mobile UX, privacy documentation, o
 
 ## Scope discipline
 
-Each roadmap item is future work unless explicitly marked as completed. Authentication, passkeys, encryption, remote services, pairing, and synchronization remain unimplemented and out of scope for v0.4.x. Releases through `v0.0.12` were documentation-only; v0.1.0 is the first coded release. Handoff is implemented in v0.3.0; Talk is implemented; Pulse is implemented in v0.5.0.
+Each roadmap item is future work unless explicitly marked as completed. Authentication, passkeys, encryption, remote services, pairing, and synchronization remain unimplemented and out of scope for v0.5.x. Releases through `v0.0.12` were documentation-only; v0.1.0 is the first coded release. Handoff is implemented in v0.3.0; Talk is implemented; Pulse is implemented in v0.5.0.

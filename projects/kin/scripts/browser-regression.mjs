@@ -5,7 +5,7 @@ import { talkRegressions, talkPeerRegressions } from "./talk-regression.mjs";
 import assert from "node:assert/strict";
 import { handoffRegressions, handoffPeerRegressions } from "./handoff-regression.mjs";
 import { spawn } from "node:child_process";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { dirname, extname, join, resolve, sep } from "node:path";
@@ -1229,6 +1229,15 @@ try {
     false,
     "increased text spacing keeps 320px layout usable",
   );
+  // Keep optional visual evidence under ignored project build output.
+  if (process.env.KIN_VISUAL_CHECK === "1") {
+    await first.send("Emulation.setEmulatedMedia", { features: [] });
+    await first.evaluate(`(async()=>{const a=document.querySelector('kin-app'),timestamp=Date.now();await a.savePulse({type:'set-pulse',value:'need-quiet',timestamp,expiresAt:timestamp+14400000});a.pulse.scrollIntoView({block:'center'});})()`);
+    await writeFile(resolve(webRoot,"../target/pulse-active-320.png"),Buffer.from((await first.send("Page.captureScreenshot",{format:"png"})).data,"base64"));
+    await first.evaluate(`(()=>{const p=document.querySelector('kin-app').pulse;p.changeButton.click();p.scrollIntoView({block:'end'});})()`);
+    await writeFile(resolve(webRoot,"../target/pulse-change-320.png"),Buffer.from((await first.send("Page.captureScreenshot",{format:"png"})).data,"base64"));
+    await first.evaluate(`document.querySelector('kin-app').savePulse({type:'clear-pulse'})`);
+  }
   await first.send("Emulation.setDeviceMetricsOverride", {
     width: 640,
     height: 960,

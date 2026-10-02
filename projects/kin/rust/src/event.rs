@@ -34,11 +34,11 @@ pub enum ItemClassification {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[repr(u8)]
 pub enum PulseValue {
-    Good,
-    Okay,
-    Drained,
-    RoughDay,
-    NeedQuiet,
+    Good = 0,
+    Okay = 1,
+    Drained = 2,
+    RoughDay = 3,
+    NeedQuiet = 4,
 }
 
 pub const MAX_TIMESTAMP: i64 = 8_640_000_000_000_000;

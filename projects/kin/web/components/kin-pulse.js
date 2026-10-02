@@ -57,6 +57,7 @@ class KinPulse extends HTMLElement {
       }));
     });
     this.changeButton.addEventListener("click", () => {
+      this.valueSelect.value = this.record.value;
       this.editing = true;
       this.render();
       this.valueSelect.focus();
