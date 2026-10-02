@@ -1,6 +1,6 @@
 # Support
 
-Kin is currently in documentation and planning releases. There is no usable application to install, account to create, or runtime support channel.
+Kin currently has a local-first v0.1.x prototype. There are no accounts, remote service, staffed runtime support channel, or guaranteed response times.
 
 ## Questions and proposals
 
@@ -10,7 +10,7 @@ Feature proposals should describe the household problem, who experiences it, the
 
 ## Bug reports
 
-There is no functional app to report runtime bugs against yet. Once implementation begins, use the Kin issue form if it is available; include the commit/version, operating system and browser, minimal reproduction steps, expected and actual behavior, and redacted error codes. Never attach real household data or unreviewed browser-storage dumps.
+For a prototype bug, use the Kin issue form if available; include the commit/version, operating system and browser, minimal reproduction steps, expected and actual behavior, and redacted error codes. Never attach real household data or unreviewed browser-storage dumps.
 
 ## Security reports
 

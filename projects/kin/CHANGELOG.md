@@ -2,17 +2,74 @@
 
 This file records completed Kin releases. The `v0.0.x` releases are planning and documentation milestones; they do not represent implemented application features. The first implementation milestone remains `v0.1.0`.
 
+## [0.1.3]
+
+### Audited
+
+- Confirmed JavaScript remains a browser adapter and renderer; Rust remains the only authoritative event validator and item-state reducer.
+- Documented the event, identity, ordering, and protocol foundations that later capabilities can extend without implementing those capabilities.
+- Confirmed no npm runtime packages, frontend frameworks, WASM helper crates, or third-party network dependencies are present.
+- Rechecked local-only storage/requests, privacy-safe diagnostics, and the v0.0.10 community/security/support guidance.
+
+### Validation
+
+- Full Rust, bridge, WASM, reload, malformed-storage, Unicode, keyboard, and narrow-viewport regressions were run for the v0.1.x line.
+- The release review records remaining platform and assistive-technology gaps and makes no certification claim for untested environments.
+
+## [0.1.2]
+
+### Improved
+
+- Preserved in-progress compose drafts across same-tab reloads with best-effort `sessionStorage`; successful persistence clears the draft.
+- Restored keyboard focus after asynchronous add and completion actions and exposed initialization/save progress with `aria-busy`.
+- Kept retryable startup feedback for WASM and IndexedDB failures without discarding stored household events.
+
+### Validation
+
+- Verified draft restore/clear, WASM failure and retry with focus restoration, add/complete focus continuity, status updates, reduced-motion preference, and 320px/360px/640px reflow in the browser.
+- Confirmed a blocked `sessionStorage` does not prevent startup or saving; draft retention degrades without affecting the event store.
+- Confirmed primary controls are at least 48px high. Testing used Windows 10 x64 with the integrated VS Code browser (Code 1.139.1, Electron 43.6.0, Chromium 150.0.7871.250).
+- Screen-reader and non-Chromium browser testing remain unverified.
+
+## [0.1.1]
+
+### Fixed
+
+- Preserved leading U+FEFF and other Unicode text during UTF-8 validation while continuing to reject malformed lone surrogates.
+- Closed IndexedDB connections when local-context initialization fails or a blocked open later completes.
+- Rejected corrupted event metadata through deterministic integrity errors before lossy conversion or replay.
+
+### Tests
+
+- Added regression tests for BOM/emoji preservation, malformed surrogate input, and the exact UTF-8 byte limit.
+- Verified invalid completion does not append, corrupted rows remain stored, concurrent tabs preserve contiguous event order, and rapid duplicate submission creates one event.
+- Re-ran 24 Rust tests, 3 built-in Node bridge tests, formatting, Clippy, the WASM build, and browser reload checks.
+
+## [0.1.0]
+
+### Added
+
+- Delivered the local Household Heartbeat flow using native Web Components, Rust/WASM event validation and replay, and IndexedDB event persistence.
+- Added and completed household items, with deterministic state reconstruction after reload.
+- Added the manual versioned binary ABI, local identity placeholders, bounded protocol parsing, and regression tests for replay and malformed input.
+- Added project-local build and static-serving instructions.
+
+### Validation
+
+- Rust unit and protocol tests passed; the `wasm32-unknown-unknown` release build succeeded.
+- Browser checks passed for add, complete, reload, inert rendering of script-like text, keyboard submission, narrow layout, and same-origin-only requests.
+- Windows 10 x64 was exercised using the integrated VS Code browser (Code 1.139.1, Electron 43.6.0, Chromium 150.0.7871.250). Firefox, Safari, standalone Chrome, and assistive-technology testing were not performed.
+
 ## [0.0.12]
 
 ### Added
 
-- Established this project-scoped changelog and documented how release entries are maintained.
-
-### Changed
+- Corrected the preserved bug-report template's prototype status and updated the implementation file map without removing v0.0.10 community guidance.
 
 - Updated Kin's current release references through `v0.0.12`; `v0.0.9` remains the specification freeze and `v0.1.0` remains the first implementation milestone.
 
-## [0.0.11]
+- All 25 Rust tests and 3 built-in Node bridge tests passed; formatting, Clippy, the `wasm32-unknown-unknown` build, and the browser reload/persistence checks passed.
+- Browser checks covered malformed-row preservation, Unicode roundtrip, keyboard/draft recovery, 320px/360px/640px reflow, and same-origin-only requests.
 
 ### Added
 

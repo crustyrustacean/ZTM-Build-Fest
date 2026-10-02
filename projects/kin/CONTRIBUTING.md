@@ -1,6 +1,6 @@
 # Contributing to Kin
 
-Thanks for considering a contribution. Kin is an open-source project for lightweight household coordination; at the current planning stage, contributions are documentation, specification, and community-policy work only. There is no application to build or run yet.
+Thanks for considering a contribution. Kin is an open-source project for lightweight household coordination. The current implementation is the local-first Household Heartbeat prototype; contributions should follow its frozen v0.1.x scope and preserve the project's privacy, accessibility, and repository-boundary requirements.
 
 ## Project purpose
 
@@ -12,7 +12,7 @@ Kin lives inside the ZTM Build Fest monorepo at `projects/kin/`. Treat that dire
 
 ## How to contribute
 
-Small, focused changes are easiest to review. For a large feature or architectural change, open an issue or discussion first and explain the user problem, scope, trade-offs, privacy/accessibility impact, and release target. Update the relevant documentation alongside any architectural change. Do not add executable application code before the project explicitly begins v0.1.0.
+Small, focused changes are easiest to review. For a large feature or architectural change, open an issue or discussion first and explain the user problem, scope, trade-offs, privacy/accessibility impact, and release target. Update the relevant documentation alongside any architectural change. Patch releases must not introduce a new product capability, and the next minor feature requires explicit user approval.
 
 Read the [Code of Conduct](CODE_OF_CONDUCT.md), [Security Policy](SECURITY.md), and [Support](SUPPORT.md). Before proposing a feature, ask:
 
@@ -36,6 +36,6 @@ Changes touching WebAuthn, Web Crypto, synchronization, device authorization, ke
 
 Accessibility is a baseline, not a polish task. Preserve semantic HTML, keyboard access, visible focus, mobile reflow, reduced-motion preferences, and clear labels/status feedback. See [the accessibility contract](docs/ACCESSIBILITY.md).
 
-## Documentation-only stage
+## Implementation stage
 
-Planning through v0.0.12 is documentation/community-readiness work. Read [AGENTS.md](AGENTS.md) and the current release documents before changing scope. The first functional implementation is v0.1.0 and must follow its frozen contract; later-version capabilities do not belong in that milestone.
+Planning through v0.0.12 was documentation/community-readiness work. The first functional implementation is v0.1.0 and follows its frozen contract. Read [AGENTS.md](AGENTS.md), [the changelog](CHANGELOG.md), and the current release documents before changing scope; later-version capabilities do not belong in the v0.1.x Household Heartbeat line.

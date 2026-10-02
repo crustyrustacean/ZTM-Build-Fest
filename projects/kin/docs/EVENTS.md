@@ -1,6 +1,6 @@
 # Household Events
 
-**Status:** event contract for future implementation. No event schema or event engine is implemented. Related entity meanings are in [Domain](DOMAIN.md); projections and replay are in [State](STATE.md).
+**Status:** event contract implemented for the v0.1.0 `ITEM_ADDED` and `ITEM_COMPLETED` subset. All other event kinds remain future work. Related entity meanings are in [Domain](DOMAIN.md); projections and replay are in [State](STATE.md).
 
 ## Canonical record
 
