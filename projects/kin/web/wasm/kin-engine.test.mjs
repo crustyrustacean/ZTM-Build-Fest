@@ -106,11 +106,13 @@ async function rawEngine() {
     {},
   );
   const abi = instance.exports;
-  return (version, records, expectedStatus = 0) => {
-    const request = new Uint8Array(12 + records.reduce((size, row) => size + row.length, 0));
+  return (version, records, expectedStatus = 0, asOf = 0) => {
+    const headerSize = version === 5 ? 20 : 12;
+    const request = new Uint8Array(headerSize + records.reduce((size, row) => size + row.length, 0));
     request.set([75, 73, 78, 69, version, 0, 0, 0]);
     new DataView(request.buffer).setUint32(8, records.length, true);
-    let offset = 12;
+    if (version === 5) new DataView(request.buffer).setBigInt64(12, BigInt(asOf), true);
+    let offset = headerSize;
     for (const record of records) {
       request.set(record, offset);
       offset += record.length;
@@ -508,4 +510,53 @@ test("Pulse encoding is fixed and legacy protocols reject both kinds",async()=>{
   const apply=await rawEngine();
   for(const version of [1,2,3,4]) for(const row of [set,clear]) apply(version,[row],3);
   assert.throws(()=>pulseRecord(1,"custom"),error=>error.code===2);
+});
+
+
+test("v5 exact request/result time fields and immutable v4 Talk bytes",async()=>{
+  const apply=await rawEngine();
+  const expected=new Uint8Array(64);expected.set([75,73,78,83,5,0,0,0]);expected[20]=1;
+  expected.fill(0xbb,24,40);const view=new DataView(expected.buffer);
+  view.setBigInt64(40,1000n,true);view.setBigInt64(48,2000n,true);expected[56]=2;
+  assert.deepEqual(apply(5,[pulseRecord(1)],0,1999),expected);
+  expected[57]=1;assert.deepEqual(apply(5,[pulseRecord(1)],0,2000),expected);
+  const v4=apply(4,[talk(1)]),v5=apply(5,[talk(1)],0,2000);
+  assert.deepEqual(v5.subarray(24),v4.subarray(20));
+  for(const time of [-(2n**63n),8640000000000001n,2n**63n-1n])apply(5,[],2,time);
+});
+
+test("v5 bridge rejects malformed Pulse fields and combined counts then recovers",async context=>{
+  const instantiate=WebAssembly.instantiate;let mutate=()=>{};
+  context.mock.method(WebAssembly,"instantiate",async(...args)=>{
+    const {instance}=await instantiate(...args),abi=instance.exports;
+    return {instance:{exports:{...abi,kin_apply_events(pointer,length){
+      const status=abi.kin_apply_events(pointer,length);
+      if(status===0)mutate(new Uint8Array(abi.memory.buffer,abi.kin_result_ptr(),abi.kin_result_len()));
+      return status;
+    }}}};
+  });
+  const engine=await pulseEngine();
+  const mutations=[bytes=>bytes[0]=0,bytes=>bytes[4]=6,bytes=>bytes[6]=1,bytes=>bytes[7]=1,
+    bytes=>bytes[56]=5,bytes=>bytes[57]=2,...[58,59,60,61,62,63].map(i=>bytes=>bytes[i]=1),
+    ...[40,48].map(i=>bytes=>new DataView(bytes.buffer,bytes.byteOffset).setBigInt64(i,8640000000000001n,true)),
+    bytes=>new DataView(bytes.buffer,bytes.byteOffset).setBigInt64(48,1000n,true),
+    ...[8,12,16,20].map(i=>bytes=>new DataView(bytes.buffer,bytes.byteOffset).setUint32(i,0xffffffff,true)),
+    bytes=>{const v=new DataView(bytes.buffer,bytes.byteOffset);for(const i of [8,12,16,20])v.setUint32(i,2501,true);}
+  ];
+  for(mutate of mutations)assert.throws(()=>engine.applyEvents([pulseRecord(1)],0),e=>e.code===6);
+  mutate=()=>{};assert.equal(engine.applyEvents([pulseRecord(1)],0).pulses[0].value,"drained");
+});
+
+test("Pulse real WASM rejects malformed schema, payload, reserved and duration",async()=>{
+  const apply=await rawEngine();
+  for(const original of [pulseRecord(1),pulseRecord(1,null)]) {
+    for(let length=0;length<=20;length++){
+      if(length===original.length-88)continue;
+      const bad=new Uint8Array(88+length);bad.set(original.subarray(0,bad.length));
+      new DataView(bad.buffer).setUint32(84,length,true);apply(5,[bad],2);
+    }
+    for(const version of [0,2,65535]){const bad=original.slice();new DataView(bad.buffer).setUint16(0,version,true);apply(5,[bad],3);}
+  }
+  for(let offset=89;offset<96;offset++){const bad=pulseRecord(1);bad[offset]=1;apply(5,[bad],2);}
+  for(const expiry of [999,1000])apply(5,[pulseRecord(1,"good",expiry)],4);
 });

@@ -2,6 +2,10 @@
 
 This file records completed Kin releases. The `v0.0.x` releases are planning and documentation milestones; they do not represent implemented application features. The first implementation milestone remains `v0.1.0`.
 
+## [0.5.1] — Pulse Correctness
+
+Added exhaustive Pulse payload lengths, schemas, reserved/value codes, timestamp bounds, mixed entity invariance, exact v5 layouts, malformed results and combined count limits. Legacy byte fixtures remain unchanged. No new capability or production defect found; validation evidence is in docs/V0.5.0.md.
+
 ## [0.5.0] — Pulse
 
 Added fixed actor-scoped capacity, set/replace/clear and explicit expiry. Rust owns rebuild_at(events, as_of); protocol v5 preserves v1–v4 layouts. Native controls and canonical timer/visibility/focus refresh reuse IndexedDB schema 1 and original-command retry. No migration, acknowledgement, analytics, identity inference, automation or dependency.

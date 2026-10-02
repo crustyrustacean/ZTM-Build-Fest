@@ -141,3 +141,117 @@ fn pulse_basic_invalid_payload_and_duration() {
     bad[89] = 1;
     assert_eq!(project(&[bad], 0), Err(KinError::MalformedProtocol));
 }
+
+#[test]
+fn pulse_all_payload_lengths_schemas_and_reserved_bytes() {
+    for value in [Some(0), None] {
+        let good = record(1, 1, value, 2000);
+        for length in 0..=20 {
+            if length == good.len() - 88 {
+                continue;
+            }
+            let mut bad = good.clone();
+            bad.resize(88 + length, 0);
+            bad[84..88].copy_from_slice(&(length as u32).to_le_bytes());
+            assert_eq!(project(&[bad], 0), Err(KinError::MalformedProtocol));
+        }
+        for schema in [0u16, 2, 3, u16::MAX] {
+            let mut bad = good.clone();
+            bad[..2].copy_from_slice(&schema.to_le_bytes());
+            assert_eq!(project(&[bad], 0), Err(KinError::UnsupportedVersion));
+        }
+    }
+    for offset in 89..96 {
+        let mut bad = record(1, 1, Some(0), 2000);
+        bad[offset] = 1;
+        assert_eq!(project(&[bad], 0), Err(KinError::MalformedProtocol));
+    }
+    for value in 5..=255 {
+        assert_eq!(
+            project(&[record(1, 1, Some(value), 2000)], 0),
+            Err(KinError::MalformedProtocol)
+        );
+    }
+}
+
+#[test]
+fn pulse_timestamp_ranges_and_projection_rejection() {
+    use crate::event::MAX_TIMESTAMP;
+    for invalid in [i64::MIN, -MAX_TIMESTAMP - 1, MAX_TIMESTAMP + 1, i64::MAX] {
+        assert_eq!(project(&[], invalid), Err(KinError::MalformedProtocol));
+        assert_eq!(
+            project(&[record(1, 1, Some(0), invalid)], 0),
+            Err(KinError::MalformedProtocol)
+        );
+        for kind in [Some(0), None] {
+            let mut bad = record(1, 1, kind, 2000);
+            bad[68..76].copy_from_slice(&invalid.to_le_bytes());
+            assert_eq!(project(&[bad], 0), Err(KinError::MalformedProtocol));
+        }
+    }
+    let mut full_range = record(1, 1, Some(0), MAX_TIMESTAMP);
+    full_range[68..76].copy_from_slice(&(-MAX_TIMESTAMP).to_le_bytes());
+    assert_eq!(
+        project(&[full_range.clone()], -MAX_TIMESTAMP)
+            .unwrap()
+            .pulses[0]
+            .status,
+        PulseStatus::Active
+    );
+    assert_eq!(
+        project(&[full_range], MAX_TIMESTAMP).unwrap().pulses[0].status,
+        PulseStatus::Expired
+    );
+}
+
+#[test]
+fn v5_headers_trailing_bytes_versions_and_combined_counts() {
+    let valid = request(&[record(1, 1, Some(0), 2000)], 5, 1500);
+    let mut trailing = valid.clone();
+    trailing.push(0);
+    assert_eq!(decode_request(&trailing), Err(KinError::MalformedProtocol));
+    for version in [0u16, 6, u16::MAX] {
+        let mut bad = valid.clone();
+        bad[4..6].copy_from_slice(&version.to_le_bytes());
+        assert_eq!(decode_request(&bad), Err(KinError::UnsupportedVersion));
+    }
+    for offset in [6, 7] {
+        let mut bad = valid.clone();
+        bad[offset] = 1;
+        assert_eq!(decode_request(&bad), Err(KinError::MalformedProtocol));
+    }
+    for count in [10001u32, u32::MAX] {
+        let mut bad = valid.clone();
+        bad[8..12].copy_from_slice(&count.to_le_bytes());
+        assert_eq!(decode_request(&bad), Err(KinError::SizeLimit));
+    }
+    let mut state = project(&[record(1, 1, Some(0), 2000)], 0).unwrap();
+    state.pulses = vec![state.pulses[0].clone(); 10000];
+    state.items.push(crate::state::ItemState {
+        item_id: crate::event::ItemId([1; 16]),
+        text: "x".into(),
+        created_by: crate::event::ActorId([1; 16]),
+        created_at: 0,
+        classification: crate::event::ItemClassification::Today,
+        status: crate::state::ItemStatus::Active,
+    });
+    assert_eq!(encode_state(&state, 5), Err(KinError::SizeLimit));
+}
+
+#[test]
+fn explicit_time_does_not_change_legacy_entities() {
+    let mut item = record(1, 1, Some(0), 2000);
+    item.resize(109, 0);
+    item[2] = 1;
+    item[84] = 21;
+    item[88..104].fill(7);
+    item[104] = 1;
+    item[108] = b'x';
+    let (_, events, _) = decode_request(&request(&[item.clone()], 4, 0)).unwrap();
+    let legacy = rebuild(&events).unwrap();
+    for time in [-1000, 0, 1000, 2000, 3000] {
+        assert_eq!(project(&[item.clone()], time).unwrap(), legacy);
+        let mixed = project(&[item.clone(), record(2, 1, Some(0), 2000)], time).unwrap();
+        assert_eq!(mixed.items, legacy.items);
+    }
+}

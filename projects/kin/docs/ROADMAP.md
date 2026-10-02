@@ -1,6 +1,6 @@
 # Roadmap
 
-Current release: `v0.5.0 — Pulse`. Authorized stabilization continues through v0.5.3, then stop for evaluation.
+Current release: `v0.5.1 — Pulse Correctness`. Authorized Pulse line stops after v0.5.3 for evaluation.
 
 ## Planning releases
 
