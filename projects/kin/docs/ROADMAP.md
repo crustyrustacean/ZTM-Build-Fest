@@ -1,6 +1,6 @@
 # Roadmap
 
-This roadmap is a planning baseline, not a promise of delivery dates. Releases may change as the product is tested. Kin is at the completed documentation-only `v0.0.9` milestone; no application code or executable developer tooling exists. Planning/specification is complete, and v0.1.0 is the first coded release when authorized.
+This roadmap is a planning baseline, not a promise of delivery dates. Releases may change as the product is tested. Kin is at the documentation-only `v0.0.10` community-readiness milestone; no application code or executable developer tooling exists. Planning/specification is complete through v0.0.9, and v0.1.0 remains the first coded release when authorized.
 
 ## Planning releases
 
@@ -38,7 +38,11 @@ Document human contribution expectations, intended cross-platform development se
 
 ### `v0.0.9` — Implementation Preflight
 
-Complete the specification audit, accepted decision records, canonical test vectors, and requirement traceability for the frozen v0.1.0 scope. This Specification Release Candidate 1 is the final planning milestone; it does not begin implementation. See [PREFLIGHT](PREFLIGHT.md), [TEST-VECTORS](TEST-VECTORS.md), [TRACEABILITY](TRACEABILITY.md), and [accepted decisions](decisions/0001-event-sourced-household-state.md).
+Complete the specification audit, accepted decision records, canonical test vectors, and requirement traceability for the frozen v0.1.0 scope. This Specification Release Candidate 1 completes technical planning; it does not begin implementation. See [PREFLIGHT](PREFLIGHT.md), [TEST-VECTORS](TEST-VECTORS.md), [TRACEABILITY](TRACEABILITY.md), and [accepted decisions](decisions/0001-event-sourced-household-state.md).
+
+### `v0.0.10` — GitHub Community & Project Documentation
+
+Align README with the Build Fest project requirements and add project-scoped conduct, security, support, issue, and pull-request guidance. The MIT license already exists. Because Kin is nested in a monorepo, GitHub does not automatically discover the nested community files/templates; document this limitation rather than changing parent-repository files. This release remains documentation-only.
 
 ## First coded release
 
@@ -88,4 +92,4 @@ Focus on polish, reliability, accessibility, mobile UX, privacy documentation, o
 
 ## Scope discipline
 
-Each roadmap item is future work unless explicitly marked as a completed planning milestone. Authentication, passkeys, encryption, remote services, pairing, and synchronization remain unimplemented and out of scope for `v0.1.0`. Planning-only scope is complete through `v0.0.9`; v0.1.0 is the first coded release and has not begun.
+Each roadmap item is future work unless explicitly marked as a completed planning milestone. Authentication, passkeys, encryption, remote services, pairing, and synchronization remain unimplemented and out of scope for `v0.1.0`. Documentation and community planning through `v0.0.10` remains code-free; v0.1.0 is the first coded release and has not begun.

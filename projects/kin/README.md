@@ -2,7 +2,7 @@
 
 > A private, lightweight household coordination app for the little things families need to know, remember, hand off, or discuss.
 
-**Current status: `v0.0.9` — Implementation Preflight. No usable application has been implemented.** Planning/specification is complete enough to begin `v0.1.0` when authorized. Rust/WASM, Web Components, and IndexedDB are specified but not implemented; `v0.1.0` will be the first executable prototype.
+**Current status: `v0.0.10` — GitHub Community & Project Documentation. No usable application has been implemented.** Planning/specification through `v0.0.9` is complete. Rust/WASM, Web Components, and IndexedDB are specified but not implemented. `v0.1.0` remains the first executable prototype and has not begun.
 
 ## The problem
 
@@ -27,19 +27,33 @@ The intended technical direction is Rust compiled to WebAssembly, native Web Com
 - `v0.0.7` — Data Durability & Evolution (`kin-v0.0.7`)
 - `v0.0.8` — Developer & Contributor Experience (`kin-v0.0.8`)
 - `v0.0.9` — Implementation Preflight (`kin-v0.0.9`)
+- `v0.0.10` — GitHub Community & Project Documentation (`kin-v0.0.10`)
 - `v0.1.0` — First functional prototype
 
-## Install and run
+## Install, build, and run
 
-There is currently no application to install or run. The `v0.0.x` releases are documentation-only; application source, build tooling, and runtime dependencies have deliberately not been added. The first implementation is planned for `v0.1.0`.
+There is currently no application to install, build, or run. Releases through `v0.0.10` are documentation-only; no application source, build tooling, or runtime dependencies have been added. The future `v0.1.0` implementation specification is available at [V0.1.0](docs/V0.1.0.md), but it is not executable software.
 
 ## AI usage
 
 AI-assisted development tools are being used for brainstorming, product planning, architecture exploration, documentation, and implementation support. Kin is not currently designed around an AI runtime. The intended privacy posture is that household content is not sent to an AI service by default.
 
+## License
+
+Kin is available under the [MIT License](LICENSE).
+
+## Community
+
+- [Code of Conduct](CODE_OF_CONDUCT.md)
+- [Contributing](CONTRIBUTING.md)
+- [Security policy](SECURITY.md)
+- [Support](SUPPORT.md)
+- [GitHub community files and monorepo limitations](docs/GITHUB-COMMUNITY.md)
+
+Kin is nested in the ZTM Build Fest repository. Its community files and templates are kept inside `projects/kin/`; GitHub does not automatically apply nested `.github` templates or count them in the parent repository's Community Standards profile.
+
 ## Project documents
 
-- [Contributing to Kin](CONTRIBUTING.md)
 - [Product vision](docs/PRODUCT.md)
 - [Principles and non-goals](docs/PRINCIPLES.md)
 - [Architecture](docs/ARCHITECTURE.md)

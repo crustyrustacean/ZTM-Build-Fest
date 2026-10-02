@@ -1,6 +1,6 @@
 # Contributing to Kin
 
-Thanks for considering a contribution. Kin is an open-source project for lightweight household coordination; at the current planning stage, contributions are documentation and specification work only. There is no application to build or run yet.
+Thanks for considering a contribution. Kin is an open-source project for lightweight household coordination; at the current planning stage, contributions are documentation, specification, and community-policy work only. There is no application to build or run yet.
 
 ## Project purpose
 
@@ -8,13 +8,13 @@ Kin aims to make the household context people need to remember, hand off, or dis
 
 ## Repository boundary
 
-Kin lives inside the ZTM Build Fest monorepo at `projects/kin/`. Treat that directory as the Kin project root. Keep every Kin-specific change inside it; do not modify the parent README, repository configuration, or another participant's project.
+Kin lives inside the ZTM Build Fest monorepo at `projects/kin/`. Treat that directory as the Kin project root. Keep every Kin-specific change inside it; do not modify the parent README, repository configuration, or another participant's project. GitHub only discovers community files and issue/PR templates at the host repository root, so the nested Kin templates are reference files until Kin is extracted. Do not move them into the parent root.
 
 ## How to contribute
 
 Small, focused changes are easiest to review. For a large feature or architectural change, open an issue or discussion first and explain the user problem, scope, trade-offs, privacy/accessibility impact, and release target. Update the relevant documentation alongside any architectural change. Do not add executable application code before the project explicitly begins v0.1.0.
 
-Before proposing a feature, ask:
+Read the [Code of Conduct](CODE_OF_CONDUCT.md), [Security Policy](SECURITY.md), and [Support](SUPPORT.md). Before proposing a feature, ask:
 
 - Would a tired parent holding a child actually use it?
 - Does it simplify household coordination, or turn Kin into project management?
@@ -38,4 +38,4 @@ Accessibility is a baseline, not a polish task. Preserve semantic HTML, keyboard
 
 ## Documentation-only stage
 
-Planning through v0.0.9 is specification work. Read [AGENTS.md](AGENTS.md) and the current release documents before changing scope. The first functional implementation is v0.1.0 and must follow its frozen contract; later-version capabilities do not belong in that milestone.
+Planning through v0.0.10 is documentation/community-readiness work. Read [AGENTS.md](AGENTS.md) and the current release documents before changing scope. The first functional implementation is v0.1.0 and must follow its frozen contract; later-version capabilities do not belong in that milestone.

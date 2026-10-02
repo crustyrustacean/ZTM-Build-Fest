@@ -114,13 +114,14 @@ v0.0.6
 v0.0.7
 v0.0.8
 v0.0.9
+v0.0.10
 ```
 
-All releases through `v0.0.9` are **planning and documentation releases only**.
+All releases through `v0.0.10` are **planning and documentation releases only**.
 
 No functional application code should be introduced during these versions.
 
-Planning/specification releases `v0.0.1` through `v0.0.9` are complete. `v0.1.0` is the first implementation release. Before any implementation is explicitly authorized, read [V0.1.0](docs/V0.1.0.md), [PREFLIGHT](docs/PREFLIGHT.md), [TEST-VECTORS](docs/TEST-VECTORS.md), [TRACEABILITY](docs/TRACEABILITY.md), and accepted ADRs under `docs/decisions/`. Do not allow features assigned to later versions to leak into v0.1.0.
+Planning/specification through `v0.0.9` is complete; `v0.0.10` adds project community documentation only. `v0.1.0` is the first implementation release. Before any implementation is explicitly authorized, read [V0.1.0](docs/V0.1.0.md), [PREFLIGHT](docs/PREFLIGHT.md), [TEST-VECTORS](docs/TEST-VECTORS.md), [TRACEABILITY](docs/TRACEABILITY.md), accepted ADRs under `docs/decisions/`, and the community/security policies. Do not allow features assigned to later versions to leak into v0.1.0.
 
 The first implementation release is:
 
@@ -220,6 +221,14 @@ Document contribution expectations, intended cross-platform development workflow
 ## v0.0.9 — Implementation Preflight
 
 Audit and reconcile the specification, record established decisions, define canonical test vectors and requirement traceability, and freeze the v0.1.0 handoff. No implementation begins in this release.
+
+---
+
+## v0.0.10 — GitHub Community & Project Documentation
+
+Keep the Kin README aligned with the ZTM Build Fest project requirements and provide project-scoped license, conduct, contribution, security, support, and reusable issue/PR templates. Document that nested community files are not automatically discovered by GitHub for the parent monorepo.
+
+No functional application code, build tooling, or runtime dependencies.
 
 ---
 
@@ -874,6 +883,17 @@ Important documents may include:
 ```text
 README.md
 AGENTS.md
+LICENSE
+CONTRIBUTING.md
+CODE_OF_CONDUCT.md
+SECURITY.md
+SUPPORT.md
+
+.github/
+├── ISSUE_TEMPLATE/
+│   ├── bug_report.yml
+│   └── feature_request.yml
+└── pull_request_template.md
 
 docs/
 ├── PRODUCT.md
@@ -907,6 +927,7 @@ docs/
 ├── CODE-STYLE.md
 ├── RELEASES.md
 ├── DEBUGGING.md
+├── GITHUB-COMMUNITY.md
 ├── PREFLIGHT.md
 ├── TRACEABILITY.md
 ├── TEST-VECTORS.md
@@ -953,6 +974,7 @@ v0.0.6 — Implementation Contract
 v0.0.7 — Data Durability & Evolution
 v0.0.8 — Developer & Contributor Experience
 v0.0.9 — Implementation Preflight
+v0.0.10 — GitHub Community & Project Documentation
 
 v0.1.0 — Household Heartbeat
 v0.2.0 — Today + Needs
@@ -984,6 +1006,13 @@ Use the `kin-` prefix for every tag:
 kin-v0.0.1
 kin-v0.0.2
 kin-v0.0.3
+kin-v0.0.4
+kin-v0.0.5
+kin-v0.0.6
+kin-v0.0.7
+kin-v0.0.8
+kin-v0.0.9
+kin-v0.0.10
 kin-v0.1.0
 kin-v1.0.0
 ```
@@ -1194,11 +1223,11 @@ A release should represent a functioning milestone.
 
 # Current v0.0.x Rule
 
-Until explicitly instructed to begin `v0.1.0`, including throughout `v0.0.4`–`v0.0.9`:
+Until explicitly instructed to begin `v0.1.0`, including throughout `v0.0.4`–`v0.0.10`:
 
 # DO NOT WRITE FUNCTIONAL APPLICATION CODE.
 
-During `v0.0.1` through `v0.0.9`, acceptable changes include:
+During `v0.0.1` through `v0.0.10`, acceptable changes include:
 
 - Markdown documentation
 - diagrams
@@ -1209,6 +1238,7 @@ During `v0.0.1` through `v0.0.9`, acceptable changes include:
 - identity, pairing, synchronization, cryptography, and threat-model documents
 - implementation, ABI, storage, component, test, and accessibility contracts
 - migration, portability, retention, contributor, development, style, release, debugging, and preflight specifications
+- GitHub community policies and project-scoped issue/pull-request templates
 - roadmap changes
 - README
 - license
