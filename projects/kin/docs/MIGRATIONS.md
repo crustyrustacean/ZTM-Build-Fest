@@ -1,6 +1,6 @@
 # Data Migrations
 
-**Status:** migration policy only. No migration code exists. Contract version axes are defined in [VERSIONING](VERSIONING.md); current local storage shape is specified in [STORAGE](STORAGE.md).
+**Status:** no structural IndexedDB migration is required or implemented in v0.2.0. Rust performs in-memory version-specific event decoding/normalization while preserving source bytes. General migration policy remains in [VERSIONING](VERSIONING.md); current local storage shape is specified in [STORAGE](STORAGE.md).
 
 ## Migration categories
 
@@ -17,7 +17,7 @@ Once implementation begins, migrations must be deterministic for the same source
 
 Storage changes should use an atomic IndexedDB upgrade transaction. Prepare a validated target representation before replacing source values; a failed transaction must leave the old database readable. Do not perform asynchronous network requests, cryptographic key changes, or unrelated work inside an upgrade transaction.
 
-For an event format change, prefer a versioned decoder/normalizer that leaves original event bytes unchanged. If conversion of source bytes becomes unavoidable, first create and verify a portable backup, then stage the conversion separately and retain a recoverable original until successful validation.
+For an event format change, use a versioned decoder/normalizer that leaves original event bytes unchanged. v0.2.0 reads `ITEM_ADDED` schema v1 as Today and schema v2 with its explicit classification; it does not convert stored source bytes. If conversion of source bytes ever becomes unavoidable, first create and verify a portable backup, then stage the conversion separately and retain a recoverable original until successful validation.
 
 ## Failure behavior
 

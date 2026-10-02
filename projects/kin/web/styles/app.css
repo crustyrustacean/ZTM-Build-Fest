@@ -37,7 +37,8 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -49,13 +50,15 @@ button {
 }
 
 button:disabled,
-input:disabled {
+input:disabled,
+select:disabled {
   cursor: wait;
   opacity: 0.65;
 }
 
 button:focus-visible,
 input:focus-visible,
+select:focus-visible,
 a:focus-visible,
 main:focus-visible {
   outline: 3px solid var(--focus);
@@ -124,6 +127,12 @@ main {
   line-height: 1.2;
 }
 
+.today-section + .today-section {
+  margin-top: 34px;
+  padding-top: 27px;
+  border-top: 1px solid var(--line);
+}
+
 .empty-state {
   margin: 0 0 24px;
   padding: 20px 0;
@@ -176,9 +185,11 @@ kin-item {
 
 .item-action {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
-  min-width: 102px;
+  gap: 7px;
+  min-width: 0;
 }
 
 .complete-button {
@@ -192,6 +203,21 @@ kin-item {
 
 .complete-button:hover:not(:disabled) {
   background: #e6f0e7;
+}
+
+.reopen-button,
+.archive-button {
+  min-width: 88px;
+  padding: 0 11px;
+  border-color: #89998e;
+  background: var(--paper);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.archive-button {
+  border-color: #a96c5b;
+  color: #783d31;
 }
 
 .completed-label {
@@ -209,19 +235,20 @@ kin-item {
 
 .compose-form {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 102px;
+  grid-template-columns: minmax(0, 1fr) 150px 102px;
   gap: 10px 12px;
   margin-top: 25px;
 }
 
-.compose-form label {
+.compose-form > label:first-child {
   grid-column: 1 / -1;
   color: var(--ink);
   font-size: 16px;
   font-weight: 600;
 }
 
-.compose-form input {
+.compose-form input,
+.classification-field select {
   width: 100%;
   min-width: 0;
   min-height: 54px;
@@ -231,6 +258,20 @@ kin-item {
   background: var(--paper);
   color: var(--ink);
   font-size: 17px;
+}
+
+.classification-field {
+  display: grid;
+  gap: 4px;
+  align-content: end;
+  min-width: 0;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.classification-field select {
+  padding: 0 10px;
 }
 
 .add-button {
@@ -305,9 +346,34 @@ kin-item {
     gap: 10px;
   }
 
-  .item-action,
   .complete-button {
     min-width: 92px;
+  }
+
+  .item-action {
+    max-width: 188px;
+  }
+
+  .reopen-button,
+  .archive-button {
+    min-width: 82px;
+    padding: 0 8px;
+  }
+
+  .compose-form {
+    grid-template-columns: minmax(0, 1fr) 94px;
+  }
+
+  .compose-form input {
+    grid-column: 1 / -1;
+  }
+
+  .classification-field {
+    grid-column: 1;
+  }
+
+  .add-button {
+    grid-column: 2;
   }
 }
 

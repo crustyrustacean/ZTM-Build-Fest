@@ -1,8 +1,10 @@
 import {
   encodeAddedRecord,
+  encodeArchivedRecord,
   encodeCompletedRecord,
   idFromHex,
   randomId,
+  encodeReopenedRecord,
 } from "../wasm/kin-engine.js";
 
 const DATABASE_NAME = "kin";
@@ -18,6 +20,7 @@ export class EventStoreError extends Error {
     super(message, { cause });
     this.name = "EventStoreError";
     this.userMessage = message;
+    this.code = cause?.code;
   }
 }
 
@@ -156,10 +159,23 @@ export class EventStore {
               ...identity,
               itemId: randomId(),
               text: command.text,
+              classification: command.classification,
             });
           } else if (command.type === "complete") {
             kind = "ITEM_COMPLETED";
             encodedEvent = encodeCompletedRecord({
+              ...identity,
+              itemId: idFromHex(command.itemId),
+            });
+          } else if (command.type === "reopen") {
+            kind = "ITEM_REOPENED";
+            encodedEvent = encodeReopenedRecord({
+              ...identity,
+              itemId: idFromHex(command.itemId),
+            });
+          } else if (command.type === "archive") {
+            kind = "ITEM_ARCHIVED";
+            encodedEvent = encodeArchivedRecord({
               ...identity,
               itemId: idFromHex(command.itemId),
             });
@@ -199,7 +215,7 @@ export class EventStore {
               timestamp,
               logical_time: logicalTime,
               kind,
-              event_version: 1,
+              event_version: command.type === "add" ? 2 : 1,
               encoded_event: encodedEvent,
             };
             try {
@@ -367,7 +383,7 @@ function validateEventRows(rows) {
 
 function validateEventRow(row) {
   const encoded = asBytes(row.encoded_event);
-  if (encoded.length < 88 || row.event_version !== 1) {
+  if (encoded.length < 88 || ![1, 2].includes(row.event_version)) {
     throw new EventStoreError(
       "Kin found an incomplete local event. The stored data was preserved.",
     );
@@ -378,8 +394,15 @@ function validateEventRow(row) {
     encoded.byteLength,
   );
   const kind = view.getUint16(2, true);
-  const expectedKind =
-    row.kind === "ITEM_ADDED" ? 1 : row.kind === "ITEM_COMPLETED" ? 2 : 0;
+  const expectedKind = {
+    ITEM_ADDED: 1,
+    ITEM_COMPLETED: 2,
+    ITEM_REOPENED: 3,
+    ITEM_ARCHIVED: 4,
+  }[row.kind];
+  const supportedVersion =
+    (row.kind === "ITEM_ADDED" && [1, 2].includes(row.event_version)) ||
+    (row.kind !== "ITEM_ADDED" && row.event_version === 1);
   if (
     !Number.isSafeInteger(row.timestamp) ||
     typeof row.logical_time !== "bigint" ||
@@ -394,6 +417,7 @@ function validateEventRow(row) {
   if (
     view.getUint16(0, true) !== row.event_version ||
     kind !== expectedKind ||
+    !supportedVersion ||
     !bytesEqual(encoded.subarray(4, 20), row.event_id) ||
     !bytesEqual(encoded.subarray(20, 36), row.household_id) ||
     !bytesEqual(encoded.subarray(36, 52), row.actor_id) ||

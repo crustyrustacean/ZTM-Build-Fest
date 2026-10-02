@@ -1,6 +1,6 @@
 # v0.1.0 Implementation Contract
 
-**Status:** implemented for v0.1.0. The project-local layout and responsibilities below describe the current Household Heartbeat implementation; later product capabilities remain future work.
+**Status:** the v0.2.0 Today + Needs implementation uses this project-local layout and ownership boundary; Handoff and later product capabilities remain future work.
 
 ## Proposed project layout
 
@@ -41,18 +41,18 @@ The v0.1.0 implementation uses this layout. The generated `target/` tree and `we
 
 ## Module responsibilities
 
-- **`rust/src/event.rs`:** event kinds, envelope representation, payload validation, and v0.1.0 event decoding.
-- **`rust/src/state.rs`:** deterministic reducer and projection of the ordered local event stream into item state.
-- **`rust/src/protocol.rs`:** versioned binary request/result encoding and bounded parsing.
+- **`rust/src/event.rs`:** event kinds, typed classification, envelope representation, and normalized payloads.
+- **`rust/src/state.rs`:** deterministic reducer and projection of ordered events into classified active/completed/archived item state.
+- **`rust/src/protocol.rs`:** bounded protocol-v1/v2 parsing/results and explicit event-schema v1/v2 decoding.
 - **`rust/src/abi.rs`:** exported C-ABI functions, pointer/length checks, buffer ownership, and status codes.
 - **`rust/src/error.rs`:** stable error categories and non-sensitive messages.
 - **`rust/src/lib.rs`:** module exports only; no DOM or browser API access.
 - **`web/wasm/kin-engine.js`:** load WASM, validate memory ranges, allocate/copy input, call exports, copy result/error bytes before another mutating call, and decode the protocol.
 - **`web/storage/event-store.js`:** open/migrate IndexedDB, read the ordered event log, and append an event atomically.
 - **`web/components/kin-app.js`:** orchestrate initialization, event-store and WASM calls, loading/error states, and rendering.
-- **`web/components/kin-today.js`:** display active and completed items from the Rust projection.
-- **`web/components/kin-compose.js`:** capture short item text and dispatch a browser-native custom event.
-- **`web/components/kin-item.js`:** render one item and expose its completion control; it contains no authoritative state transition.
+- **`web/components/kin-today.js`:** display Today and Needs active/completed items from the Rust projection; omit archived items.
+- **`web/components/kin-compose.js`:** capture short item text and fixed classification, preserving draft ownership, and dispatch a browser-native custom event.
+- **`web/components/kin-item.js`:** render one item and expose lifecycle intents; it contains no authoritative state transition.
 - **`web/index.html` and styles:** semantic shell and minimal responsive presentation.
 
 See [ABI](ABI.md), [Storage](STORAGE.md), and [Components](COMPONENTS.md) for implementable contracts. Rust owns authoritative domain rules; JavaScript owns browser integration and persistence.

@@ -2,6 +2,81 @@
 
 This file records completed Kin releases. The `v0.0.x` releases are planning and documentation milestones; they do not represent implemented application features. The first implementation milestone remains `v0.1.0`.
 
+## [0.2.4] — Today + Needs Compatibility Fixes
+
+### Fixed
+
+- Protocol-v1 `KINS` responses now carry the requested v1 header, matching the unchanged active/completed record layout and zero reserved bytes. Protocol-v2 responses retain their v2 classification/status layout.
+- Item busy state now disables every action control, including Archive beside Complete or Reopen. Compose and retry controls remain disabled until the pending operation finishes, with focus restoration preserved.
+- Added exact-byte real-WASM ABI regressions for both versions, unsupported v1 state, repeated result/error buffer clearing, bridge decoding, and browser coverage for all busy controls and recovery. The focused adjacent audit found no further defect requiring a production change.
+
+### Validation
+
+- Passed 44 Rust tests, 8 Node bridge/real-WASM tests, `cargo fmt --check`, Clippy with warnings denied, version consistency, release `wasm32-unknown-unknown` compilation, and both PowerShell and POSIX WASM build scripts. POSIX validation ran in WSL Ubuntu 22.04 with Rust 1.93.0.
+- The Windows x64 browser runner passed in headless Chrome 154.0.8037.59 with Node 22.12.0: legacy replay, Today/Needs, complete/reopen/archive, pending busy controls, retries, draft ownership, cross-tab canonical refresh, malformed-storage preservation, 320px reflow, CSP/console, and same-origin requests. Existing forced-colors, reduced-motion, text-spacing, and 200% page-scale checks also passed.
+- Native desktop 200% zoom, Firefox, Safari, NVDA, and VoiceOver were not tested. No product capability, persisted event change, IndexedDB schema change, or runtime dependency was introduced. Published `kin-v0.2.0`–`kin-v0.2.3` tags remain unchanged.
+
+## [0.2.3] — Today + Needs Hardening & Polish
+
+### Hardened
+
+- Rechecked Rust-owned replay, protocol/event version boundaries, IndexedDB schema 1, immutable history, safe text rendering, same-origin-only runtime requests, content-free BroadcastChannel messages, and the absence of runtime dependencies or remote services.
+- Added deterministic 10,000-event classified replay checks through native Rust and real WASM, plus valid/error/empty/repeated-call coverage for stale ABI output handling.
+- Completed focused Today/Needs clarity and accessibility regressions without adding a product concept. `v0.3.0 — Handoff` remains future work.
+
+### Validation
+
+- Passed 44 Rust tests, 4 built-in Node bridge tests, `cargo fmt --check`, Clippy with warnings denied, version consistency, and both PowerShell and POSIX WASM release builds. The shell build ran in WSL Ubuntu 22.04 with Rust 1.93.0.
+- The Windows x64 browser runner passed in headless Chrome 154.0.8037.59 with Node 22.12.0. It covered v0.1 byte preservation, protocol errors/repeated calls, maximum 10,000-event replay, draft/action recovery, stale cross-tab actions, two-tab canonical replay, 320px, forced colors, reduced motion, increased text spacing, 200% page-scale emulation, CSP, and same-origin-only requests.
+- Native desktop 200% browser zoom, Firefox, Safari, NVDA, and VoiceOver were not tested. The 200% check was Chromium page-scale emulation, not native desktop zoom; no screen-reader certification is claimed.
+- No product capability, IndexedDB schema change, runtime dependency, framework, backend, or remote service was added.
+
+## [0.2.2] — Today + Needs Resilience & Accessibility
+
+### Improved
+
+- Hardened complete/reopen/archive failures and retries; a domain-invalid retry now reloads canonical events and clears stale item intent instead of repeatedly presenting an unavailable action.
+- Restored compose focus when a peer refresh replaces a focused item control and disabled retry controls while the app is busy.
+- Extended browser coverage for text-only draft compatibility, action write failures/abort recovery, two-tab stale-action races with and without invalidation delivery, and keyboard lifecycle actions.
+- Added forced-colors, reduced-motion, increased-text-spacing, 320px reflow, target-size/focus checks, and 200% Chromium page-scale emulation.
+
+### Validation
+
+- Passed 43 Rust tests, 4 built-in Node bridge tests, `cargo fmt --check`, Clippy with warnings denied, version consistency, and both PowerShell and POSIX WASM release builds. The shell build ran in WSL Ubuntu 22.04 with Rust 1.93.0.
+- The Windows x64 browser runner passed in Chrome 154.0.8037.59 with Node 22.12.0. It covered draft restoration/ownership, action failures and retries, stale cross-tab intent with and without invalidation delivery, keyboard/focus recovery, 320px reflow, forced colors, reduced motion, increased text spacing, 200% page-scale emulation, CSP, same-origin requests, and the event/storage compatibility regressions.
+- Native desktop 200% browser zoom, Firefox, Safari, NVDA, and VoiceOver were not tested. The 200% check used Chromium page-scale emulation, not native desktop zoom; no screen-reader certification is claimed.
+- No product capability, IndexedDB schema change, framework, or runtime dependency was added.
+
+## [0.2.1] — Today + Needs Correctness
+
+### Hardened
+
+- Added exact malformed-length coverage for `ITEM_REOPENED` and `ITEM_ARCHIVED` payloads and a regression ensuring protocol v1 rejects state it cannot represent rather than dropping classification/status.
+- Extended browser regressions to verify event and logical-time counter rollback on failed/aborted writes and exactly-once counter advancement on retry.
+- Reconciled test vectors, traceability, and the current compatibility contract; no product capability or persistent schema changed.
+
+### Validation
+
+- Passed 43 Rust tests, 4 built-in Node bridge tests, formatting, Clippy with warnings denied, version consistency, and both PowerShell and POSIX WASM release builds.
+- The Windows x64 browser runner passed in Chrome 154.0.8037.59 with Node 22.12.0, including exact v0.1 byte preservation, malformed lifecycle payloads, event/counter rollback and retry, metadata mismatch preservation, the 10,000-event cap, cross-tab replay, CSP, same-origin requests, keyboard submission, focus, and 320px reflow. The shell build ran in WSL Ubuntu 22.04 with Rust 1.93.0.
+- No product capability, IndexedDB schema change, framework, or runtime dependency was added.
+
+## [0.2.0] — Today + Needs
+
+### Added
+
+- Added separate Today and Needs views, with new items defaulting to Needs and a native classification selector for Today.
+- Added completion, reopening, and terminal archival intents. Archived items remain in event history and are hidden from ordinary views.
+- Added explicit protocol v2 and schema-v2 `ITEM_ADDED` classification while preserving protocol v1, schema-v1 event bytes, and IndexedDB schema version 1. Legacy unclassified items normalize to Today.
+- Extended text draft ownership to the submitted text-and-classification snapshot and added browser regressions for retry, reload, two-tab replay, and lifecycle actions.
+
+### Validation
+
+- Passed 41 Rust tests, 4 built-in Node bridge tests, `cargo fmt --check`, Clippy with warnings denied, version consistency, and both PowerShell and POSIX WASM release builds. Browser regressions passed on Windows x64 with Node 22.12.0 and Chrome 154.0.8037.59; the shell build ran in WSL Ubuntu 22.04 with Rust 1.93.0.
+- Browser checks covered Needs-default and Today capture, synthetic v0.1 event replay with exact byte preservation, failed-write retries, text/classification draft ownership, completion in both views, reopen/archive, invalid-transition non-append, hidden tombstones after reload, cross-tab content-free invalidation, malformed-row preservation, keyboard submission, focus, busy state, 320px reflow, CSP, and same-origin requests.
+- Forced-colors, 200% zoom, Firefox, Safari, NVDA, and VoiceOver were not tested for this milestone.
+- No new IndexedDB schema, framework, runtime dependency, backend, or remote service was added.
+
 ## [0.1.5] — Final 0.1.x Stabilization
 
 ### Fixed

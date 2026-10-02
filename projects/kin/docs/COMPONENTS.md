@@ -1,6 +1,6 @@
 # Web Component Contract
 
-**Status:** v0.1.0 native custom elements and command communication are implemented. Later components and product areas remain out of scope.
+**Status:** v0.2.0 Today/Needs presentation and lifecycle command communication use native custom elements. Handoff and later product areas remain out of scope.
 
 ## Component responsibilities
 
@@ -10,24 +10,26 @@ Own application initialization, WASM loading, IndexedDB opening/loading, orchest
 
 ### `<kin-today>`
 
-Display the current local household items using the projection supplied by `<kin-app>`. Keep active items and completed items visually distinguishable without ranking people or adding future Today features.
+Display Today and Needs items using the projection supplied by `<kin-app>`. Group active/completed items and omit archived tombstones. Do not rank people or add calendar-like features.
 
 ### `<kin-compose>`
 
-Provide a labeled, short item-entry form. On valid submission, dispatch `kin:add-item` with the submitted text. It does not create event IDs, write storage, or mutate authoritative state.
+Provide a labeled, short item-entry form that defaults classification to Needs. On valid submission, dispatch `kin:add-item` with the submitted text and classification snapshot. It does not create event IDs, write storage, or mutate authoritative state.
 
 ### `<kin-item>`
 
-Render one item and expose a semantic completion control only while active. Dispatch `kin:complete-item` with the item ID. It does not decide or persist completion.
+Render one item and expose semantic complete, reopen, and archive controls as appropriate. Dispatch the corresponding command with the item ID. It does not decide or persist transitions.
 
 Only create the components needed for these responsibilities; do not componentize for its own sake. A simpler `<kin-app>`-owned view is acceptable if it avoids needless indirection while preserving these boundaries.
 
 ## Browser-native command events
 
-| Event               | Dispatching component | `detail`             | `bubbles` | `composed` | `cancelable` |
-| ------------------- | --------------------- | -------------------- | --------- | ---------- | ------------ |
-| `kin:add-item`      | `<kin-compose>`       | `{ text: string }`   | `true`    | `true`     | `false`      |
-| `kin:complete-item` | `<kin-item>`          | `{ itemId: string }` | `true`    | `true`     | `false`      |
+| Event               | Dispatching component | `detail`                                 | `bubbles` | `composed` | `cancelable` |
+| ------------------- | --------------------- | ---------------------------------------- | --------- | ---------- | ------------ | ------- |
+| `kin:add-item`      | `<kin-compose>`       | `{ text: string, classification: "today" | "need" }` | `true`     | `true`       | `false` |
+| `kin:complete-item` | `<kin-item>`          | `{ itemId: string }`                     | `true`    | `true`     | `false`      |
+| `kin:reopen-item`   | `<kin-item>`          | `{ itemId: string }`                     | `true`    | `true`     | `false`      |
+| `kin:archive-item`  | `<kin-item>`          | `{ itemId: string }`                     | `true`    | `true`     | `false`      |
 
 `composed: true` allows a command to cross a shadow boundary to `<kin-app>`; `bubbles: true` allows normal ancestor handling. Events represent user intent, not successful domain mutations. `<kin-app>` validates through Rust, persists the accepted event, then rerenders from returned state. Errors are presented through an explicit app state, not by components pretending the action succeeded.
 

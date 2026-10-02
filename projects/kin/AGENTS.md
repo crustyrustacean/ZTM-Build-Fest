@@ -100,7 +100,7 @@ If an unrelated parent-repository file was modified accidentally, revert that ch
 
 # Current Development Stage
 
-Kin uses semantic versions. The current release is `v0.1.5` — Final 0.1.x Stabilization. This closes the 0.1.x stabilization line; the next development target is `v0.2.0`. Use `kin-v0.1.5-development` → `kin-development` → `kin-main` for this patch.
+Kin uses semantic versions. The current release is `v0.2.4` — Today + Needs Compatibility Fixes. The approved stabilization line is complete; stop and ask the user before starting another v0.2.x patch or planning `v0.3.0 — Handoff`. The v0.2 line is based on the validated `kin-v0.1.5` state promoted to `kin-development`; use the dedicated v0.2 development branch and do not merge to `kin-main` or push automatically.
 
 The pre-implementation releases are:
 
@@ -1054,6 +1054,11 @@ kin-v0.1.2
 kin-v0.1.3
 kin-v0.1.4
 kin-v0.1.5
+kin-v0.2.0
+kin-v0.2.1
+kin-v0.2.2
+kin-v0.2.3
+kin-v0.2.4
 kin-v1.0.0
 ```
 

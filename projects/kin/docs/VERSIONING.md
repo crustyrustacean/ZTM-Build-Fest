@@ -1,22 +1,22 @@
 # Persistent Contract Versioning
 
-**Status:** compatibility policy for future implementation. No event migration, storage upgrade, or export/import path exists yet. Canonical event semantics are in [EVENTS](EVENTS.md); the v0.1.0 wire/storage contracts are in [ABI](ABI.md) and [STORAGE](STORAGE.md).
+**Status:** v0.2.0 implements version-specific event decoding and protocol v1/v2 handling. No source-event rewrite, structural IndexedDB upgrade, or export/import path exists. Canonical event semantics are in [EVENTS](EVENTS.md); current wire/storage contracts are in [ABI](ABI.md) and [STORAGE](STORAGE.md).
 
 ## Independent version axes
 
 Kin version numbers describe product releases; they do not version every persistent or transport contract.
 
-| Version axis             | Example                | Governs                                                                  |
-| ------------------------ | ---------------------- | ------------------------------------------------------------------------ |
-| Application version      | `v0.1.0`, `v0.2.0`     | A Kin product release, source snapshot, and namespaced Git tag.          |
-| Event schema version     | `event_version = 1`    | The payload/envelope interpretation for one persisted event kind.        |
-| ABI/protocol version     | `protocol_version = 1` | The byte-level JavaScript ↔ WASM request/result contract.                |
-| IndexedDB schema version | database `version = 1` | Object stores, indexes, and local record structure managed by IndexedDB. |
-| Export format version    | `format_version = 1`   | The portable archive manifest and event-container representation.        |
+| Version axis             | Example                     | Governs                                                                  |
+| ------------------------ | --------------------------- | ------------------------------------------------------------------------ |
+| Application version      | `v0.1.0`, `v0.2.0`          | A Kin product release, source snapshot, and namespaced Git tag.          |
+| Event schema version     | `event_version = 1`         | The payload/envelope interpretation for one persisted event kind.        |
+| ABI/protocol version     | `protocol_version = 1 or 2` | The byte-level JavaScript ↔ WASM request/result contract.                |
+| IndexedDB schema version | database `version = 1`      | Object stores, indexes, and local record structure managed by IndexedDB. |
+| Export format version    | `format_version = 1`        | The portable archive manifest and event-container representation.        |
 
 These numbers evolve independently. An application release may keep the same event, protocol, storage, or export version; a contract may change between application versions. Never infer compatibility from equal version numbers or silently bump one axis as a proxy for another.
 
-The v0.1.0 implementation is specified with event version 1, protocol version 1, and IndexedDB schema version 1. Export format version 1 is a future design baseline only; none of these contracts are implemented in the current planning repository.
+The v0.2.0 implementation reads event schema 1 for all supported kinds and schema 2 for `ITEM_ADDED`; new instances write add schema 2 and other Item event schema 1. It reads protocol versions 1 and 2 and writes protocol 2. IndexedDB schema remains 1. Export format version 1 is a future design baseline only.
 
 ## Compatibility policy
 
@@ -50,4 +50,4 @@ This separates durable history from evolving in-memory types and enables old his
 
 ## Backward and forward guarantees
 
-No old production data exists today. v0.1.0 starts with the first published contract versions and supports those exact versions only. Future releases must state an explicit compatibility window. A client with no decoder for a future event must preserve it and fail closed, not pretend it has derived complete household state.
+Kin has published v0.1.x event history. v0.2.0 explicitly reads schema-v1 legacy item events, normalizes them in memory, and preserves their exact bytes; it writes schema-v2 `ITEM_ADDED` and schema-v1 lifecycle events. Protocol v1 and v2 are supported, with v2 written by current clients. IndexedDB remains schema 1. A client with no decoder for a future event must preserve it and fail closed, not pretend it has derived complete household state.

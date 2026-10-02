@@ -1,6 +1,6 @@
 # Architecture
 
-**Status:** the v0.1.0 local Household Heartbeat architecture is implemented. This document records current ownership boundaries and future design direction; it does not claim later product areas exist.
+**Status:** the v0.2.0 Today + Needs architecture is implemented. Rust owns classification normalization and item transitions; JavaScript remains a browser adapter. Later product areas are future work.
 
 ## System shape
 
@@ -85,7 +85,7 @@ The v0.1.x core is intended to be extended, not treated as proof that later feat
 
 | Future capability     | Foundation already present                           | Extendable without replacing the core? | Still required                                                     |
 | --------------------- | ---------------------------------------------------- | -------------------------------------- | ------------------------------------------------------------------ |
-| Today / Needs         | Event pipeline and Rust-derived item projection      | Yes                                    | Classification rules and their scoped UI/events                    |
+| Today / Needs         | Versioned event pipeline and Rust-derived projection | Implemented in v0.2.0                  | Stabilization and accessibility audit in v0.2.1–v0.2.3             |
 | Handoff               | Actor-aware immutable event envelope                 | Yes                                    | Handoff-specific events and lifecycle                              |
 | Talk                  | Identified events and deterministic replay           | Yes                                    | Talk-specific lifecycle events and UI                              |
 | Pulse                 | Actor IDs and timestamps                             | Yes                                    | Time-bounded domain, explicit evaluation time, and expiry rules    |

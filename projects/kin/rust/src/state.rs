@@ -1,12 +1,15 @@
 use std::collections::BTreeMap;
 
 use crate::error::KinError;
-use crate::event::{ActorId, EventEnvelope, EventId, EventKind, HouseholdId, ItemId};
+use crate::event::{
+    ActorId, EventEnvelope, EventId, EventKind, HouseholdId, ItemClassification, ItemId,
+};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ItemStatus {
     Active,
     Completed,
+    Archived,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -15,6 +18,7 @@ pub struct ItemState {
     pub text: String,
     pub created_by: ActorId,
     pub created_at: i64,
+    pub classification: ItemClassification,
     pub status: ItemStatus,
 }
 
@@ -52,7 +56,11 @@ pub fn rebuild(events: &[EventEnvelope]) -> Result<HouseholdState, KinError> {
         }
 
         match &event.kind {
-            EventKind::ItemAdded { item_id, text } => {
+            EventKind::ItemAdded {
+                item_id,
+                text,
+                classification,
+            } => {
                 if text.trim().is_empty() || item_positions.contains_key(item_id) {
                     return Err(KinError::InvalidEvent);
                 }
@@ -62,6 +70,7 @@ pub fn rebuild(events: &[EventEnvelope]) -> Result<HouseholdState, KinError> {
                     text: text.clone(),
                     created_by: event.actor_id,
                     created_at: event.timestamp,
+                    classification: *classification,
                     status: ItemStatus::Active,
                 });
             }
@@ -70,7 +79,34 @@ pub fn rebuild(events: &[EventEnvelope]) -> Result<HouseholdState, KinError> {
                     .get(item_id)
                     .copied()
                     .ok_or(KinError::InvalidEvent)?;
-                items[position].status = ItemStatus::Completed;
+                match items[position].status {
+                    ItemStatus::Active => items[position].status = ItemStatus::Completed,
+                    ItemStatus::Completed => {}
+                    ItemStatus::Archived => return Err(KinError::InvalidEvent),
+                }
+            }
+            EventKind::ItemReopened { item_id } => {
+                let position = item_positions
+                    .get(item_id)
+                    .copied()
+                    .ok_or(KinError::InvalidEvent)?;
+                match items[position].status {
+                    ItemStatus::Active => {}
+                    ItemStatus::Completed => items[position].status = ItemStatus::Active,
+                    ItemStatus::Archived => return Err(KinError::InvalidEvent),
+                }
+            }
+            EventKind::ItemArchived { item_id } => {
+                let position = item_positions
+                    .get(item_id)
+                    .copied()
+                    .ok_or(KinError::InvalidEvent)?;
+                match items[position].status {
+                    ItemStatus::Active | ItemStatus::Completed => {
+                        items[position].status = ItemStatus::Archived;
+                    }
+                    ItemStatus::Archived => return Err(KinError::InvalidEvent),
+                }
             }
         }
 
@@ -97,11 +133,15 @@ mod tests {
         let event_id = EventId(id(event_number));
         let mut canonical_bytes = vec![event_number, logical_time as u8];
         match &kind {
-            EventKind::ItemAdded { item_id, text } => {
+            EventKind::ItemAdded { item_id, text, .. } => {
                 canonical_bytes.extend_from_slice(&item_id.0);
                 canonical_bytes.extend_from_slice(text.as_bytes());
             }
-            EventKind::ItemCompleted { item_id } => canonical_bytes.extend_from_slice(&item_id.0),
+            EventKind::ItemCompleted { item_id }
+            | EventKind::ItemReopened { item_id }
+            | EventKind::ItemArchived { item_id } => {
+                canonical_bytes.extend_from_slice(&item_id.0);
+            }
         }
         EventEnvelope {
             event_id,
@@ -110,6 +150,7 @@ mod tests {
             device_id: DeviceId(id(0xcc)),
             timestamp: 1_760_000_000_000 + i64::from(event_number),
             logical_time,
+            event_version: 1,
             kind,
             canonical_bytes,
         }
@@ -122,6 +163,7 @@ mod tests {
             EventKind::ItemAdded {
                 item_id: ItemId(id(item_number)),
                 text: text.to_owned(),
+                classification: ItemClassification::Need,
             },
         )
     }
@@ -247,6 +289,71 @@ mod tests {
             rebuild(&[added(1, 1, 0x11, " \t\n")]),
             Err(KinError::InvalidEvent)
         );
+    }
+
+    #[test]
+    fn reopening_completed_and_active_items_is_valid() {
+        let item_id = ItemId(id(0x11));
+        let completed_then_reopened = [
+            added(1, 1, 0x11, "Buy milk"),
+            event(2, 2, EventKind::ItemCompleted { item_id }),
+            event(3, 3, EventKind::ItemReopened { item_id }),
+        ];
+        let reopened_state = rebuild(&completed_then_reopened).unwrap();
+        assert_eq!(reopened_state.items[0].status, ItemStatus::Active);
+
+        let already_active = [
+            added(1, 1, 0x11, "Buy milk"),
+            event(2, 2, EventKind::ItemReopened { item_id }),
+        ];
+        let active_state = rebuild(&already_active).unwrap();
+        assert_eq!(active_state.items[0].status, ItemStatus::Active);
+    }
+
+    #[test]
+    fn archiving_active_or_completed_items_is_terminal() {
+        let item_id = ItemId(id(0x11));
+        for prefix in [
+            vec![added(1, 1, 0x11, "Buy milk")],
+            vec![
+                added(1, 1, 0x11, "Buy milk"),
+                event(2, 2, EventKind::ItemCompleted { item_id }),
+            ],
+        ] {
+            let mut archived_events = prefix.clone();
+            archived_events.push(event(
+                archived_events.len() as u8 + 1,
+                archived_events.len() as u64 + 1,
+                EventKind::ItemArchived { item_id },
+            ));
+            let archived_state = rebuild(&archived_events).unwrap();
+            assert_eq!(archived_state.items[0].status, ItemStatus::Archived);
+
+            for mutation in [
+                EventKind::ItemCompleted { item_id },
+                EventKind::ItemReopened { item_id },
+                EventKind::ItemArchived { item_id },
+            ] {
+                let mut invalid_events = archived_events.clone();
+                invalid_events.push(event(
+                    invalid_events.len() as u8 + 1,
+                    invalid_events.len() as u64 + 1,
+                    mutation,
+                ));
+                assert_eq!(rebuild(&invalid_events), Err(KinError::InvalidEvent));
+            }
+        }
+    }
+
+    #[test]
+    fn unknown_reopen_and_archive_references_are_invalid() {
+        let item_id = ItemId(id(0xff));
+        for kind in [
+            EventKind::ItemReopened { item_id },
+            EventKind::ItemArchived { item_id },
+        ] {
+            assert_eq!(rebuild(&[event(1, 1, kind)]), Err(KinError::InvalidEvent));
+        }
     }
 
     #[test]

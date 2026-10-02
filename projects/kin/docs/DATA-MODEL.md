@@ -1,6 +1,6 @@
 # Data Model
 
-**Status:** conceptual model and durable event infrastructure. v0.1.0 implements local item events, IndexedDB persistence, and Rust-derived state; other domain concepts remain specifications.
+**Status:** v0.2.0 implements local classified Item events, IndexedDB persistence, and Rust-derived state; other domain concepts remain specifications.
 
 ## Event-oriented source of truth
 
@@ -28,7 +28,7 @@ Event
 └── payload
 ```
 
-The envelope is a domain contract, not the eventual JS/WASM byte encoding. The field meanings, local and future distributed ordering, idempotency, and invalid-event behavior are defined in [EVENTS](EVENTS.md). v0.1.0 uses local placeholder identities and only `ITEM_ADDED` and `ITEM_COMPLETED`.
+The envelope is a domain contract, not the JS/WASM byte encoding. The field meanings, local and future distributed ordering, idempotency, and invalid-event behavior are defined in [EVENTS](EVENTS.md). v0.2.x uses local placeholder identities and the four supported Item event kinds; legacy add payloads remain readable.
 
 ## Conceptual entities
 
@@ -44,7 +44,7 @@ The envelope is a domain contract, not the eventual JS/WASM byte encoding. The f
 - **Agreement:** A deliberately recorded household understanding, never inferred.
 - **Event:** An immutable identified fact from which current state is reconstructed.
 
-See [DOMAIN](DOMAIN.md) for definitions and release scope, and [LIFECYCLES](LIFECYCLES.md) for transition rules. Only the v0.1.0 item subset is implemented.
+See [DOMAIN](DOMAIN.md) for definitions and release scope, and [LIFECYCLES](LIFECYCLES.md) for transition rules. Only the v0.2.0 Item subset is implemented.
 
 ## Data evolution and ownership
 

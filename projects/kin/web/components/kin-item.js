@@ -12,8 +12,7 @@ class KinItem extends HTMLElement {
 
   set disabled(value) {
     this.isDisabled = Boolean(value);
-    const control = this.querySelector("button");
-    if (control) {
+    for (const control of this.querySelectorAll("button")) {
       control.disabled = this.isDisabled;
     }
   }
@@ -31,31 +30,40 @@ class KinItem extends HTMLElement {
     action.className = "item-action";
 
     if (this.record.status === "active") {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "complete-button";
-      button.textContent = "Complete";
-      button.disabled = this.isDisabled;
-      button.addEventListener("click", () => {
-        this.dispatchEvent(
-          new CustomEvent("kin:complete-item", {
-            detail: { itemId: this.record.itemId },
-            bubbles: true,
-            composed: true,
-            cancelable: false,
-          }),
-        );
-      });
-      action.append(button);
+      action.append(
+        this.createAction("Complete", "complete", "complete-button"),
+      );
     } else {
       const completed = document.createElement("span");
       completed.className = "completed-label";
       completed.textContent = "Completed";
       action.append(completed);
+      action.append(this.createAction("Reopen", "reopen", "reopen-button"));
     }
+    action.append(this.createAction("Archive", "archive", "archive-button"));
 
     row.append(text, action);
     this.replaceChildren(row);
+  }
+
+  createAction(label, action, className) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = className;
+    button.textContent = label;
+    button.setAttribute("aria-label", `${label} ${this.record.text}`);
+    button.disabled = this.isDisabled;
+    button.addEventListener("click", () => {
+      this.dispatchEvent(
+        new CustomEvent(`kin:${action}-item`, {
+          detail: { itemId: this.record.itemId },
+          bubbles: true,
+          composed: true,
+          cancelable: false,
+        }),
+      );
+    });
+    return button;
   }
 }
 

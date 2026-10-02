@@ -1,6 +1,6 @@
 # Roadmap
 
-This roadmap is a planning baseline, not a promise of delivery dates. Releases may change as the product is tested. Kin's current release is `v0.1.5` Final 0.1.x Stabilization, closing the local prototype stabilization line without introducing a new product capability. The next development target is `v0.2.0`. The `v0.0.1`–`v0.0.12` planning and documentation history remains preserved; later product increments remain future work.
+This roadmap is a planning baseline, not a promise of delivery dates. Releases may change as the product is tested. Kin's current release is `v0.2.4` Today + Needs Compatibility Fixes. The approved v0.2.x stabilization line is complete; stop for user review before starting another patch or planning `v0.3.0 — Handoff`, which remains future work. The `v0.0.1`–`v0.0.12` planning and documentation history remains preserved.
 
 ## Planning releases
 
@@ -86,7 +86,23 @@ Associates draft clearing with the successfully persisted submission, preserves 
 
 ### `v0.2.0` — Today + Needs
 
-Add the Today and Needs views, fast capture, lightweight classification, and active/completed household items.
+Implemented: Today and Needs views, lightweight fixed classification, fast capture defaulting to Needs, complete/reopen/archive item transitions, and local deterministic replay. Legacy v0.1.x unclassified items appear in Today. Protocol v2 carries the new projection while protocol v1 and IndexedDB schema 1 remain unchanged.
+
+### `v0.2.1` — Today + Needs Correctness
+
+Completed: added exact reopen/archive payload-boundary tests, ensured protocol v1 fails closed for unrepresentable state, and checked event/logical-counter atomicity through failures, aborts, and retries. No product concept was added.
+
+### `v0.2.2` — Today + Needs Resilience & Accessibility
+
+Completed: drafts and item actions recover across failures/retries and peer state changes; stale retries clear against Rust-derived state. Keyboard focus, forced colors, reduced motion, increased text spacing, 320px reflow, and 200% page-scale emulation were checked. No new capability.
+
+### `v0.2.3` — Today + Needs Hardening & Polish
+
+Completed: verified the architecture/privacy boundary, parser/version handling, 10,000-event/64 MiB behavior, and current Today + Needs clarity. No new capability. Stop here for release-line evaluation.
+
+### `v0.2.4` — Today + Needs Compatibility Fixes
+
+Completed: corrected protocol-v1 result headers without changing the historical byte layout, disabled every item action while busy, and added exact WASM ABI and browser regression coverage. No new capability. Stop for user review before further work.
 
 ### `v0.3.0` — Handoff
 
@@ -122,4 +138,4 @@ Focus on polish, reliability, accessibility, mobile UX, privacy documentation, o
 
 ## Scope discipline
 
-Each roadmap item is future work unless explicitly marked as completed. Authentication, passkeys, encryption, remote services, pairing, and synchronization remain unimplemented and out of scope for the v0.1.x line. Releases through `v0.0.12` were documentation-only; v0.1.0 is the first coded release, and v0.1.3 remains solely its hardening line.
+Each roadmap item is future work unless explicitly marked as completed. Authentication, passkeys, encryption, remote services, pairing, and synchronization remain unimplemented and out of scope for v0.2.x. Releases through `v0.0.12` were documentation-only; v0.1.0 is the first coded release. Handoff remains assigned to v0.3.0 and has not started.

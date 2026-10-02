@@ -22,10 +22,28 @@ id_type!(ActorId);
 id_type!(DeviceId);
 id_type!(ItemId);
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ItemClassification {
+    Today,
+    Need,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum EventKind {
-    ItemAdded { item_id: ItemId, text: String },
-    ItemCompleted { item_id: ItemId },
+    ItemAdded {
+        item_id: ItemId,
+        text: String,
+        classification: ItemClassification,
+    },
+    ItemCompleted {
+        item_id: ItemId,
+    },
+    ItemReopened {
+        item_id: ItemId,
+    },
+    ItemArchived {
+        item_id: ItemId,
+    },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -36,6 +54,7 @@ pub struct EventEnvelope {
     pub device_id: DeviceId,
     pub timestamp: i64,
     pub logical_time: u64,
+    pub event_version: u16,
     pub kind: EventKind,
     pub canonical_bytes: Vec<u8>,
 }
