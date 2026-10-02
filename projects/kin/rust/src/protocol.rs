@@ -74,7 +74,7 @@ pub fn encode_state(state: &HouseholdState, protocol_version: u16) -> Result<Vec
         .try_reserve_exact(RESULT_HEADER_BYTES)
         .map_err(|_| KinError::SizeLimit)?;
     result.extend_from_slice(b"KINS");
-    push_u16(&mut result, PROTOCOL_VERSION);
+    push_u16(&mut result, protocol_version);
     push_u16(&mut result, 0);
     push_u32(&mut result, item_count);
 
@@ -361,11 +361,15 @@ mod tests {
 
     #[test]
     fn empty_request_rebuilds_empty_state() {
-        let request = request_with(&[], PROTOCOL_VERSION, 0);
-        let (protocol_version, events) = decode_request(&request).unwrap();
-        let result = encode_state(&rebuild(&events).unwrap(), protocol_version).unwrap();
-        assert_eq!(&result[..4], b"KINS");
-        assert_eq!(result.len(), RESULT_HEADER_BYTES);
+        for version in [PROTOCOL_V1, PROTOCOL_V2] {
+            let request = request_with(&[], version, 0);
+            let (protocol_version, events) = decode_request(&request).unwrap();
+            let result = encode_state(&rebuild(&events).unwrap(), protocol_version).unwrap();
+            assert_eq!(
+                result,
+                [b"KINS".as_slice(), &[version as u8, 0, 0, 0, 0, 0, 0, 0]].concat()
+            );
+        }
     }
 
     #[test]
@@ -383,6 +387,7 @@ mod tests {
         ));
         let state = rebuild(&events).unwrap();
         let result = encode_state(&state, PROTOCOL_V1).unwrap();
+        assert_eq!(read_u16(&result, 4), Ok(PROTOCOL_V1));
         assert_eq!(result[RESULT_HEADER_BYTES + 40], 0);
         assert_eq!(
             &result[RESULT_HEADER_BYTES + 41..RESULT_HEADER_BYTES + 44],
@@ -404,6 +409,7 @@ mod tests {
         ));
         let state = rebuild(&events).unwrap();
         let result = encode_state(&state, PROTOCOL_V2).unwrap();
+        assert_eq!(read_u16(&result, 4), Ok(PROTOCOL_V2));
         assert_eq!(result[RESULT_HEADER_BYTES + 40], 1);
         assert_eq!(result[RESULT_HEADER_BYTES + 41], 0);
         assert_eq!(
@@ -596,7 +602,13 @@ mod tests {
             1,
         ))
         .unwrap();
-        let state = rebuild(&events).unwrap();
+        let mut state = rebuild(&events).unwrap();
+        assert_eq!(
+            encode_state(&state, PROTOCOL_V1),
+            Err(KinError::UnsupportedVersion)
+        );
+        state.items[0].classification = ItemClassification::Today;
+        state.items[0].status = ItemStatus::Archived;
         assert_eq!(
             encode_state(&state, PROTOCOL_V1),
             Err(KinError::UnsupportedVersion)

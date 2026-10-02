@@ -2,7 +2,7 @@
 
 > A private, lightweight household coordination app for the little things families need to know, remember, hand off, or discuss.
 
-**Current status: `v0.2.3` — Today + Needs Hardening & Polish.** Kin separates household items into Today and Needs, defaults fast capture to Needs, and supports completion, reopening, and archival. Rust remains the only domain reducer; IndexedDB schema 1 remains canonical, v0.1.x event bytes remain unchanged, and no runtime framework or remote service is present. The v0.2.x line adds no concepts beyond Today + Needs; `v0.3.0 — Handoff` remains future work.
+**Current status: `v0.2.4` — Today + Needs Compatibility Fixes.** Kin separates household items into Today and Needs, defaults fast capture to Needs, and supports completion, reopening, and archival. Rust remains the only domain reducer; IndexedDB schema 1 remains canonical, v0.1.x event bytes remain unchanged, and no runtime framework or remote service is present. The v0.2.x line adds no concepts beyond Today + Needs; `v0.3.0 — Handoff` remains future work.
 
 ## The problem
 
@@ -40,6 +40,7 @@ The intended technical direction is Rust compiled to WebAssembly, native Web Com
 - `v0.2.1` — Today + Needs Correctness (`kin-v0.2.1`)
 - `v0.2.2` — Today + Needs Resilience & Accessibility (`kin-v0.2.2`)
 - `v0.2.3` — Today + Needs Hardening & Polish (`kin-v0.2.3`)
+- `v0.2.4` — Today + Needs Compatibility Fixes (`kin-v0.2.4`)
 - See the [changelog](CHANGELOG.md) for the completed release history.
 
 ## Install, build, and run

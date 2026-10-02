@@ -1,6 +1,6 @@
 # Roadmap
 
-This roadmap is a planning baseline, not a promise of delivery dates. Releases may change as the product is tested. Kin's current release is `v0.2.3` Today + Needs Hardening & Polish. The approved v0.2.x stabilization line is complete; stop for user review before starting another patch or planning `v0.3.0 — Handoff`, which remains future work. The `v0.0.1`–`v0.0.12` planning and documentation history remains preserved.
+This roadmap is a planning baseline, not a promise of delivery dates. Releases may change as the product is tested. Kin's current release is `v0.2.4` Today + Needs Compatibility Fixes. The approved v0.2.x stabilization line is complete; stop for user review before starting another patch or planning `v0.3.0 — Handoff`, which remains future work. The `v0.0.1`–`v0.0.12` planning and documentation history remains preserved.
 
 ## Planning releases
 
@@ -99,6 +99,10 @@ Completed: drafts and item actions recover across failures/retries and peer stat
 ### `v0.2.3` — Today + Needs Hardening & Polish
 
 Completed: verified the architecture/privacy boundary, parser/version handling, 10,000-event/64 MiB behavior, and current Today + Needs clarity. No new capability. Stop here for release-line evaluation.
+
+### `v0.2.4` — Today + Needs Compatibility Fixes
+
+Completed: corrected protocol-v1 result headers without changing the historical byte layout, disabled every item action while busy, and added exact WASM ABI and browser regression coverage. No new capability. Stop for user review before further work.
 
 ### `v0.3.0` — Handoff
 

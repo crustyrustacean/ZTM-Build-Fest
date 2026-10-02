@@ -543,8 +543,47 @@ async function regressions() {
     "aborted reopen leaves item completed",
   );
   check((await count()) === actionEventCount, "aborted reopen does not append");
+  let releaseRetry;
+  const retryGate = new Promise((done) => { releaseRetry = done; });
+  let appendCalls = 0;
+  app.store.append = async (...args) => {
+    appendCalls++;
+    await retryGate;
+    return append(...args);
+  };
   app.retryButton.click();
+  check(app.busy, "retry remains busy while append is pending");
+  const checkControls = (disabled) => {
+    for (const selector of [".complete-button", ".reopen-button", ".archive-button"]) {
+      const buttons = [...app.querySelectorAll(`kin-item ${selector}`)];
+      check(buttons.length > 0, `fixture must expose ${selector}`);
+      check(buttons.every((button) => button.disabled === disabled), `${selector} disabled state`);
+    }
+    for (const control of [compose.input, compose.classification, compose.button, app.retryButton]) {
+      check(control.disabled === disabled, `${control.tagName} disabled state`);
+    }
+  };
+  checkControls(true);
+  // Native disabled buttons must suppress activation, including retry clicks.
+  let activations = 0;
+  const recordActivation = () => { activations++; };
+  app.addEventListener("click", recordActivation);
+  for (const button of app.querySelectorAll("button")) button.click();
+  app.removeEventListener("click", recordActivation);
+  check(activations === 0, "busy controls must not dispatch clicks");
+  check((await count()) === actionEventCount, "pending retry has not appended");
+  releaseRetry();
   await idle();
+  app.store.append = append;
+  check(appendCalls === 1, "busy clicks must not start additional writes");
+  check(
+    [...app.querySelectorAll("kin-item button")].every((button) => !button.disabled) &&
+      !compose.input.disabled && !compose.classification.disabled && !compose.button.disabled &&
+      !app.retryButton.disabled,
+    "all appropriate controls become usable after retry",
+  );
+  check(document.activeElement === compose.input, "pending retry restores compose focus");
+  passed.push("pending retry disables Complete, Reopen, every Archive, compose input/select/Add and retry; controls and focus recover");
   check(
     app.state.items.find((item) => item.text === actionText).status ===
       "active",

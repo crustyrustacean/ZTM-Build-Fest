@@ -12,8 +12,7 @@ class KinItem extends HTMLElement {
 
   set disabled(value) {
     this.isDisabled = Boolean(value);
-    const control = this.querySelector("button");
-    if (control) {
+    for (const control of this.querySelectorAll("button")) {
       control.disabled = this.isDisabled;
     }
   }
