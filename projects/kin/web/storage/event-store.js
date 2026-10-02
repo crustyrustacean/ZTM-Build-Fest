@@ -202,16 +202,21 @@ export class EventStore {
               event_version: 1,
               encoded_event: encodedEvent,
             };
-            const addRequest = events.add(row);
-            const contextWrite = contextStore.put({
-              ...context,
-              next_logical_time: logicalTime + 1n,
-            });
-            addRequest.onerror = () =>
-              abortWith(transaction, storageError(addRequest.error));
-            contextWrite.onerror = () =>
-              abortWith(transaction, storageError(contextWrite.error));
-            finish(candidateState);
+            try {
+              const addRequest = events.add(row);
+              const contextWrite = contextStore.put({
+                ...context,
+                next_logical_time: logicalTime + 1n,
+              });
+              addRequest.onerror = () =>
+                abortWith(transaction, storageError(addRequest.error));
+              contextWrite.onerror = () =>
+                abortWith(transaction, storageError(contextWrite.error));
+              finish(candidateState);
+            } catch (error) {
+              // Request creation can throw before an onerror handler exists.
+              abortWith(transaction, storageError(error));
+            }
           };
           existingRequest.onerror = () =>
             abortWith(transaction, storageError(existingRequest.error));

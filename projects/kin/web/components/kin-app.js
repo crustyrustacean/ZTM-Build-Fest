@@ -22,6 +22,7 @@ class KinApp extends HTMLElement {
     this.refreshing = false;
     this.pendingRefresh = false;
     this.retryAction = null;
+    this.retryRefresh = () => this.refreshFromEvents();
     this.onAddItem = (event) => this.handleAddItem(event);
     this.onCompleteItem = (event) => this.handleCompleteItem(event);
     this.onPeerMessage = (event) => this.handlePeerMessage(event);
@@ -35,7 +36,13 @@ class KinApp extends HTMLElement {
     this.addEventListener("kin:add-item", this.onAddItem);
     this.addEventListener("kin:complete-item", this.onCompleteItem);
     this.openPeerChannel();
-    this.initialize();
+    if (this.store) {
+      // Reconnecting must not restart the engine or unlock an in-flight save.
+      this.pendingRefresh = true;
+      this.flushPeerRefresh();
+    } else {
+      this.initialize();
+    }
   }
 
   initializeElements() {
@@ -133,23 +140,24 @@ class KinApp extends HTMLElement {
     if (this.busy || !this.store || !this.engine) {
       return;
     }
+    const submittedText = event.detail.text;
     this.setBusy(true);
     this.clearAlert();
     this.setStatus("Saving…");
     let restoreComposeFocus = false;
     try {
       this.state = await this.store.append(
-        { type: "add", text: event.detail.text },
+        { type: "add", text: submittedText },
         this.engine,
       );
       this.renderState();
-      this.compose.clear();
+      this.compose.clearIfMatches(submittedText);
       this.setStatus("Added.");
       this.broadcastEventChange();
       restoreComposeFocus = true;
     } catch (error) {
       this.showAlert(error.userMessage ?? SAVE_ERROR, () =>
-        this.handleAddItem({ detail: { text: event.detail.text } }),
+        this.handleAddItem({ detail: { text: submittedText } }),
       );
       this.setStatus("");
       restoreComposeFocus = true;
@@ -195,7 +203,7 @@ class KinApp extends HTMLElement {
   }
 
   openPeerChannel() {
-    if (this.channel || !("BroadcastChannel" in globalThis)) {
+    if (!this.isConnected || this.channel || !("BroadcastChannel" in globalThis)) {
       return;
     }
     try {
@@ -238,6 +246,9 @@ class KinApp extends HTMLElement {
     }
     this.refreshing = true;
     this.setBusy(true);
+    const previousRetry =
+      this.retryAction !== this.retryRefresh ? this.retryAction : null;
+    const previousAlert = this.alert.textContent;
     this.clearAlert();
     this.setStatus("Updating from another tab…");
     try {
@@ -247,11 +258,14 @@ class KinApp extends HTMLElement {
       );
       this.renderState();
       this.setStatus("Updated from another tab.");
+      if (previousRetry) {
+        this.showAlert(previousAlert, previousRetry);
+      }
     } catch (error) {
       this.showAlert(
         error.userMessage ??
           "Kin could not refresh from local household storage. Your saved information was not deleted.",
-        () => this.refreshFromEvents(),
+        this.retryRefresh,
       );
       this.setStatus("");
     } finally {

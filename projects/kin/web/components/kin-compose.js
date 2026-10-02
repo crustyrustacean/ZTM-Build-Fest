@@ -48,7 +48,11 @@ class KinCompose extends HTMLElement {
     this.button.disabled = this.isDisabled;
   }
 
-  clear() {
+  clearIfMatches(submittedText) {
+    // Completion belongs to the submitted draft, not a newer edit.
+    if (this.input.value !== submittedText) {
+      return;
+    }
     this.input.value = "";
     this.message.textContent = "";
     try {
