@@ -321,6 +321,17 @@ mod tests {
     }
 
     #[test]
+    fn bom_and_emoji_text_are_preserved() {
+        let text = "\u{feff}milk 🥛";
+        let record = added_record(text.as_bytes());
+        let request = request_with(&record, PROTOCOL_VERSION, 1);
+        let events = decode_request(&request).unwrap();
+        assert!(
+            matches!(&events[0].kind, EventKind::ItemAdded { text: decoded, .. } if decoded == text)
+        );
+    }
+
+    #[test]
     fn item_text_above_byte_limit_is_rejected() {
         let record = added_record(&vec![b'x'; MAX_ITEM_TEXT_BYTES + 1]);
         let request = request_with(&record, PROTOCOL_VERSION, 1);

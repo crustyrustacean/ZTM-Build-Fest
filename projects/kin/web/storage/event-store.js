@@ -35,6 +35,7 @@ export class EventStore {
 
     const database = await new Promise((resolve, reject) => {
       const request = indexedDB.open(DATABASE_NAME, DATABASE_VERSION);
+      let settled = false;
       request.onupgradeneeded = () => {
         const db = request.result;
         if (!db.objectStoreNames.contains(EVENT_STORE)) {
@@ -48,19 +49,40 @@ export class EventStore {
           db.createObjectStore(CONTEXT_STORE, { keyPath: "key" });
         }
       };
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(storageError(request.error));
-      request.onblocked = () =>
-        reject(
-          new EventStoreError(
-            "Kin could not finish opening local household storage. Close other Kin tabs and try again.",
-          ),
-        );
+      request.onsuccess = () => {
+        if (settled) {
+          request.result.close();
+          return;
+        }
+        settled = true;
+        resolve(request.result);
+      };
+      request.onerror = () => {
+        if (!settled) {
+          settled = true;
+          reject(storageError(request.error));
+        }
+      };
+      request.onblocked = () => {
+        if (!settled) {
+          settled = true;
+          reject(
+            new EventStoreError(
+              "Kin could not finish opening local household storage. Close other Kin tabs and try again.",
+            ),
+          );
+        }
+      };
     });
 
     const store = new EventStore(database);
     database.onversionchange = () => database.close();
-    await store.ensureContext();
+    try {
+      await store.ensureContext();
+    } catch (error) {
+      database.close();
+      throw error;
+    }
     return store;
   }
 
@@ -321,6 +343,9 @@ function validateEventRows(rows) {
   let previousSequence = 0;
   for (const row of rows) {
     if (
+      !row ||
+      typeof row !== "object" ||
+      Array.isArray(row) ||
       !Number.isSafeInteger(row.local_sequence) ||
       row.local_sequence <= previousSequence
     ) {
@@ -349,6 +374,15 @@ function validateEventRow(row) {
   const kind = view.getUint16(2, true);
   const expectedKind =
     row.kind === "ITEM_ADDED" ? 1 : row.kind === "ITEM_COMPLETED" ? 2 : 0;
+  if (
+    !Number.isSafeInteger(row.timestamp) ||
+    typeof row.logical_time !== "bigint" ||
+    row.logical_time < 0n
+  ) {
+    throw new EventStoreError(
+      "Kin found inconsistent local event data. The stored data was preserved.",
+    );
+  }
   const timestamp = view.getBigInt64(68, true);
   const logicalTime = view.getBigUint64(76, true);
   if (
@@ -358,7 +392,6 @@ function validateEventRow(row) {
     !bytesEqual(encoded.subarray(20, 36), row.household_id) ||
     !bytesEqual(encoded.subarray(36, 52), row.actor_id) ||
     !bytesEqual(encoded.subarray(52, 68), row.device_id) ||
-    !Number.isSafeInteger(row.timestamp) ||
     timestamp !== BigInt(row.timestamp) ||
     logicalTime !== BigInt(row.logical_time)
   ) {

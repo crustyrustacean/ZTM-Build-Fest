@@ -1,6 +1,6 @@
 # v0.1.0 Testing Contract
 
-**Status:** v0.1.0 Rust unit/protocol tests and browser acceptance checks are available. Continue using this contract for regression coverage. Accessibility requirements are in [ACCESSIBILITY](ACCESSIBILITY.md); event/protocol behavior is in [EVENTS](EVENTS.md) and [ABI](ABI.md).
+**Status:** v0.1.x Rust unit/protocol tests, built-in Node bridge regression tests, and browser acceptance checks are available. Continue using this contract for regression coverage. Accessibility requirements are in [ACCESSIBILITY](ACCESSIBILITY.md); event/protocol behavior is in [EVENTS](EVENTS.md) and [ABI](ABI.md).
 
 ## Rust domain tests
 
@@ -18,6 +18,12 @@ Before v0.1.0 is considered complete, cover at least:
 10. Cross-household input and bounds/length violations fail without partial state.
 
 The Rust reducer must be testable without a browser or WebAssembly runtime. Use the standard Rust test harness; no third-party test framework is required.
+
+The browser bridge's focused Unicode regression tests use Node's built-in test runner (no npm dependencies):
+
+```text
+node --experimental-default-type=module --test web/wasm/kin-engine.test.mjs
+```
 
 ## ABI/protocol tests
 

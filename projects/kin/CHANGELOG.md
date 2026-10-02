@@ -2,6 +2,20 @@
 
 This file records completed Kin releases. The `v0.0.x` releases are planning and documentation milestones; they do not represent implemented application features. The first implementation milestone remains `v0.1.0`.
 
+## [0.1.1]
+
+### Fixed
+
+- Preserved leading U+FEFF and other Unicode text during UTF-8 validation while continuing to reject malformed lone surrogates.
+- Closed IndexedDB connections when local-context initialization fails or a blocked open later completes.
+- Rejected corrupted event metadata through deterministic integrity errors before lossy conversion or replay.
+
+### Tests
+
+- Added regression tests for BOM/emoji preservation, malformed surrogate input, and the exact UTF-8 byte limit.
+- Verified invalid completion does not append, corrupted rows remain stored, concurrent tabs preserve contiguous event order, and rapid duplicate submission creates one event.
+- Re-ran 24 Rust tests, 3 built-in Node bridge tests, formatting, Clippy, the WASM build, and browser reload checks.
+
 ## [0.1.0]
 
 ### Added

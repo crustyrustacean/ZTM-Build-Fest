@@ -7,7 +7,10 @@ const MAX_EVENT_COUNT = 10_000;
 const MAX_PROTOCOL_BYTES = 64 * 1024 * 1024;
 const MAX_ITEM_TEXT_BYTES = 4096;
 const textEncoder = new TextEncoder();
-const strictTextDecoder = new TextDecoder("utf-8", { fatal: true });
+const strictTextDecoder = new TextDecoder("utf-8", {
+  fatal: true,
+  ignoreBOM: true,
+});
 
 export class KinEngineError extends Error {
   constructor(code, message) {
