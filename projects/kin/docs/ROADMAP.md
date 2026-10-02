@@ -1,6 +1,6 @@
 # Roadmap
 
-Current release: `v0.4.1 — Talk`. Continue through v0.4.1 correctness, v0.4.2 resilience/accessibility, and v0.4.3 hardening/polish, then stop for evaluation. Pulse remains future work.
+Current release: `v0.4.2 — Talk`. Continue through v0.4.1 correctness, v0.4.2 resilience/accessibility, and v0.4.3 hardening/polish, then stop for evaluation. Pulse remains future work.
 
 ## Planning releases
 

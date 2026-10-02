@@ -39,6 +39,9 @@ export async function talkRegressions() {
       check(code === 4 && (await count()) === before + 4, "invalid reference must not append");
     }
   }
+  const otherDrafts = [sessionStorage.getItem("kin.compose.draft"),sessionStorage.getItem("kin.handoff.draft")];
+  edit("Independent Talk draft");
+  check(JSON.stringify(otherDrafts)===JSON.stringify([sessionStorage.getItem("kin.compose.draft"),sessionStorage.getItem("kin.handoff.draft")]), "Talk draft cannot overwrite Item/Handoff drafts");
   const originalAdd = IDBObjectStore.prototype.add;
   edit("Original talk");
   IDBObjectStore.prototype.add = function (...args) {
@@ -188,7 +191,7 @@ export async function talkPeerRegressions(first, second, until) {
     return app.saveTalk({type:'archive-talk',talkId:app.state.talks.find(row=>row.text==='Peer Talk').talkId});
   })()`);
   await until(() => second.evaluate(`document.querySelector('kin-app').state.talks.find(row=>row.text==='Peer Talk')?.status==='archived' && document.querySelector('kin-app').retryButton.hidden`));
-  for (const action of ["resolve-talk", "reopen-talk", "archive-talk"]) {
+  for (const recoverRefresh of [false, true]) for (const action of ["resolve-talk", "reopen-talk", "archive-talk"]) {
     const id = await first.evaluate(`(async()=>{
       const app=document.querySelector('kin-app');
       await app.saveTalk({type:"add-talk",text:'Missed Talk invalidation'});
@@ -206,7 +209,7 @@ export async function talkPeerRegressions(first, second, until) {
       try { await app.saveTalk({type:'${action}',talkId:'${id}'}); }
       finally { IDBObjectStore.prototype.add=original; }
     })()`);
-    await second.evaluate(`(async()=>{
+    if (recoverRefresh) await second.evaluate(`(async()=>{
       const app=document.querySelector('kin-app');
       const load=app.store.loadEvents.bind(app.store);
       app.store.loadEvents=async()=>{throw new Error('Synthetic refresh failure');};

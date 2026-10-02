@@ -881,6 +881,26 @@ try {
   assert.equal(await first.evaluate('document.activeElement === document.querySelector("#talk-text")'), true);
   assert.equal(await first.evaluate('document.querySelector("kin-app").state.talks.at(-1).status'), "resolved");
   console.log("PASS Talk draft reload, keyboard capture/resolution, focus restoration");
+  // Exercise the remaining Talk lifecycle through native keyboard activation.
+  for (const label of ["Reopen", "Resolve", "Archive"]) {
+    await first.evaluate(`(()=>{
+      const capture=document.querySelector('kin-app').talks;
+      const row=[...capture.querySelectorAll('li')].find(row=>row.querySelector('.item-text').textContent==='Newer talk draft');
+      [...row.querySelectorAll('button')].find(button=>button.textContent==='${label}').focus();
+    })()`);
+    for (const type of ["keyDown", "keyUp"]) await first.send("Input.dispatchKeyEvent", {
+      type,key:"Enter",code:"Enter",windowsVirtualKeyCode:13,...(type==="keyDown"?{text:"\r"}:{})
+    });
+    await ready(first);
+    assert.equal(await first.evaluate('document.activeElement===document.querySelector("#talk-text")'),true);
+    assert.equal(await first.evaluate('document.querySelector("kin-app").state.talks.at(-1).status'),
+      label==="Reopen"?"open":label==="Resolve"?"resolved":"archived");
+  }
+  await first.evaluate('document.querySelector("#talk-text").focus()');
+  await first.send("Input.dispatchKeyEvent",{type:"keyDown",key:"Tab",code:"Tab",windowsVirtualKeyCode:9});
+  await first.send("Input.dispatchKeyEvent",{type:"keyUp",key:"Tab",code:"Tab",windowsVirtualKeyCode:9});
+  assert.equal(await first.evaluate('document.activeElement===document.querySelector("kin-talk-list .add-button")'),true,"Talk input followed by Add in native focus order");
+  console.log("PASS Talk keyboard resolve/reopen/archive, focus and native tab order");
   const second = await tab();
   await second.evaluate(`window.peerReads=0; window.peerReplays=0; window.peerMessages=[];
     { const a=document.querySelector('kin-app'); const load=a.store.loadEvents.bind(a.store); const replay=a.engine.applyEvents;
@@ -1172,6 +1192,17 @@ try {
       app.status.getAttribute('aria-live')==='polite' && app.alert.getAttribute('role')==='alert' &&
       [...capture.querySelectorAll('button')].every(button=>button.textContent && button.getBoundingClientRect().height>=48);
   })()`),true,"Handoff semantics, announcements, focus and targets in forced colors");
+  assert.equal(await first.evaluate(`(()=>{
+    const app=document.querySelector('kin-app'),capture=app.talks;
+    capture.input.focus();
+    return capture.querySelector('h2').textContent==='Talk' &&
+      capture.input.labels[0].textContent==='What should we talk about?' &&
+      capture.querySelectorAll('ul > li').length>0 &&
+      [...capture.querySelectorAll('h3')].every(heading=>['Open','Resolved'].includes(heading.textContent)) &&
+      getComputedStyle(capture.input).outlineWidth==='3px' &&
+      app.status.getAttribute('aria-live')==='polite' && app.alert.getAttribute('role')==='alert' &&
+      [...capture.querySelectorAll('button')].every(button=>button.textContent && button.getBoundingClientRect().height>=48);
+  })()`),true,"Talk semantics, announcements, focus and targets in forced colors");
   const spacingResult = await first.evaluate(`(()=>{
     const sheet=[...document.styleSheets].find(candidate=>candidate.href?.endsWith('/styles/app.css'));
     const ruleIndex=sheet.cssRules.length;
