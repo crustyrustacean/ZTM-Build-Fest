@@ -22,7 +22,7 @@ Derived household state
       +------> Web Components render the result
 ```
 
-The exact module layout and ABI remain open until implementation. The boundary is the important part: browser concerns stay in the browser layer; authoritative, deterministic household-state rules live in Rust.
+The v0.1.0 module layout and ABI are specified in [IMPLEMENTATION](IMPLEMENTATION.md) and [ABI](ABI.md); neither has been implemented. The boundary is the important part: browser concerns stay in the browser layer; authoritative, deterministic household-state rules live in Rust.
 
 ## Browser and JavaScript responsibilities
 
@@ -51,21 +51,11 @@ Rust must not manipulate the DOM. It should be possible to test domain behavior 
 
 ## Manual WebAssembly boundary
 
-The initial implementation is intended to target `wasm32-unknown-unknown` and explore a small, explicit JavaScript-to-WASM ABI before adopting convenience bindings. Initial constraints are no `wasm-bindgen`, `web-sys`, `js-sys`, `serde`, or framework runtime.
+The v0.1.0 implementation is specified to target `wasm32-unknown-unknown` and use the explicit JavaScript-to-WASM ABI in [ABI](ABI.md). Initial constraints are no `wasm-bindgen`, `web-sys`, `js-sys`, `serde`, or framework runtime. This boundary is specified, not implemented.
 
-A possible conceptual ABI is:
+A manual ABI is specified for v0.1.0 in [ABI](ABI.md), including exported function signatures, versioned request/result encoding, ownership and lifetimes, errors, bounds, and repeated-call behavior. JavaScript allocates/copies input and decodes output; Rust reads validated input ranges and returns a well-defined result. The browser layer retains ownership of DOM, storage, cryptographic APIs, networking, and lifecycle integration.
 
-```text
-alloc(size)
-dealloc(ptr, size)
-apply_events(ptr, len)
-result_ptr()
-result_len()
-```
-
-These names and signatures are illustrative, not commitments. The eventual boundary must specify memory ownership, encoding, buffer lifetimes, error reporting, bounds checking, and ABI versioning. JavaScript would allocate/copy input and decode output; Rust would only read valid input ranges and return a well-defined result. The browser layer retains ownership of DOM, storage, cryptographic APIs, networking, and lifecycle integration.
-
-A manual ABI is being explored to keep the interface visible, understand the cost of crossing the boundary, and avoid introducing bindings before their value is clear. It is not a goal to make the boundary manual forever if a later requirement justifies another choice.
+The manual boundary keeps the interface visible and avoids convenience bindings before a demonstrated need. A later requirement may justify revisiting that choice through an explicit architecture decision; the v0.1.0 implementation must follow the current contract.
 
 ## Local-first progression
 

@@ -120,7 +120,7 @@ All releases through `v0.0.9` are **planning and documentation releases only**.
 
 No functional application code should be introduced during these versions.
 
-Planning through `v0.0.9` must be complete before implementation begins. `v0.1.0` is the first coded milestone. When implementation is explicitly authorized, follow [V0.1.0](docs/V0.1.0.md) and, once planning is complete, read `docs/PREFLIGHT.md`, `docs/TEST-VECTORS.md`, `docs/TRACEABILITY.md`, and accepted decisions under `docs/decisions/`. Do not allow features assigned to later versions to leak into v0.1.0.
+Planning/specification releases `v0.0.1` through `v0.0.9` are complete. `v0.1.0` is the first implementation release. Before any implementation is explicitly authorized, read [V0.1.0](docs/V0.1.0.md), [PREFLIGHT](docs/PREFLIGHT.md), [TEST-VECTORS](docs/TEST-VECTORS.md), [TRACEABILITY](docs/TRACEABILITY.md), and accepted ADRs under `docs/decisions/`. Do not allow features assigned to later versions to leak into v0.1.0.
 
 The first implementation release is:
 

@@ -2,7 +2,7 @@
 
 > A private, lightweight household coordination app for the little things families need to know, remember, hand off, or discuss.
 
-**Current status: `v0.0.8` — Developer & Contributor Experience. No usable application has been implemented.** Contributor expectations, the intended cross-platform workflow, code style, release procedure, and privacy-safe debugging are documented, not executable tooling. The final specification preflight remains before the first coded prototype, `v0.1.0`.
+**Current status: `v0.0.9` — Implementation Preflight. No usable application has been implemented.** Planning/specification is complete enough to begin `v0.1.0` when authorized. Rust/WASM, Web Components, and IndexedDB are specified but not implemented; `v0.1.0` will be the first executable prototype.
 
 ## The problem
 
@@ -26,7 +26,7 @@ The intended technical direction is Rust compiled to WebAssembly, native Web Com
 - `v0.0.6` — Implementation Contract (`kin-v0.0.6`)
 - `v0.0.7` — Data Durability & Evolution (`kin-v0.0.7`)
 - `v0.0.8` — Developer & Contributor Experience (`kin-v0.0.8`)
-- `v0.0.9` — Implementation Preflight
+- `v0.0.9` — Implementation Preflight (`kin-v0.0.9`)
 - `v0.1.0` — First functional prototype
 
 ## Install and run
@@ -68,6 +68,10 @@ AI-assisted development tools are being used for brainstorming, product planning
 - [Code style](docs/CODE-STYLE.md)
 - [Release process](docs/RELEASES.md)
 - [Debugging and diagnostics](docs/DEBUGGING.md)
+- [Implementation preflight](docs/PREFLIGHT.md)
+- [Requirement traceability](docs/TRACEABILITY.md)
+- [Canonical test vectors](docs/TEST-VECTORS.md)
+- [Accepted architecture decision: event-sourced household state](docs/decisions/0001-event-sourced-household-state.md)
 - [UX flows](docs/UX.md)
 - [Roadmap](docs/ROADMAP.md)
 - [v0.1.0 implementation specification](docs/V0.1.0.md)

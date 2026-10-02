@@ -1,6 +1,6 @@
 # Roadmap
 
-This roadmap is a planning baseline, not a promise of delivery dates. Releases may change as the product is tested. Kin is currently at the documentation-only `v0.0.8` milestone; no application code or executable developer tooling exists. Planning continues through `v0.0.9` before the first coded release.
+This roadmap is a planning baseline, not a promise of delivery dates. Releases may change as the product is tested. Kin is at the completed documentation-only `v0.0.9` milestone; no application code or executable developer tooling exists. Planning/specification is complete, and v0.1.0 is the first coded release when authorized.
 
 ## Planning releases
 
@@ -38,7 +38,7 @@ Document human contribution expectations, intended cross-platform development se
 
 ### `v0.0.9` — Implementation Preflight
 
-Complete the specification audit, decision records, test vectors, and traceability for the frozen v0.1.0 scope. This is the final planning release; it does not begin implementation.
+Complete the specification audit, accepted decision records, canonical test vectors, and requirement traceability for the frozen v0.1.0 scope. This Specification Release Candidate 1 is the final planning milestone; it does not begin implementation. See [PREFLIGHT](PREFLIGHT.md), [TEST-VECTORS](TEST-VECTORS.md), [TRACEABILITY](TRACEABILITY.md), and [accepted decisions](decisions/0001-event-sourced-household-state.md).
 
 ## First coded release
 
@@ -88,4 +88,4 @@ Focus on polish, reliability, accessibility, mobile UX, privacy documentation, o
 
 ## Scope discipline
 
-Each roadmap item is future work unless explicitly marked as a completed planning milestone. Authentication, passkeys, encryption, remote services, pairing, and synchronization are design topics, not implemented features or part of `v0.1.0`. Planning-only scope continues through `v0.0.9`; v0.1.0 remains the first coded release.
+Each roadmap item is future work unless explicitly marked as a completed planning milestone. Authentication, passkeys, encryption, remote services, pairing, and synchronization remain unimplemented and out of scope for `v0.1.0`. Planning-only scope is complete through `v0.0.9`; v0.1.0 is the first coded release and has not begun.
