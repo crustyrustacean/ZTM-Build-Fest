@@ -1,6 +1,6 @@
 # Roadmap
 
-This roadmap is a planning baseline, not a promise of delivery dates. Releases may change as the product is tested. Kin's current release is `v0.2.1` Today + Needs Correctness. v0.2.2–v0.2.3 remain the approved stabilization line; `v0.3.0 — Handoff` remains future work. The `v0.0.1`–`v0.0.12` planning and documentation history remains preserved.
+This roadmap is a planning baseline, not a promise of delivery dates. Releases may change as the product is tested. Kin's current release is `v0.2.2` Today + Needs Resilience & Accessibility. v0.2.3 remains the approved final stabilization milestone; `v0.3.0 — Handoff` remains future work. The `v0.0.1`–`v0.0.12` planning and documentation history remains preserved.
 
 ## Planning releases
 
@@ -94,7 +94,7 @@ Completed: added exact reopen/archive payload-boundary tests, ensured protocol v
 
 ### `v0.2.2` — Today + Needs Resilience & Accessibility
 
-Harden drafts and item actions across failures, retries, tabs, interruption, keyboard use, narrow screens, and accessibility settings.
+Completed: drafts and item actions recover across failures/retries and peer state changes; stale retries clear against Rust-derived state. Keyboard focus, forced colors, reduced motion, increased text spacing, 320px reflow, and 200% page-scale emulation were checked. No new capability.
 
 ### `v0.2.3` — Today + Needs Hardening & Polish
 

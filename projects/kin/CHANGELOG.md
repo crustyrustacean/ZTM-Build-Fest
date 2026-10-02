@@ -2,6 +2,22 @@
 
 This file records completed Kin releases. The `v0.0.x` releases are planning and documentation milestones; they do not represent implemented application features. The first implementation milestone remains `v0.1.0`.
 
+## [0.2.2] — Today + Needs Resilience & Accessibility
+
+### Improved
+
+- Hardened complete/reopen/archive failures and retries; a domain-invalid retry now reloads canonical events and clears stale item intent instead of repeatedly presenting an unavailable action.
+- Restored compose focus when a peer refresh replaces a focused item control and disabled retry controls while the app is busy.
+- Extended browser coverage for text-only draft compatibility, action write failures/abort recovery, two-tab stale-action races with and without invalidation delivery, and keyboard lifecycle actions.
+- Added forced-colors, reduced-motion, increased-text-spacing, 320px reflow, target-size/focus checks, and 200% Chromium page-scale emulation.
+
+### Validation
+
+- Passed 43 Rust tests, 4 built-in Node bridge tests, `cargo fmt --check`, Clippy with warnings denied, version consistency, and both PowerShell and POSIX WASM release builds. The shell build ran in WSL Ubuntu 22.04 with Rust 1.93.0.
+- The Windows x64 browser runner passed in Chrome 154.0.8037.59 with Node 22.12.0. It covered draft restoration/ownership, action failures and retries, stale cross-tab intent with and without invalidation delivery, keyboard/focus recovery, 320px reflow, forced colors, reduced motion, increased text spacing, 200% page-scale emulation, CSP, same-origin requests, and the event/storage compatibility regressions.
+- Native desktop 200% browser zoom, Firefox, Safari, NVDA, and VoiceOver were not tested. The 200% check used Chromium page-scale emulation, not native desktop zoom; no screen-reader certification is claimed.
+- No product capability, IndexedDB schema change, framework, or runtime dependency was added.
+
 ## [0.2.1] — Today + Needs Correctness
 
 ### Hardened

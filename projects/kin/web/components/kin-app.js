@@ -22,6 +22,7 @@ class KinApp extends HTMLElement {
     this.refreshing = false;
     this.pendingRefresh = false;
     this.retryAction = null;
+    this.retryIntent = null;
     this.retryRefresh = () => this.refreshFromEvents();
     this.onAddItem = (event) => this.handleAddItem(event);
     this.onCompleteItem = (event) => this.handleCompleteItem(event);
@@ -216,8 +217,13 @@ class KinApp extends HTMLElement {
       this.broadcastEventChange();
       restoreComposeFocus = true;
     } catch (error) {
-      this.showAlert(error.userMessage ?? SAVE_ERROR, () =>
-        this.handleItemAction(type, submittedItemId),
+      if (error.code === 4) {
+        this.pendingRefresh = true;
+      }
+      this.showAlert(
+        error.userMessage ?? SAVE_ERROR,
+        () => this.handleItemAction(type, submittedItemId),
+        { type, itemId: submittedItemId },
       );
       this.setStatus("");
       restoreComposeFocus = true;
@@ -280,7 +286,9 @@ class KinApp extends HTMLElement {
     this.setBusy(true);
     const previousRetry =
       this.retryAction !== this.retryRefresh ? this.retryAction : null;
+    const previousRetryIntent = this.retryIntent;
     const previousAlert = this.alert.textContent;
+    const restoreComposeFocus = this.today.contains(document.activeElement);
     this.clearAlert();
     this.setStatus("Updating from another tab…");
     try {
@@ -291,7 +299,16 @@ class KinApp extends HTMLElement {
       this.renderState();
       this.setStatus("Updated from another tab.");
       if (previousRetry) {
-        this.showAlert(previousAlert, previousRetry);
+        const item = previousRetryIntent
+          ? this.state.items.find(
+              (stateItem) => stateItem.itemId === previousRetryIntent.itemId,
+            )
+          : null;
+        if (previousRetryIntent && (!item || item.status === "archived")) {
+          this.setStatus("That item changed. Review its current state below.");
+        } else {
+          this.showAlert(previousAlert, previousRetry, previousRetryIntent);
+        }
       }
     } catch (error) {
       this.showAlert(
@@ -303,6 +320,9 @@ class KinApp extends HTMLElement {
     } finally {
       this.refreshing = false;
       this.setBusy(false);
+      if (restoreComposeFocus) {
+        this.compose.focusInput();
+      }
       this.flushPeerRefresh();
     }
   }
@@ -324,6 +344,7 @@ class KinApp extends HTMLElement {
     this.main.setAttribute("aria-busy", String(isBusy));
     this.compose.disabled = isBusy || !this.store;
     this.today.disabled = isBusy || !this.store;
+    this.retryButton.disabled = isBusy;
   }
 
   setStatus(message) {
@@ -335,12 +356,14 @@ class KinApp extends HTMLElement {
     this.alert.hidden = true;
     this.retryButton.hidden = true;
     this.retryAction = null;
+    this.retryIntent = null;
   }
 
-  showAlert(message, retryAction = null) {
+  showAlert(message, retryAction = null, retryIntent = null) {
     this.alert.textContent = message;
     this.alert.hidden = false;
     this.retryAction = retryAction;
+    this.retryIntent = retryIntent;
     this.retryButton.hidden = typeof retryAction !== "function";
   }
 }

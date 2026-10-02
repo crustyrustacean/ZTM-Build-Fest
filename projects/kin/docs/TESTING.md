@@ -1,6 +1,6 @@
 # v0.1.0 Testing Contract
 
-**Status:** v0.2.1 correctness coverage extends v0.1.x Rust, built-in Node bridge, and browser-native regressions for classification, all Item transitions, exact event payload lengths, and transactional counter integrity. Continue using these dependency-free contracts. Accessibility requirements are in [ACCESSIBILITY](ACCESSIBILITY.md); event/protocol behavior is in [EVENTS](EVENTS.md) and [ABI](ABI.md).
+**Status:** v0.2.2 resilience/accessibility coverage extends v0.1.x and v0.2.1 Rust, built-in Node bridge, and browser-native regressions. It exercises draft/action recovery, stale cross-tab retries, keyboard focus, forced colors, reduced motion, text spacing, and narrow reflow. Continue using these dependency-free contracts. Accessibility requirements are in [ACCESSIBILITY](ACCESSIBILITY.md); event/protocol behavior is in [EVENTS](EVENTS.md) and [ABI](ABI.md).
 
 ## Rust domain tests
 
@@ -43,7 +43,7 @@ It starts a loopback static server and an isolated headless browser profile, run
 
 Regression cases include unchanged/edited drafts after failed add, exact original-command retry, rapid and stale retry clicks, delayed add completion, reconnect during a pending save, and peer refresh retaining a failed-command retry. Both synchronous and asynchronous quota categories are injected without exhausting disk space. A separate real transaction abort after request success verifies rollback and retry. The remaining checks cover the existing add/complete/replay, storage, cross-tab, Unicode, rendering, focus, and narrow-layout flows below. Automated focus checks assert focus ownership and a 3px outline; they do not certify screen-reader announcements or visual contrast.
 
-The v0.2.1 regression suite retains Rust as the authoritative validator/reducer, IndexedDB schema 1 as the canonical event source, and content-free BroadcastChannel invalidations. It covers Today/Needs classification, legacy/current event replay with exact source-byte preservation, classification-aware retry ownership, complete/reopen/archive transitions, exact lifecycle payload lengths, event/logical-counter commit or rollback, metadata/canonical-byte mismatch preservation, and the 10,000-event limit in addition to v0.1.x regressions.
+The v0.2.2 regression suite retains Rust as the authoritative validator/reducer, IndexedDB schema 1 as the canonical event source, and content-free BroadcastChannel invalidations. It also covers complete/reopen/archive failures and retries, canonical state changes during a stale retry, focus recovery when a peer rerender replaces the focused control, legacy text-only draft fallback, forced colors, reduced motion, increased text spacing, and 200% page-scale emulation. Screen-reader certification and native desktop zoom are not inferred from these checks.
 
 Manually exercise or use a lightweight browser-native harness to verify:
 
@@ -60,6 +60,8 @@ Manually exercise or use a lightweight browser-native harness to verify:
 - Storage/ABI failures reach an understandable error state without claiming success.
 - A compose draft survives a same-tab reload and clears only after successful persistence; the draft is not written to the event store.
 - Focus returns to a usable control after add, complete, reopen, and archive; `aria-busy` clears after success or failure.
+- Complete/reopen/archive storage failures and transaction aborts preserve the prior state; retry applies exactly one event.
+- If canonical state makes a retry invalid, reload the full event log through Rust, clear the stale retry, present the current state, and append nothing.
 - A quota-exceeded write preserves the event count, announces a storage-full message, exposes retry, and a later retry persists exactly one event.
 - With two same-origin tabs open, a successful write in one invalidates the other; the peer reloads canonical events and reruns Rust replay. Verify the notification carries no event or household content.
 - CSP smoke: load the page under its shipped same-origin policy and inspect the console for CSP violation messages.

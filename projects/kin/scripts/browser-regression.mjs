@@ -274,7 +274,7 @@ async function regressions() {
 
   // Fail an actual IndexedDB transaction after a successful add request.
   // Quota injection separately verifies the actionable storage-full path.
-  async function failOnce(mode) {
+  async function failOnce(mode, operation = submit) {
     const original = IDBObjectStore.prototype.add;
     IDBObjectStore.prototype.add = function (...args) {
       if (this.name !== "events") return original.apply(this, args);
@@ -299,7 +299,7 @@ async function regressions() {
       return request;
     };
     try {
-      await submit();
+      await operation();
     } finally {
       IDBObjectStore.prototype.add = original;
     }
@@ -435,6 +435,90 @@ async function regressions() {
     "delayed add preserves newer text/classification draft across reconnect",
   );
 
+  const findItem = (text) =>
+    [...app.querySelectorAll("kin-item")].find(
+      (item) => item.querySelector(".item-text")?.textContent === text,
+    );
+  const actionText = "Action retry";
+  edit(actionText);
+  await submit();
+  let actionItem = findItem(actionText);
+  let actionEventCount = await count();
+  await failOnce("quota", async () => {
+    actionItem.querySelector(".complete-button").click();
+    await idle();
+  });
+  check(
+    app.state.items.find((item) => item.text === actionText).status ===
+      "active",
+    "failed completion leaves item active",
+  );
+  check(
+    (await count()) === actionEventCount,
+    "failed completion does not append",
+  );
+  app.retryButton.click();
+  await idle();
+  check(
+    app.state.items.find((item) => item.text === actionText).status ===
+      "completed",
+    "completion retry applies once",
+  );
+  check(
+    (await count()) === actionEventCount + 1,
+    "completion retry appends once",
+  );
+
+  actionItem = findItem(actionText);
+  actionEventCount = await count();
+  await failOnce("abort", async () => {
+    actionItem.querySelector(".reopen-button").click();
+    await idle();
+  });
+  check(
+    app.state.items.find((item) => item.text === actionText).status ===
+      "completed",
+    "aborted reopen leaves item completed",
+  );
+  check((await count()) === actionEventCount, "aborted reopen does not append");
+  app.retryButton.click();
+  await idle();
+  check(
+    app.state.items.find((item) => item.text === actionText).status ===
+      "active",
+    "reopen retry applies once",
+  );
+  check((await count()) === actionEventCount + 1, "reopen retry appends once");
+
+  actionItem = findItem(actionText);
+  actionEventCount = await count();
+  await failOnce("quota", async () => {
+    actionItem.querySelector(".archive-button").click();
+    await idle();
+  });
+  check(
+    app.state.items.find((item) => item.text === actionText).status ===
+      "active",
+    "failed archive leaves item active",
+  );
+  check((await count()) === actionEventCount, "failed archive does not append");
+  app.retryButton.click();
+  await idle();
+  check(
+    app.state.items.find((item) => item.text === actionText).status ===
+      "archived",
+    "archive retry applies once",
+  );
+  check((await count()) === actionEventCount + 1, "archive retry appends once");
+  check(
+    !findItem(actionText),
+    "archived action control disappears after state transition",
+  );
+  check(document.activeElement === compose.input, "lifecycle retry focus");
+  passed.push(
+    "complete/reopen/archive write failures, abort retry, exactly-once action transitions, focus",
+  );
+
   const unicode =
     "\uFEFFMilk 🥛 café 家 <script>window.kinInjected=true</script>";
   edit(unicode);
@@ -552,6 +636,7 @@ async function regressions() {
     Storage.prototype.removeItem = originalRemove;
   }
   edit("Restored after reload");
+  sessionStorage.removeItem(classificationKey);
   window.kinExpectedState = JSON.stringify(app.state);
   passed.push("sessionStorage denial does not prevent persistence");
   return passed;
@@ -624,6 +709,11 @@ try {
     await first.evaluate('document.querySelector("input").value'),
     "Restored after reload",
   );
+  assert.equal(
+    await first.evaluate('document.querySelector("select").value'),
+    "need",
+    "legacy text-only draft defaults classification to Needs",
+  );
   await first.evaluate('document.querySelector("input").focus()');
   await first.send("Input.dispatchKeyEvent", {
     type: "keyDown",
@@ -673,9 +763,193 @@ try {
       'JSON.stringify(document.querySelector("kin-app").state)',
     ),
   );
+
+  const raceItemId = await first.evaluate(`(async()=>{
+    const app=document.querySelector('kin-app');
+    app.compose.input.value='Peer action race';
+    app.compose.saveDraft();
+    app.compose.form.requestSubmit();
+    for(let index=0;app.busy&&index<200;index++)
+      await new Promise(resolve=>setTimeout(resolve,10));
+    return app.state.items.find(item=>item.text==='Peer action race').itemId;
+  })()`);
+  await until(() =>
+    second.evaluate(
+      `document.querySelector('kin-app').state.items.some(item=>item.itemId==='${raceItemId}'&&item.status==='active')`,
+    ),
+  );
+  const failedPeerAction = await second.evaluate(`(async()=>{
+    const app=document.querySelector('kin-app');
+    window.peerActionCountBefore=(await app.store.loadEvents()).length;
+    const item=[...app.querySelectorAll('kin-item')]
+      .find(element=>element.record?.itemId==='${raceItemId}');
+    const original=IDBObjectStore.prototype.add;
+    IDBObjectStore.prototype.add=function(...args){
+      if(this.name==='events')
+        throw new DOMException('Synthetic quota failure','QuotaExceededError');
+      return original.apply(this,args);
+    };
+    try{
+      item.querySelector('.complete-button').click();
+      for(let index=0;app.busy&&index<200;index++)
+        await new Promise(resolve=>setTimeout(resolve,10));
+    }finally{
+      IDBObjectStore.prototype.add=original;
+    }
+    return {retryVisible:!app.retryButton.hidden,status:app.state.items.find(row=>row.itemId==='${raceItemId}').status};
+  })()`);
+  assert.deepEqual(failedPeerAction, { retryVisible: true, status: "active" });
+  await second.evaluate(`(()=>{
+    const app=document.querySelector('kin-app');
+    [...app.querySelectorAll('kin-item')]
+      .find(item=>item.querySelector('.item-text')?.textContent==='Peer addition')
+      .querySelector('.complete-button').focus();
+  })()`);
+  await first.evaluate(`(async()=>{
+    const app=document.querySelector('kin-app');
+    [...app.querySelectorAll('kin-item')]
+      .find(element=>element.record?.itemId==='${raceItemId}')
+      .querySelector('.archive-button').click();
+    for(let index=0;app.busy&&index<200;index++)
+      await new Promise(resolve=>setTimeout(resolve,10));
+  })()`);
+  await until(() =>
+    second.evaluate(
+      `document.querySelector('kin-app').state.items.find(item=>item.itemId==='${raceItemId}')?.status==='archived'&&!document.querySelector('kin-app').busy`,
+    ),
+  );
+  assert.deepEqual(
+    await second.evaluate(`(async()=>{
+      const app=document.querySelector('kin-app');
+      return {
+        status:app.state.items.find(item=>item.itemId==='${raceItemId}').status,
+        retryHidden:app.retryButton.hidden,
+        focusRestored:document.activeElement===app.compose.input,
+        itemVisible:[...app.querySelectorAll('kin-item')]
+          .some(item=>item.record?.itemId==='${raceItemId}'),
+        eventCount:(await app.store.loadEvents()).length,
+        expectedCount:window.peerActionCountBefore+1,
+        updateMessage:app.status.textContent,
+      };
+    })()`),
+    {
+      status: "archived",
+      retryHidden: true,
+      focusRestored: true,
+      itemVisible: false,
+      eventCount: (await second.evaluate("window.peerActionCountBefore")) + 1,
+      expectedCount:
+        (await second.evaluate("window.peerActionCountBefore")) + 1,
+      updateMessage: "That item changed. Review its current state below.",
+    },
+  );
+  const noSignalItemId = await first.evaluate(`(async()=>{
+    const app=document.querySelector('kin-app');
+    app.compose.input.value='Missed invalidation race';
+    app.compose.saveDraft();
+    app.compose.form.requestSubmit();
+    for(let index=0;app.busy&&index<200;index++)
+      await new Promise(resolve=>setTimeout(resolve,10));
+    return app.state.items.find(item=>item.text==='Missed invalidation race').itemId;
+  })()`);
+  await until(() =>
+    second.evaluate(
+      `document.querySelector('kin-app').state.items.some(item=>item.itemId==='${noSignalItemId}'&&item.status==='active')`,
+    ),
+  );
+  const noSignalFailedAction = await second.evaluate(`(async()=>{
+    const app=document.querySelector('kin-app');
+    app.channel.removeEventListener('message',app.onPeerMessage);
+    window.noSignalCountBefore=(await app.store.loadEvents()).length;
+    const item=[...app.querySelectorAll('kin-item')]
+      .find(element=>element.record?.itemId==='${noSignalItemId}');
+    const original=IDBObjectStore.prototype.add;
+    IDBObjectStore.prototype.add=function(...args){
+      if(this.name==='events')
+        throw new DOMException('Synthetic quota failure','QuotaExceededError');
+      return original.apply(this,args);
+    };
+    try{
+      item.querySelector('.complete-button').click();
+      for(let index=0;app.busy&&index<200;index++)
+        await new Promise(resolve=>setTimeout(resolve,10));
+    }finally{
+      IDBObjectStore.prototype.add=original;
+    }
+    return !app.retryButton.hidden;
+  })()`);
+  assert.equal(noSignalFailedAction, true);
+  await first.evaluate(`(async()=>{
+    const app=document.querySelector('kin-app');
+    [...app.querySelectorAll('kin-item')]
+      .find(element=>element.record?.itemId==='${noSignalItemId}')
+      .querySelector('.archive-button').click();
+    for(let index=0;app.busy&&index<200;index++)
+      await new Promise(resolve=>setTimeout(resolve,10));
+  })()`);
+  await second.evaluate(
+    "document.querySelector('kin-app').retryButton.click()",
+  );
+  await until(() =>
+    second.evaluate(`(()=>{
+      const app=document.querySelector('kin-app');
+      return !app.busy&&app.retryButton.hidden&&
+        app.state.items.find(item=>item.itemId==='${noSignalItemId}')?.status==='archived';
+    })()`),
+  );
+  assert.equal(
+    await second.evaluate(
+      `(async()=> (await document.querySelector('kin-app').store.loadEvents()).length === window.noSignalCountBefore+1)()`,
+    ),
+    true,
+    "stale action retry reloads canonical history without appending",
+  );
+  assert.equal(
+    await second.evaluate(
+      'document.querySelector("kin-app").status.textContent',
+    ),
+    "That item changed. Review its current state below.",
+  );
+  await second.evaluate(`(()=>{
+    const app=document.querySelector('kin-app');
+    app.channel.addEventListener('message',app.onPeerMessage);
+  })()`);
   console.log(
     "PASS two tabs, content-free invalidation, canonical IndexedDB reload, Rust replay",
   );
+
+  await first.evaluate(`(()=>{
+    const app=document.querySelector('kin-app');
+    const item=[...app.querySelectorAll('kin-item')]
+      .find(element=>element.querySelector('.item-text')?.textContent==='Peer addition');
+    item.querySelector('.complete-button').focus();
+  })()`);
+  await first.send("Input.dispatchKeyEvent", {
+    type: "keyDown",
+    key: "Enter",
+    code: "Enter",
+    text: "\r",
+    windowsVirtualKeyCode: 13,
+  });
+  await first.send("Input.dispatchKeyEvent", {
+    type: "keyUp",
+    key: "Enter",
+    code: "Enter",
+    windowsVirtualKeyCode: 13,
+  });
+  await until(() =>
+    first.evaluate(
+      `!document.querySelector('kin-app').busy&&document.querySelector('kin-app').state.items.find(item=>item.text==='Peer addition')?.status==='completed'`,
+    ),
+  );
+  assert.equal(
+    await first.evaluate(
+      'document.activeElement===document.querySelector("input")',
+    ),
+    true,
+    "keyboard completion restores capture focus",
+  );
+  console.log("PASS keyboard item action and focus restoration");
 
   await first.evaluate(
     `{const a=document.querySelector('kin-app');a.remove();document.body.append(a);}`,
@@ -702,7 +976,71 @@ try {
     ),
     "3px",
   );
-  console.log("PASS idle disconnect/reconnect, 320px reflow, focus outline");
+  await first.evaluate('document.querySelector("select").focus()');
+  assert.deepEqual(
+    await first.evaluate(`(()=>{
+      const select=document.querySelector('select');
+      return {
+        label:select.labels?.[0]?.textContent,
+        targetHeight:select.getBoundingClientRect().height,
+        focusWidth:getComputedStyle(select).outlineWidth,
+      };
+    })()`),
+    { label: "Add to", targetHeight: 54, focusWidth: "3px" },
+  );
+  await first.send("Emulation.setEmulatedMedia", {
+    features: [
+      { name: "forced-colors", value: "active" },
+      { name: "prefers-reduced-motion", value: "reduce" },
+    ],
+  });
+  assert.deepEqual(
+    await first.evaluate(`(()=>{
+      const controls=[...document.querySelectorAll('button,select')];
+      return {
+        forcedColors:matchMedia('(forced-colors: active)').matches,
+        reducedMotion:matchMedia('(prefers-reduced-motion: reduce)').matches,
+        undersized:controls.some(control=>control.getClientRects().length>0&&control.getBoundingClientRect().height<48),
+        focusWidth:getComputedStyle(document.querySelector('select')).outlineWidth,
+        overflow:document.documentElement.scrollWidth>innerWidth,
+      };
+    })()`),
+    {
+      forcedColors: true,
+      reducedMotion: true,
+      undersized: false,
+      focusWidth: "3px",
+      overflow: false,
+    },
+  );
+  const spacingResult = await first.evaluate(`(()=>{
+    const sheet=[...document.styleSheets].find(candidate=>candidate.href?.endsWith('/styles/app.css'));
+    const ruleIndex=sheet.cssRules.length;
+    sheet.insertRule('*{letter-spacing:.12em!important;word-spacing:.16em!important;line-height:1.5!important}',ruleIndex);
+    const overflow=document.documentElement.scrollWidth>innerWidth;
+    sheet.deleteRule(ruleIndex);
+    return overflow;
+  })()`);
+  assert.equal(
+    spacingResult,
+    false,
+    "increased text spacing keeps 320px layout usable",
+  );
+  await first.send("Emulation.setDeviceMetricsOverride", {
+    width: 640,
+    height: 960,
+    deviceScaleFactor: 1,
+    mobile: true,
+  });
+  await first.send("Emulation.setPageScaleFactor", { pageScaleFactor: 2 });
+  assert.equal(
+    await first.evaluate("visualViewport.scale"),
+    2,
+    "Chromium page-scale zoom reaches 200 percent",
+  );
+  console.log(
+    "PASS 320px reflow, forced colors, reduced motion, text spacing, 200% page-scale zoom, focus and targets",
+  );
 
   await first.evaluate(`(async()=>{const a=document.querySelector('kin-app');
     const tx=a.store.database.transaction('events','readwrite');tx.objectStore('events').add({encoded_event:new Uint8Array([1])});

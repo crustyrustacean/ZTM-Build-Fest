@@ -20,6 +20,7 @@ export class EventStoreError extends Error {
     super(message, { cause });
     this.name = "EventStoreError";
     this.userMessage = message;
+    this.code = cause?.code;
   }
 }
 
