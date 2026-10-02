@@ -1,6 +1,6 @@
 # Web Component Contract
 
-**Status:** v0.2.0 Today/Needs presentation and lifecycle command communication use native custom elements. Handoff and later product areas remain out of scope.
+**Status:** Native custom elements present Today, Needs, and Handoff. KinApp orchestrates persistence and Rust replay.
 
 ## Component responsibilities
 
@@ -38,3 +38,7 @@ The detail value contains only the minimum command data. Do not include member a
 ## State and accessibility boundary
 
 Parent/application orchestration supplies state as properties or a documented attribute/property contract; components do not read IndexedDB or call WASM directly. Controls use semantic HTML, labels, keyboard interaction, visible focus, and accessible status feedback as described in [ACCESSIBILITY](ACCESSIBILITY.md). User text is rendered as text, never interpolated as executable HTML.
+
+## Handoff component
+
+`kin-handoff-list` owns dedicated capture and semantic needs-attention/recent lists. It renders Rust status and hides archived rows; it never validates transitions. Bubbling/composed commands: `kin:add-handoff { text }`, `kin:acknowledge-handoff { handoffId }`, `kin:archive-handoff { handoffId }`. KinApp validates via Rust and persists atomically. Older successful submissions never clear newer text. No classification selector or verified-person attribution appears.

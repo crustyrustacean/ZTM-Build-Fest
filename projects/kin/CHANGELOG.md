@@ -2,6 +2,20 @@
 
 This file records completed Kin releases. The `v0.0.x` releases are planning and documentation milestones; they do not represent implemented application features. The first implementation milestone remains `v0.1.0`.
 
+## [0.3.0] — Handoff
+
+### Added
+
+- Dedicated short Handoff capture and needs-attention/recent lists, neutral acknowledgement, and terminal archival. Actor placeholders are not verified people; no named receipt or creator/acknowledger inequality is inferred.
+- Rust-owned Handoff types, lifecycle, mixed replay and explicit protocol v3. Protocols v1/v2 remain unchanged and reject Handoff history/state. Existing event bytes and IndexedDB schema 1 remain unchanged.
+- Independent tab draft ownership, atomic persistence/retry, content-free peer invalidation, inert text rendering, keyboard/focus/busy behavior. No framework, runtime dependency, or remote service.
+
+### Validation
+
+- Passed 46 Rust tests and 9 Node bridge/real-WASM tests, formatting, Clippy with warnings denied, release WASM compilation, both build scripts and version consistency.
+- Full browser regression suite passed on Windows x64, Node 22.12.0, headless Chrome 154.0.8037.59, including prior Today/Needs checks and Handoff lifecycle, mixed replay/reload, invalid-reference non-append, retries/drafts, cross-tab stale acknowledgement, keyboard/focus, 320px, forced colors, text spacing, reduced motion, page-scale emulation, CSP and same-origin requests. POSIX build ran in WSL Ubuntu 22.04.
+- Native desktop zoom, Firefox, Safari, NVDA and VoiceOver remain untested. Page-scale emulation is not native desktop 200% zoom.
+
 ## [0.2.4] — Today + Needs Compatibility Fixes
 
 ### Fixed

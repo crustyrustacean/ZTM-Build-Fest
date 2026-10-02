@@ -1,4 +1,4 @@
-const PROTOCOL_VERSION = 2;
+const PROTOCOL_VERSION = 3;
 const REQUEST_HEADER_BYTES = 12;
 const EVENT_HEADER_BYTES = 88;
 const RESULT_HEADER_BYTES = 12;
@@ -30,7 +30,7 @@ const USER_MESSAGES = new Map([
     3,
     "Kin needs a compatible household engine. Your saved information was not deleted.",
   ],
-  [4, "That household change is not valid. Check the item and try again."],
+  [4, "That household change is not valid. Review its current state and try again."],
   [
     5,
     "Kin has reached a supported storage limit. Your saved information was not deleted.",
@@ -84,7 +84,7 @@ export function randomId() {
 
 export function idFromHex(value) {
   if (typeof value !== "string" || !/^[0-9a-fA-F]{32}$/.test(value)) {
-    throw new KinEngineError(4, "Kin received an invalid item reference.");
+    throw new KinEngineError(4, "Kin received an invalid household reference.");
   }
   const id = new Uint8Array(16);
   for (let index = 0; index < id.length; index += 1) {
@@ -208,6 +208,27 @@ export function encodeArchivedRecord({
     kind: 4,
     payload: assertId(itemId),
   });
+}
+
+export function encodeHandoffAddedRecord({ handoffId, text, ...identity }) {
+  const textBytes = textEncoder.encode(text);
+  if (strictTextDecoder.decode(textBytes) !== text || textBytes.length < 1 ||
+      textBytes.length > MAX_ITEM_TEXT_BYTES) {
+    throw new KinEngineError(2, "Handoff text must be valid Unicode and no more than 4096 UTF-8 bytes.");
+  }
+  const payload = new Uint8Array(20 + textBytes.length);
+  payload.set(assertId(handoffId));
+  new DataView(payload.buffer).setUint32(16, textBytes.length, true);
+  payload.set(textBytes, 20);
+  return encodeEventRecord({ ...identity, eventVersion: 1, kind: 5, payload });
+}
+
+export function encodeHandoffAcknowledgedRecord({ handoffId, ...identity }) {
+  return encodeEventRecord({ ...identity, eventVersion: 1, kind: 6, payload: assertId(handoffId) });
+}
+
+export function encodeHandoffArchivedRecord({ handoffId, ...identity }) {
+  return encodeEventRecord({ ...identity, eventVersion: 1, kind: 7, payload: assertId(handoffId) });
 }
 
 function encodeEventRecord({
@@ -347,7 +368,7 @@ function decodeError(bytes, status) {
   const code = view.getUint16(6, true);
   const messageLength = view.getUint32(8, true);
   if (
-    ![1, PROTOCOL_VERSION].includes(version) ||
+    ![1, 2, PROTOCOL_VERSION].includes(version) ||
     code !== status ||
     bytes.length !== REQUEST_HEADER_BYTES + messageLength
   ) {
@@ -376,20 +397,24 @@ function decodeState(bytes) {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const protocolVersion = view.getUint16(4, true);
   if (
-    ![1, PROTOCOL_VERSION].includes(protocolVersion) ||
+    ![1, 2, PROTOCOL_VERSION].includes(protocolVersion) ||
     view.getUint16(6, true) !== 0
   ) {
     throw new KinEngineError(6, "Kin received an unsupported state format.");
   }
+  if (protocolVersion === 3 && bytes.length < 16) {
+    throw new KinEngineError(6, "Kin received a truncated state header.");
+  }
+  const handoffCount = protocolVersion === 3 ? view.getUint32(12, true) : 0;
   const itemCount = view.getUint32(8, true);
-  if (itemCount > MAX_EVENT_COUNT) {
+  if (itemCount + handoffCount > MAX_EVENT_COUNT) {
     throw new KinEngineError(
       6,
       "Kin received too many items from its household engine.",
     );
   }
   const items = [];
-  let offset = RESULT_HEADER_BYTES;
+  let offset = protocolVersion === 3 ? 16 : RESULT_HEADER_BYTES;
   for (let index = 0; index < itemCount; index += 1) {
     const headerEnd = offset + ITEM_HEADER_BYTES;
     if (headerEnd > bytes.length) {
@@ -413,7 +438,7 @@ function decodeState(bytes) {
           statusCode <= 2 &&
           view.getUint8(offset + 42) === 0 &&
           view.getUint8(offset + 43) === 0;
-    if (recordEnd > bytes.length || !validStatus) {
+    if (recordEnd > bytes.length || textLength < 1 || textLength > MAX_ITEM_TEXT_BYTES || !validStatus) {
       throw new KinEngineError(
         6,
         "Kin received an invalid item record from its household engine.",
@@ -447,13 +472,36 @@ function decodeState(bytes) {
     });
     offset = recordEnd;
   }
+  const handoffs = [];
+  for (let index = 0; index < handoffCount; index += 1) {
+    const headerEnd = offset + 48;
+    if (headerEnd > bytes.length) throw new KinEngineError(6, "Kin received a truncated handoff record.");
+    const textLength = view.getUint32(offset + 44, true);
+    const end = headerEnd + textLength;
+    const status = bytes[offset + 40];
+    const createdAt = Number(view.getBigInt64(offset + 32, true));
+    if (end > bytes.length || textLength < 1 || textLength > MAX_ITEM_TEXT_BYTES ||
+        status > 2 || bytes.slice(offset + 41, offset + 44).some(value => value !== 0) ||
+        !Number.isSafeInteger(createdAt)) {
+      throw new KinEngineError(6, "Kin received an invalid handoff record.");
+    }
+    let text;
+    try { text = strictTextDecoder.decode(bytes.subarray(headerEnd, end)); }
+    catch { throw new KinEngineError(6, "Kin received invalid handoff text."); }
+    handoffs.push({
+      handoffId: idToHex(bytes.subarray(offset, offset + 16)),
+      createdBy: idToHex(bytes.subarray(offset + 16, offset + 32)),
+      createdAt, text, status: ["unacknowledged", "acknowledged", "archived"][status],
+    });
+    offset = end;
+  }
   if (offset !== bytes.length) {
     throw new KinEngineError(
       6,
       "Kin received trailing bytes from its household engine.",
     );
   }
-  return { items };
+  return { items, handoffs };
 }
 
 function assertId(value) {

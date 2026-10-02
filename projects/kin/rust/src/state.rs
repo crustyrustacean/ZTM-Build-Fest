@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use crate::error::KinError;
 use crate::event::{
-    ActorId, EventEnvelope, EventId, EventKind, HouseholdId, ItemClassification, ItemId,
+    ActorId, EventEnvelope, EventId, EventKind, HandoffId, HouseholdId, ItemClassification, ItemId,
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -22,15 +22,34 @@ pub struct ItemState {
     pub status: ItemStatus,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum HandoffStatus {
+    Unacknowledged,
+    Acknowledged,
+    Archived,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct HandoffState {
+    pub handoff_id: HandoffId,
+    pub text: String,
+    pub created_by: ActorId,
+    pub created_at: i64,
+    pub status: HandoffStatus,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct HouseholdState {
     pub household_id: Option<HouseholdId>,
     pub items: Vec<ItemState>,
+    pub handoffs: Vec<HandoffState>,
 }
 
 pub fn rebuild(events: &[EventEnvelope]) -> Result<HouseholdState, KinError> {
     let mut household_id = None;
     let mut items = Vec::new();
+    let mut handoffs = Vec::new();
+    let mut handoff_positions = BTreeMap::new();
     let mut item_positions = BTreeMap::new();
     let mut event_bytes = BTreeMap::<EventId, Vec<u8>>::new();
     let mut last_logical_time = 0;
@@ -56,6 +75,34 @@ pub fn rebuild(events: &[EventEnvelope]) -> Result<HouseholdState, KinError> {
         }
 
         match &event.kind {
+            EventKind::HandoffAdded { handoff_id, text } => {
+                if text.trim().is_empty() || handoff_positions.contains_key(handoff_id) {
+                    return Err(KinError::InvalidEvent);
+                }
+                handoff_positions.insert(*handoff_id, handoffs.len());
+                handoffs.push(HandoffState {
+                    handoff_id: *handoff_id,
+                    text: text.clone(),
+                    created_by: event.actor_id,
+                    created_at: event.timestamp,
+                    status: HandoffStatus::Unacknowledged,
+                });
+            }
+            EventKind::HandoffAcknowledged { handoff_id }
+            | EventKind::HandoffArchived { handoff_id } => {
+                let position = handoff_positions
+                    .get(handoff_id)
+                    .copied()
+                    .ok_or(KinError::InvalidEvent)?;
+                let handoff = &mut handoffs[position];
+                if handoff.status == HandoffStatus::Archived {
+                    return Err(KinError::InvalidEvent);
+                }
+                handoff.status = match event.kind {
+                    EventKind::HandoffAcknowledged { .. } => HandoffStatus::Acknowledged,
+                    _ => HandoffStatus::Archived,
+                };
+            }
             EventKind::ItemAdded {
                 item_id,
                 text,
@@ -117,6 +164,7 @@ pub fn rebuild(events: &[EventEnvelope]) -> Result<HouseholdState, KinError> {
     Ok(HouseholdState {
         household_id,
         items,
+        handoffs,
     })
 }
 
@@ -133,6 +181,14 @@ mod tests {
         let event_id = EventId(id(event_number));
         let mut canonical_bytes = vec![event_number, logical_time as u8];
         match &kind {
+            EventKind::HandoffAdded { handoff_id, text } => {
+                canonical_bytes.extend_from_slice(&handoff_id.0);
+                canonical_bytes.extend_from_slice(text.as_bytes());
+            }
+            EventKind::HandoffAcknowledged { handoff_id }
+            | EventKind::HandoffArchived { handoff_id } => {
+                canonical_bytes.extend_from_slice(&handoff_id.0);
+            }
             EventKind::ItemAdded { item_id, text, .. } => {
                 canonical_bytes.extend_from_slice(&item_id.0);
                 canonical_bytes.extend_from_slice(text.as_bytes());

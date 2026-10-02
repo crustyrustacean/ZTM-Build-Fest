@@ -1,6 +1,6 @@
 # Persistent Contract Versioning
 
-**Status:** v0.2.0 implements version-specific event decoding and protocol v1/v2 handling. No source-event rewrite, structural IndexedDB upgrade, or export/import path exists. Canonical event semantics are in [EVENTS](EVENTS.md); current wire/storage contracts are in [ABI](ABI.md) and [STORAGE](STORAGE.md).
+**Status:** Protocols 1/2/3 and supported Item/Handoff schemas have explicit decoders. IndexedDB remains schema 1; no source-event migration exists.
 
 ## Independent version axes
 
@@ -10,13 +10,13 @@ Kin version numbers describe product releases; they do not version every persist
 | ------------------------ | --------------------------- | ------------------------------------------------------------------------ |
 | Application version      | `v0.1.0`, `v0.2.0`          | A Kin product release, source snapshot, and namespaced Git tag.          |
 | Event schema version     | `event_version = 1`         | The payload/envelope interpretation for one persisted event kind.        |
-| ABI/protocol version     | `protocol_version = 1 or 2` | The byte-level JavaScript ↔ WASM request/result contract.                |
+| ABI/protocol version     | `protocol_version = 1, 2, or 3` | The byte-level JavaScript ↔ WASM request/result contract.                |
 | IndexedDB schema version | database `version = 1`      | Object stores, indexes, and local record structure managed by IndexedDB. |
 | Export format version    | `format_version = 1`        | The portable archive manifest and event-container representation.        |
 
 These numbers evolve independently. An application release may keep the same event, protocol, storage, or export version; a contract may change between application versions. Never infer compatibility from equal version numbers or silently bump one axis as a proxy for another.
 
-The v0.2.0 implementation reads event schema 1 for all supported kinds and schema 2 for `ITEM_ADDED`; new instances write add schema 2 and other Item event schema 1. It reads protocol versions 1 and 2 and writes protocol 2. IndexedDB schema remains 1. Export format version 1 is a future design baseline only.
+The v0.2.0 implementation reads event schema 1 for all supported kinds and schema 2 for `ITEM_ADDED`; new instances write add schema 2 and other Item event schema 1. v0.3.0 additionally reads Handoff schema 1, supports protocols 1/2/3, and writes protocol 3. IndexedDB schema remains 1. Export format version 1 is a future design baseline only.
 
 ## Compatibility policy
 
@@ -50,4 +50,4 @@ This separates durable history from evolving in-memory types and enables old his
 
 ## Backward and forward guarantees
 
-Kin has published v0.1.x event history. v0.2.0 explicitly reads schema-v1 legacy item events, normalizes them in memory, and preserves their exact bytes; it writes schema-v2 `ITEM_ADDED` and schema-v1 lifecycle events. Protocol v1 and v2 are supported, with v2 written by current clients. IndexedDB remains schema 1. A client with no decoder for a future event must preserve it and fail closed, not pretend it has derived complete household state.
+Kin has published v0.1.x event history. v0.2.0 explicitly reads schema-v1 legacy item events, normalizes them in memory, and preserves their exact bytes; it writes schema-v2 `ITEM_ADDED` and schema-v1 lifecycle events. Protocols v1/v2/v3 are supported, with v3 written by current clients. Protocols v1/v2 reject Handoff history rather than return lossy state. IndexedDB remains schema 1. A client with no decoder for a future event must preserve it and fail closed, not pretend it has derived complete household state.

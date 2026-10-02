@@ -1,6 +1,6 @@
 # Release Process
 
-**Status:** active release procedure. Kin's current tags are annotated, namespaced `kin-vX.Y.Z`; the v0.2.0–v0.2.4 line is developed on its approved release branch and is not merged to `kin-main` automatically.
+**Status:** Annotated local Kin milestones use kin-v0.3.0-development. Do not merge to kin-main or push automatically; stop after v0.3.3.
 
 ## Release sequence
 

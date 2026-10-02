@@ -106,7 +106,7 @@ Completed: corrected protocol-v1 result headers without changing the historical 
 
 ### `v0.3.0` — Handoff
 
-Add short parent-to-parent handoffs, acknowledgement, recent handoff state, and household context transfer.
+Implemented locally: short Handoff capture, acknowledgement, recent context, and terminal archival. Protocol v3 preserves Item history and adds Handoff projection; actors remain local placeholders. Approved stabilization continues through v0.3.3, then stops for evaluation.
 
 ### `v0.4.0` — Talk
 
@@ -138,4 +138,4 @@ Focus on polish, reliability, accessibility, mobile UX, privacy documentation, o
 
 ## Scope discipline
 
-Each roadmap item is future work unless explicitly marked as completed. Authentication, passkeys, encryption, remote services, pairing, and synchronization remain unimplemented and out of scope for v0.2.x. Releases through `v0.0.12` were documentation-only; v0.1.0 is the first coded release. Handoff remains assigned to v0.3.0 and has not started.
+Each roadmap item is future work unless explicitly marked as completed. Authentication, passkeys, encryption, remote services, pairing, and synchronization remain unimplemented and out of scope for v0.2.x. Releases through `v0.0.12` were documentation-only; v0.1.0 is the first coded release. Handoff is implemented in v0.3.0; v0.4.0 Talk remains future work.

@@ -387,3 +387,13 @@ kin-item {
     transition-duration: 0.01ms !important;
   }
 }
+
+kin-handoff-list { display: block; }
+.handoff-section { margin-top: 28px; padding-top: 28px; border-top: 1px solid var(--line); }
+.handoff-hint { color: var(--muted); line-height: 1.5; }
+.handoff-form { grid-template-columns: minmax(0, 1fr) auto; }
+.handoff-row { grid-template-columns: minmax(0, 1fr); }
+.handoff-row .item-action { justify-content: flex-start; max-width: none; }
+@media (max-width: 420px) {
+  .handoff-form .add-button { grid-column: 1 / -1; }
+}

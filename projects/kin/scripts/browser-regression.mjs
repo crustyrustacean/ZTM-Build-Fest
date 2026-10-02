@@ -1,6 +1,7 @@
 // Node 22+ and a Chromium-family executable; no npm packages required.
 // Uses a fresh temporary profile and loopback server, never an existing Kin DB.
 import assert from "node:assert/strict";
+import { handoffRegressions, handoffPeerRegressions } from "./handoff-regression.mjs";
 import { spawn } from "node:child_process";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { createServer } from "node:http";
@@ -779,7 +780,8 @@ try {
   }
   const first = await tab();
   console.log(await first.evaluate(`(${regressions.toString()})()`));
-  const state = await first.evaluate("window.kinExpectedState");
+  console.log(await first.evaluate(`(${handoffRegressions.toString()})()`));
+  const state = await first.evaluate('JSON.stringify(document.querySelector("kin-app").state)');
   await first.send("Page.reload");
   await until(() => first.evaluate("window.kinExpectedState === undefined"));
   await ready(first);
@@ -836,6 +838,23 @@ try {
   );
   console.log("PASS reload/replay, draft restoration, keyboard submission");
 
+  assert.equal(await first.evaluate('document.querySelector("#handoff-text").value'), "Newer handoff draft");
+  await first.evaluate('document.querySelector("#handoff-text").focus()');
+  for (const type of ["keyDown", "keyUp"]) await first.send("Input.dispatchKeyEvent", {
+    type, key: "Enter", code: "Enter", windowsVirtualKeyCode: 13,
+    ...(type === "keyDown" ? { text: "\r" } : {}),
+  });
+  await ready(first);
+  assert.equal(await first.evaluate('document.querySelector("#handoff-text").value'), "");
+  await first.evaluate('document.querySelector("kin-handoff-list .complete-button").focus()');
+  for (const type of ["keyDown", "keyUp"]) await first.send("Input.dispatchKeyEvent", {
+    type, key: "Enter", code: "Enter", windowsVirtualKeyCode: 13,
+    ...(type === "keyDown" ? { text: "\r" } : {}),
+  });
+  await ready(first);
+  assert.equal(await first.evaluate('document.activeElement === document.querySelector("#handoff-text")'), true);
+  assert.equal(await first.evaluate('document.querySelector("kin-app").state.handoffs.at(-1).status'), "acknowledged");
+  console.log("PASS Handoff draft reload, keyboard capture/acknowledgement, focus restoration");
   const second = await tab();
   await second.evaluate(`window.peerReads=0; window.peerReplays=0; window.peerMessages=[];
     { const a=document.querySelector('kin-app'); const load=a.store.loadEvents.bind(a.store); const replay=a.engine.applyEvents;
@@ -1019,6 +1038,7 @@ try {
     "PASS two tabs, content-free invalidation, canonical IndexedDB reload, Rust replay",
   );
 
+  await handoffPeerRegressions(first, second, until);
   await first.evaluate(`(()=>{
     const app=document.querySelector('kin-app');
     const item=[...app.querySelectorAll('kin-item')]
@@ -1057,7 +1077,7 @@ try {
   );
   await ready(first);
   assert.equal(
-    await first.evaluate('document.querySelectorAll(".compose-form").length'),
+    await first.evaluate('document.querySelectorAll("kin-compose .compose-form").length'),
     1,
   );
   await first.send("Emulation.setDeviceMetricsOverride", {

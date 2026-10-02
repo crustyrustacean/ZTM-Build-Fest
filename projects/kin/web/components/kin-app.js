@@ -3,6 +3,7 @@ import { EventStore } from "../storage/event-store.js";
 import "./kin-compose.js";
 import "./kin-item.js";
 import "./kin-today.js";
+import "./kin-handoff-list.js";
 
 const START_ERROR =
   "Kin could not start its household engine or local storage. Your saved information was not intentionally deleted.";
@@ -14,7 +15,7 @@ class KinApp extends HTMLElement {
     super();
     this.engine = null;
     this.store = null;
-    this.state = { items: [] };
+    this.state = { items: [], handoffs: [] };
     this.busy = false;
     this.starting = null;
     this.initialized = false;
@@ -28,6 +29,9 @@ class KinApp extends HTMLElement {
     this.onCompleteItem = (event) => this.handleCompleteItem(event);
     this.onReopenItem = (event) => this.handleReopenItem(event);
     this.onArchiveItem = (event) => this.handleArchiveItem(event);
+    this.onAddHandoff = event => this.handleAddHandoff(event);
+    this.onAcknowledgeHandoff = event => this.handleHandoffAction("acknowledge-handoff", event.detail.handoffId);
+    this.onArchiveHandoff = event => this.handleHandoffAction("archive-handoff", event.detail.handoffId);
     this.onPeerMessage = (event) => this.handlePeerMessage(event);
   }
 
@@ -40,6 +44,9 @@ class KinApp extends HTMLElement {
     this.addEventListener("kin:complete-item", this.onCompleteItem);
     this.addEventListener("kin:reopen-item", this.onReopenItem);
     this.addEventListener("kin:archive-item", this.onArchiveItem);
+    this.addEventListener("kin:add-handoff", this.onAddHandoff);
+    this.addEventListener("kin:acknowledge-handoff", this.onAcknowledgeHandoff);
+    this.addEventListener("kin:archive-handoff", this.onArchiveHandoff);
     this.openPeerChannel();
     if (this.store) {
       // Reconnecting must not restart the engine or unlock an in-flight save.
@@ -69,7 +76,8 @@ class KinApp extends HTMLElement {
     this.main = main;
     this.today = document.createElement("kin-today");
     this.compose = document.createElement("kin-compose");
-    main.append(this.today, this.compose);
+    this.handoffs = document.createElement("kin-handoff-list");
+    main.append(this.today, this.compose, this.handoffs);
 
     const feedback = document.createElement("div");
     feedback.className = "app-feedback";
@@ -97,6 +105,9 @@ class KinApp extends HTMLElement {
     this.removeEventListener("kin:complete-item", this.onCompleteItem);
     this.removeEventListener("kin:reopen-item", this.onReopenItem);
     this.removeEventListener("kin:archive-item", this.onArchiveItem);
+    this.removeEventListener("kin:add-handoff", this.onAddHandoff);
+    this.removeEventListener("kin:acknowledge-handoff", this.onAcknowledgeHandoff);
+    this.removeEventListener("kin:archive-handoff", this.onArchiveHandoff);
     this.closePeerChannel();
   }
 
@@ -176,6 +187,39 @@ class KinApp extends HTMLElement {
       if (restoreComposeFocus) {
         this.compose.focusInput();
       }
+      this.flushPeerRefresh();
+    }
+  }
+
+  async handleAddHandoff(event) {
+    return this.saveHandoff({ type: "add-handoff", text: event.detail.text });
+  }
+
+  async handleHandoffAction(type, handoffId) {
+    return this.saveHandoff({ type, handoffId });
+  }
+
+  async saveHandoff(command) {
+    if (this.busy || !this.store || !this.engine) return;
+    const submitted = Object.freeze({ ...command });
+    this.setBusy(true);
+    this.clearAlert();
+    this.setStatus("Saving…");
+    try {
+      this.state = await this.store.append(submitted, this.engine);
+      this.renderState();
+      if (submitted.type === "add-handoff") this.handoffs.clearIfMatches(submitted);
+      this.setStatus(submitted.type === "add-handoff" ? "Handoff added." :
+        submitted.type === "acknowledge-handoff" ? "Acknowledged." : "Handoff archived.");
+      this.broadcastEventChange();
+    } catch (error) {
+      if (error.code === 4 && submitted.handoffId) this.pendingRefresh = true;
+      this.showAlert(error.userMessage ?? SAVE_ERROR, () => this.saveHandoff(submitted),
+        submitted.handoffId ? submitted : null);
+      this.setStatus("");
+    } finally {
+      this.setBusy(false);
+      this.handoffs.focusInput();
       this.flushPeerRefresh();
     }
   }
@@ -289,6 +333,7 @@ class KinApp extends HTMLElement {
     const previousRetryIntent = this.retryIntent;
     const previousAlert = this.alert.textContent;
     const restoreComposeFocus = this.today.contains(document.activeElement);
+    const restoreHandoffFocus = this.handoffs.lists.contains(document.activeElement);
     this.clearAlert();
     this.setStatus("Updating from another tab…");
     try {
@@ -299,13 +344,15 @@ class KinApp extends HTMLElement {
       this.renderState();
       this.setStatus("Updated from another tab.");
       if (previousRetry) {
-        const item = previousRetryIntent
+        const handoff = previousRetryIntent?.handoffId
+          ? this.state.handoffs.find(record => record.handoffId === previousRetryIntent.handoffId) : null;
+        const item = previousRetryIntent?.handoffId ? handoff : previousRetryIntent
           ? this.state.items.find(
               (stateItem) => stateItem.itemId === previousRetryIntent.itemId,
             )
           : null;
         if (previousRetryIntent && (!item || item.status === "archived")) {
-          this.setStatus("That item changed. Review its current state below.");
+          this.setStatus(previousRetryIntent.handoffId ? "That handoff changed. Review its current state." : "That item changed. Review its current state below.");
         } else {
           this.showAlert(previousAlert, previousRetry, previousRetryIntent);
         }
@@ -320,6 +367,7 @@ class KinApp extends HTMLElement {
     } finally {
       this.refreshing = false;
       this.setBusy(false);
+      if (restoreHandoffFocus) this.handoffs.focusInput();
       if (restoreComposeFocus) {
         this.compose.focusInput();
       }
@@ -337,6 +385,7 @@ class KinApp extends HTMLElement {
 
   renderState() {
     this.today.items = this.state.items;
+    this.handoffs.handoffs = this.state.handoffs;
   }
 
   setBusy(isBusy) {
@@ -344,6 +393,7 @@ class KinApp extends HTMLElement {
     this.main.setAttribute("aria-busy", String(isBusy));
     this.compose.disabled = isBusy || !this.store;
     this.today.disabled = isBusy || !this.store;
+    this.handoffs.disabled = isBusy || !this.store;
     this.retryButton.disabled = isBusy;
   }
 

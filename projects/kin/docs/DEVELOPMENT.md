@@ -1,6 +1,6 @@
 # Development Workflow
 
-**Status:** current workflow for the v0.2.x Today + Needs prototype.
+**Status:** current workflow for the v0.3.x Today + Needs + Handoff prototype.
 
 ## Build and run
 
@@ -51,7 +51,7 @@ No npm dependency tree or framework runtime is planned. If static serving later 
 
 ## Browser capabilities
 
-The application requires WebAssembly, ES modules, Custom Elements, IndexedDB, `CustomEvent`, text encoders/decoders, and secure-context browser APIs. WebAuthn and Web Crypto for content security belong to later identity/sync work, not v0.2.x. Browser validation is recorded per release and does not certify the full browser support target.
+The application requires WebAssembly, ES modules, Custom Elements, IndexedDB, `CustomEvent`, text encoders/decoders, and secure-context browser APIs. WebAuthn and Web Crypto for content security belong to later identity/sync work, not v0.3.x. Browser validation is recorded per release and does not certify the full browser support target.
 
 ## Development data
 

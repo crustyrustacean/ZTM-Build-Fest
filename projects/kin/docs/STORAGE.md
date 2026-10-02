@@ -1,6 +1,6 @@
 # Local Event Storage
 
-**Status:** IndexedDB schema 1 remains the canonical v0.2.0 event store. It persists immutable schema-v1/v2 event bytes and local context; protocol bytes are specified in [ABI](ABI.md), and event identity/order are in [EVENTS](EVENTS.md).
+**Status:** IndexedDB schema 1 remains canonical for Item and Handoff events. No persisted bytes are migrated; stores/indexes are unchanged.
 
 The compose input keeps a best-effort in-progress text and classification draft in the current tab's `sessionStorage`, retaining the existing text key for legacy drafts. This transient data is not an event or household-state source of truth, is cleared only when the exact submitted draft succeeds or the user clears text, and is unavailable across tabs.
 
@@ -35,8 +35,8 @@ actor_id             16-byte local actor placeholder
 device_id            16-byte local installation placeholder
 timestamp            signed UTC epoch milliseconds
 logical_time         unsigned 64-bit local logical order value
-kind                 ITEM_ADDED, ITEM_COMPLETED, ITEM_REOPENED, or ITEM_ARCHIVED
-event_version        ITEM_ADDED schema 1 or 2; lifecycle schema 1
+kind                 Item kinds 1–4 or Handoff kinds 5–7 (see ABI)
+event_version        ITEM_ADDED schema 1 or 2; all other supported kinds schema 1
 encoded_event        exact canonical event bytes used for Rust replay
 ```
 
@@ -65,4 +65,8 @@ IndexedDB stores events. Rust derives household state from those events. Do not 
 
 Increment the IndexedDB schema version only for structural database changes. Each migration must be transactional, preserve event bytes and ordering where possible, and fail with a recoverable message rather than silently discarding data. Event schema version, ABI protocol version, application version, and portable export version are independent from the IndexedDB database version. On an unsupported version or failed upgrade, preserve the existing database and do not clear it as a fallback. See [VERSIONING](VERSIONING.md) and [MIGRATIONS](MIGRATIONS.md) for compatibility and recovery policy.
 
-Archive is an Item tombstone event; it does not delete source events or implement physical deletion. Portable copy, household deletion, remote deletion, backup retention, and event compaction remain future work described in [RETENTION](RETENTION.md) and [PORTABILITY](PORTABILITY.md). Do not silently delete history as a side effect of completing or archiving an item.
+Archive is an Item or Handoff tombstone event; it does not delete source events or implement physical deletion. Portable copy, household deletion, remote deletion, backup retention, and event compaction remain future work described in [RETENTION](RETENTION.md) and [PORTABILITY](PORTABILITY.md). Do not silently delete history as a side effect of completing or archiving an item.
+
+## Handoff storage
+
+The independent draft key is `kin.handoff.draft`; it is best-effort, tab-scoped, and cleared only if successful submitted text still matches. Handoff shares atomic append/counter transactions and content-free invalidation.

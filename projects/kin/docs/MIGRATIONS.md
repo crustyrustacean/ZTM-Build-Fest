@@ -1,6 +1,6 @@
 # Data Migrations
 
-**Status:** no structural IndexedDB migration is required or implemented in v0.2.0. Rust performs in-memory version-specific event decoding/normalization while preserving source bytes. General migration policy remains in [VERSIONING](VERSIONING.md); current local storage shape is specified in [STORAGE](STORAGE.md).
+**Status:** No structural migration is required in v0.3.0. Legacy Item bytes and Handoff bytes coexist in schema 1; normalization is in memory only.
 
 ## Migration categories
 

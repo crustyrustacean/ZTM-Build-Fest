@@ -21,6 +21,7 @@ id_type!(HouseholdId);
 id_type!(ActorId);
 id_type!(DeviceId);
 id_type!(ItemId);
+id_type!(HandoffId);
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ItemClassification {
@@ -30,6 +31,16 @@ pub enum ItemClassification {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum EventKind {
+    HandoffAdded {
+        handoff_id: HandoffId,
+        text: String,
+    },
+    HandoffAcknowledged {
+        handoff_id: HandoffId,
+    },
+    HandoffArchived {
+        handoff_id: HandoffId,
+    },
     ItemAdded {
         item_id: ItemId,
         text: String,

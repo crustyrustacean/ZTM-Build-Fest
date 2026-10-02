@@ -1,5 +1,8 @@
 import {
   encodeAddedRecord,
+  encodeHandoffAddedRecord,
+  encodeHandoffAcknowledgedRecord,
+  encodeHandoffArchivedRecord,
   encodeArchivedRecord,
   encodeCompletedRecord,
   idFromHex,
@@ -153,7 +156,16 @@ export class EventStore {
           };
           let kind;
           let encodedEvent;
-          if (command.type === "add") {
+          if (command.type === "add-handoff") {
+            kind = "HANDOFF_ADDED";
+            encodedEvent = encodeHandoffAddedRecord({ ...identity, handoffId: randomId(), text: command.text });
+          } else if (command.type === "acknowledge-handoff") {
+            kind = "HANDOFF_ACKNOWLEDGED";
+            encodedEvent = encodeHandoffAcknowledgedRecord({ ...identity, handoffId: idFromHex(command.handoffId) });
+          } else if (command.type === "archive-handoff") {
+            kind = "HANDOFF_ARCHIVED";
+            encodedEvent = encodeHandoffArchivedRecord({ ...identity, handoffId: idFromHex(command.handoffId) });
+          } else if (command.type === "add") {
             kind = "ITEM_ADDED";
             encodedEvent = encodeAddedRecord({
               ...identity,
@@ -399,6 +411,9 @@ function validateEventRow(row) {
     ITEM_COMPLETED: 2,
     ITEM_REOPENED: 3,
     ITEM_ARCHIVED: 4,
+    HANDOFF_ADDED: 5,
+    HANDOFF_ACKNOWLEDGED: 6,
+    HANDOFF_ARCHIVED: 7,
   }[row.kind];
   const supportedVersion =
     (row.kind === "ITEM_ADDED" && [1, 2].includes(row.event_version)) ||

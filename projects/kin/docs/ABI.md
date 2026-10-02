@@ -1,6 +1,6 @@
 # JavaScript–WASM ABI
 
-**Status:** protocol v1 remains supported unchanged, and protocol v2 is implemented for v0.2.0. The manual WASM exports and versioned byte layouts below define the current bridge; module responsibilities are in [IMPLEMENTATION](IMPLEMENTATION.md), and state semantics are in [EVENTS](EVENTS.md) and [STATE](STATE.md).
+**Status:** Protocols v1/v2 remain supported unchanged. Protocol v3 explicitly carries Item + Handoff state; current browser calls use v3.
 
 ## Target and exports
 
@@ -85,7 +85,7 @@ The error code is also returned from `kin_apply_events`: `0` success, `1` invali
 
 Protocol v1 is retained byte-for-byte for legacy callers. Its event kinds are only `ITEM_ADDED` (1) and `ITEM_COMPLETED` (2), event schema is v1, result status is `0 = active` or `1 = completed`, and all its reserved bytes remain zero. It does not reinterpret reserved bytes as classification or archived status.
 
-## Protocol version 2 (current)
+## Protocol version 2 (legacy classified Items)
 
 Protocol v2 uses the same `KINE`/`KINS` signatures, 12-byte outer headers, 88-byte event headers, little-endian encoding, 10,000-event limit, and 64 MiB request/result limits. Its header version is `2`; event envelope fields retain the protocol-v1 byte offsets. It supports legacy schema-v1 records and current event kinds 1–4; `ITEM_ADDED` schema v2 is the only new payload version.
 
@@ -116,7 +116,7 @@ size  field
 N     text bytes
 ```
 
-Items remain serialized in original add-event order, including archived tombstones so the caller can make a filtered view without becoming a reducer. The browser hides archived items from ordinary lists. Protocol v2 is the only protocol written by new browser instances. `KERR` retains the v1 header/version and stable numeric error codes for both request versions.
+Items remain serialized in original add-event order, including archived tombstones so the caller can make a filtered view without becoming a reducer. The browser hides archived items from ordinary lists. Protocol v3 is written by new browser instances. `KERR` retains the v1 header/version and stable numeric error codes for both request versions.
 
 ## Ownership and lifetime
 
@@ -132,10 +132,18 @@ Items remain serialized in original add-event order, including archived tombston
 
 ## Call behavior
 
-`kin_apply_events` accepts one complete, ordered event batch using protocol version 1 or 2. It validates the entire request and reconstructs from scratch. On success it publishes a complete result in the requested protocol version and returns zero. On failure it publishes an error and no partial result; stored IndexedDB bytes remain untouched. Unknown protocol/event versions fail with a stable unsupported-version code; malformed payload, bounds overflow, and invalid state transitions fail deterministically.
+`kin_apply_events` accepts one complete, ordered event batch using protocol version 1, 2, or 3. It validates the entire request and reconstructs from scratch. On success it publishes a complete result in the requested protocol version and returns zero. On failure it publishes an error and no partial result; stored IndexedDB bytes remain untouched. Unknown protocol/event versions fail with a stable unsupported-version code; malformed payload, bounds overflow, and invalid state transitions fail deterministically.
 
 The function may grow memory while parsing or building output. JavaScript must reacquire `memory.buffer` after the call before copying result/error bytes. Length arithmetic is checked for overflow in both languages. Cap a request and result at 64 MiB, a request at 10,000 events, and individual item text at 4096 UTF-8 bytes for v0.1.0; reject larger input before unbounded allocation. The matching 10,000-event storage limit is specified in [STORAGE](STORAGE.md).
 
 ## JavaScript bridge responsibilities
 
 The high-level bridge owns loading/instantiation, ABI export checks, buffer allocation/copy/free, memory view refresh, binary protocol encode/decode, and conversion of stable ABI errors to UI-safe messages. It must not implement event replay or state transitions.
+
+## Protocol version 3 (current)
+
+Requests retain the 12-byte KINE header and 88-byte envelope with explicit version 3. All v2 events plus schema-1 kinds 5 HANDOFF_ADDED, 6 HANDOFF_ACKNOWLEDGED, and 7 HANDOFF_ARCHIVED are supported. Add payload: handoff_id[16], text_length:u32, strict UTF-8 text (1–4096 bytes). Reference payloads: exactly handoff_id[16]. Existing codes/payloads are unchanged.
+
+KINS v3 header: magic[4], version:u16=3, reserved:u16=0, item_count:u32, handoff_count:u32 (16 bytes). All v2-layout Item records precede Handoff records. A Handoff record is handoff_id[16], created_by[16], created_at:i64, status:u8 (0 unacknowledged, 1 acknowledged, 2 archived), reserved[3]=0, text_length:u32, text. Fixed record size is 48 bytes. Collections retain original add order including tombstones; combined count is at most 10,000. The 64 MiB bound remains. Empty v3 output is 16 bytes. KERR stays version 1.
+
+Protocols v1/v2 reject Handoff events and cannot serialize Handoff projection, including archived state. They never silently omit it. Protocol v1 still rejects Needs/archived Item state. See [V0.3.0](V0.3.0.md).

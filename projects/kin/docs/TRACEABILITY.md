@@ -42,3 +42,7 @@
 | 10,000-event replay remains bounded and deterministic               | [ABI](ABI.md), [STATE](STATE.md), [TEST-VECTORS](TEST-VECTORS.md)             | Native Rust and real WASM replay 10,000 classified items within 64 MiB and produce deterministic results.         |
 | Repeated WASM calls do not leak stale output/error buffers          | [ABI](ABI.md), [TESTING](TESTING.md)                                          | Browser performs success, unsupported event, empty, and repeated success calls in sequence.                       |
 | Local privacy/security boundaries remain intact                     | [ARCHITECTURE](ARCHITECTURE.md), [PRINCIPLES](PRINCIPLES.md), [ABI](ABI.md)   | Safe text DOM, CSP, same-origin-only requests, content-free invalidation, and no framework/dependency audit.      |
+
+## v0.3.0 Handoff
+
+Authority: [V0.3.0](V0.3.0.md), ABI, EVENTS, LIFECYCLES. Rust protocol tests cover typed projection, lifecycle, identity, deduplication, and mixed replay. Node tests cover actual WASM and v1/v2/v3 compatibility. Browser Handoff regressions cover persistence, drafts, retry ownership, inert rendering, neutral labels, and cross-tab stale intent.

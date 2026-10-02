@@ -1,6 +1,6 @@
 # Derived Household State
 
-**Status:** v0.2.0 Item state, classification normalization, lifecycle transitions, and deterministic replay are implemented in Rust. Other domain projections remain future work. Event rules are in [Events](EVENTS.md); entity meaning is in [Domain](DOMAIN.md).
+**Status:** Rust projects Items and Handoffs from one immutable event stream. Later projections remain future work.
 
 ## Projection pipeline
 
@@ -28,7 +28,8 @@ Keep the first projection small:
 ```text
 HouseholdState
 ├── household_id: Option<HouseholdId>
-└── items: Vec<ItemState> in original add-event order
+├── items: Vec<ItemState> in original add-event order
+└── handoffs: Vec<HandoffState> in original add-event order
 
 ItemState
 ├── item_id
@@ -39,7 +40,7 @@ ItemState
 └── status: active | completed | archived
 ```
 
-Items are identified by stable item ID, never display text. Actor, household, and device IDs remain local placeholders. Schema-v1 `ITEM_ADDED` events normalize to `today`; schema-v2 events carry explicit classification. Handoff, Talk, Pulse, Routine, Agreement, authentication, and remote device state are outside the v0.2.x projection.
+Items are identified by stable item ID, never display text. Actor, household, and device IDs remain local placeholders. Schema-v1 `ITEM_ADDED` events normalize to `today`; schema-v2 events carry explicit classification. HandoffState contains handoff_id, text, created_by, created_at, and status (unacknowledged, acknowledged, archived). Acknowledgement actor/time remain in its source envelope. Talk, Pulse, Routine, Agreement, authentication, and remote device state remain future work.
 
 ## Validation and errors
 

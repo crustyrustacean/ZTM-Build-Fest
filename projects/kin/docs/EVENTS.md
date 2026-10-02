@@ -1,6 +1,6 @@
 # Household Events
 
-**Status:** v0.2.0 implements `ITEM_ADDED` schemas 1 and 2, plus schema-1 `ITEM_COMPLETED`, `ITEM_REOPENED`, and `ITEM_ARCHIVED`. Other event kinds remain future work. Related entity meanings are in [Domain](DOMAIN.md); projections and replay are in [State](STATE.md).
+**Status:** Item kinds 1–4 and Handoff kinds 5–7 are implemented. See [V0.3.0](V0.3.0.md); later event kinds remain future work.
 
 ## Canonical record
 
@@ -35,7 +35,7 @@ Fields are specified now to avoid casually changing identity semantics later. Th
 
 ## Event naming and availability
 
-Use uppercase entity/action-past-tense names consistently. The milestone column records assigned scope; v0.2.0 Item events are implemented, and later product events remain planned.
+Use uppercase entity/action-past-tense names consistently. The milestone column records assigned scope; Item and Handoff events are implemented; later events remain planned.
 
 | Event kind             | Planned milestone | Purpose                                                      |
 | ---------------------- | ----------------- | ------------------------------------------------------------ |
@@ -64,7 +64,7 @@ Use uppercase entity/action-past-tense names consistently. The milestone column 
 | `AGREEMENT_REVISED`    | Unscheduled       | Record a deliberate revision.                                |
 | `AGREEMENT_ARCHIVED`   | Unscheduled       | Archive an agreement.                                        |
 
-“Since You Last Looked” is a derived view of events, not a new event kind. v0.2.0 supports the four Item event kinds above; all other kinds are deferred. Event kind codes remain 1–4 respectively. Event schema v1 `ITEM_ADDED` contains no classification and normalizes to Today. Schema v2 `ITEM_ADDED` adds a fixed classification byte (`0 = Today`, `1 = Need`) and three zero reserved bytes before the text length. New instances write schema v2 for adds and schema v1 for the other Item events. Protocol and event version compatibility is specified in [ABI](ABI.md) and [VERSIONING](VERSIONING.md). The unscheduled agreement events are not a release commitment.
+“Since You Last Looked” is a derived view of events, not a new event kind. v0.3.0 supports Item kinds 1–4 plus Handoff kinds 5–7, each Handoff kind using schema 1; all other kinds are deferred. Event kind codes remain 1–4 respectively. Event schema v1 `ITEM_ADDED` contains no classification and normalizes to Today. Schema v2 `ITEM_ADDED` adds a fixed classification byte (`0 = Today`, `1 = Need`) and three zero reserved bytes before the text length. New instances write schema v2 for adds and schema v1 for the other Item events. Protocol and event version compatibility is specified in [ABI](ABI.md) and [VERSIONING](VERSIONING.md). The unscheduled agreement events are not a release commitment.
 
 ## Immutability and corrections
 

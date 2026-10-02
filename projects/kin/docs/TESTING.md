@@ -1,6 +1,6 @@
 # v0.1.0 Testing Contract
 
-**Status:** v0.2.3 completes the approved v0.2.x regression line. It retains the v0.1.x/v0.2.1/v0.2.2 dependency-free Rust, Node bridge, and browser-native coverage, including architecture/privacy checks and a maximum 10,000-event replay through Rust and real WASM. Accessibility requirements are in [ACCESSIBILITY](ACCESSIBILITY.md); event/protocol behavior is in [EVENTS](EVENTS.md) and [ABI](ABI.md).
+**Status:** The complete prior regression suite is retained and extended for Handoff. See V0.3.0 for the release gate and CHANGELOG for actual results/environments.
 
 ## Rust domain tests
 
@@ -82,3 +82,7 @@ The following platforms/assistive technologies are not certified by the Windows/
 - [ ] VoiceOver with Safari: labels, status/error announcements, completion, and focus restoration.
 
 Do not introduce an external test framework just for convenience. Record tested browser/runtime versions and manual steps in the release notes when implementation begins.
+
+## Handoff
+
+Coverage in protocol.rs, kin-engine.test.mjs, and scripts/handoff-regression.mjs (called by the browser runner) exercises mixed replay, lifecycle, legacy rejection, immutable storage, inert text, drafts/retries, and cross-tab canonical state.
