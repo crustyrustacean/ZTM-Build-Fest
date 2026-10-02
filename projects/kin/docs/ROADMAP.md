@@ -1,6 +1,6 @@
 # Roadmap
 
-This roadmap is a planning baseline, not a promise of delivery dates. Releases may change as the product is tested. Kin is currently at the completed documentation-only `v0.0.6` milestone; no application code exists. Planning is complete and v0.1.0 is the next, first coded release.
+This roadmap is a planning baseline, not a promise of delivery dates. Releases may change as the product is tested. Kin is currently at the documentation-only `v0.0.7` milestone; no application code exists. Planning continues through `v0.0.9` before the first coded release.
 
 ## Planning releases
 
@@ -26,7 +26,19 @@ Specify household/member/device/credential identity, pairing and device revocati
 
 ### `v0.0.6` — Implementation Contract
 
-Freeze the v0.1.0 scope and specify its ABI, protocol, local storage, components, testing, accessibility, and release gate. This completes planning; it does not ship an app. See [IMPLEMENTATION](IMPLEMENTATION.md), [ABI](ABI.md), [STORAGE](STORAGE.md), [COMPONENTS](COMPONENTS.md), [TESTING](TESTING.md), [ACCESSIBILITY](ACCESSIBILITY.md), and [V0.1.0](V0.1.0.md).
+Freeze the initial v0.1.0 scope and specify its ABI, protocol, local storage, components, testing, accessibility, and release gate. The `.0.7`–`.0.9` planning releases add durability, contributor guidance, and final preflight; v0.0.6 does not ship an app. See [IMPLEMENTATION](IMPLEMENTATION.md), [ABI](ABI.md), [STORAGE](STORAGE.md), [COMPONENTS](COMPONENTS.md), [TESTING](TESTING.md), [ACCESSIBILITY](ACCESSIBILITY.md), and [V0.1.0](V0.1.0.md).
+
+### `v0.0.7` — Data Durability & Evolution
+
+Define independent persistent-contract versions, compatibility and migration failure behavior, portable export/import requirements, data retention/deletion boundaries, and event-log growth/checkpoint principles. Specifications only; no migration or export functionality. See [VERSIONING](VERSIONING.md), [MIGRATIONS](MIGRATIONS.md), [PORTABILITY](PORTABILITY.md), and [RETENTION](RETENTION.md).
+
+### `v0.0.8` — Developer & Contributor Experience
+
+Document human contribution expectations, intended cross-platform development setup, code style, release procedure, and privacy-safe debugging. No executable tooling or application code.
+
+### `v0.0.9` — Implementation Preflight
+
+Complete the specification audit, decision records, test vectors, and traceability for the frozen v0.1.0 scope. This is the final planning release; it does not begin implementation.
 
 ## First coded release
 
@@ -76,4 +88,4 @@ Focus on polish, reliability, accessibility, mobile UX, privacy documentation, o
 
 ## Scope discipline
 
-Each roadmap item is future work unless explicitly marked as a completed planning milestone. Authentication, passkeys, encryption, remote services, pairing, and synchronization are design topics in `v0.0.5`, not implemented features or part of `v0.1.0`. No v0.1.0 code should be started during planning through `v0.0.6`.
+Each roadmap item is future work unless explicitly marked as a completed planning milestone. Authentication, passkeys, encryption, remote services, pairing, and synchronization are design topics, not implemented features or part of `v0.1.0`. Planning-only scope continues through `v0.0.9`; v0.1.0 remains the first coded release.

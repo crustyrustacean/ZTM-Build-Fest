@@ -111,13 +111,16 @@ v0.0.3
 v0.0.4
 v0.0.5
 v0.0.6
+v0.0.7
+v0.0.8
+v0.0.9
 ```
 
-All releases through `v0.0.6` are **planning and documentation releases only**.
+All releases through `v0.0.9` are **planning and documentation releases only**.
 
 No functional application code should be introduced during these versions.
 
-Planning through `v0.0.6` is complete. `v0.1.0` is the first coded milestone. When implementation is explicitly authorized, follow [docs/V0.1.0.md](docs/V0.1.0.md) and its linked ABI, storage, component, test, and accessibility contracts. Do not allow features assigned to later versions to leak into v0.1.0.
+Planning through `v0.0.9` must be complete before implementation begins. `v0.1.0` is the first coded milestone. When implementation is explicitly authorized, follow [V0.1.0](docs/V0.1.0.md) and, once planning is complete, read `docs/PREFLIGHT.md`, `docs/TEST-VECTORS.md`, `docs/TRACEABILITY.md`, and accepted decisions under `docs/decisions/`. Do not allow features assigned to later versions to leak into v0.1.0.
 
 The first implementation release is:
 
@@ -198,7 +201,25 @@ No implementation.
 
 Freeze the v0.1.0 implementation scope and specify its project layout, manual JS/WASM ABI and protocol, IndexedDB contract, component boundaries, test contract, accessibility contract, and release gate.
 
-Planning is complete at v0.0.6. The first coded milestone is v0.1.0; do not begin it until explicitly instructed.
+The v0.0.6 implementation contract is an initial specification milestone; durability, contributor, and preflight planning continue through v0.0.9. The first coded milestone is v0.1.0; do not begin it until explicitly instructed.
+
+---
+
+## v0.0.7 — Data Durability & Evolution
+
+Specify persistent-contract versioning, compatibility, migrations, portable export/import, retention/deletion, and event-log growth. Do not implement migrations, exports, or deletion.
+
+---
+
+## v0.0.8 — Developer & Contributor Experience
+
+Document contribution expectations, intended cross-platform development workflow, code style, release process, and privacy-safe debugging. Do not add executable tooling or build code.
+
+---
+
+## v0.0.9 — Implementation Preflight
+
+Audit and reconcile the specification, record established decisions, define canonical test vectors and requirement traceability, and freeze the v0.1.0 handoff. No implementation begins in this release.
 
 ---
 
@@ -877,7 +898,21 @@ docs/
 ├── COMPONENTS.md
 ├── TESTING.md
 ├── ACCESSIBILITY.md
-└── V0.1.0.md
+├── VERSIONING.md
+├── MIGRATIONS.md
+├── PORTABILITY.md
+├── RETENTION.md
+├── CONTRIBUTING.md
+├── DEVELOPMENT.md
+├── CODE-STYLE.md
+├── RELEASES.md
+├── DEBUGGING.md
+├── PREFLIGHT.md
+├── TRACEABILITY.md
+├── TEST-VECTORS.md
+├── V0.1.0.md
+└── decisions/
+      └── numbered accepted decision records
 ```
 
 Do not allow implementation to drift significantly away from documentation without updating the relevant document.
@@ -915,6 +950,9 @@ v0.0.3 — UX and implementation planning
 v0.0.4 — Household Domain Specification
 v0.0.5 — Trust, Identity, and Synchronization Design
 v0.0.6 — Implementation Contract
+v0.0.7 — Data Durability & Evolution
+v0.0.8 — Developer & Contributor Experience
+v0.0.9 — Implementation Preflight
 
 v0.1.0 — Household Heartbeat
 v0.2.0 — Today + Needs
@@ -1156,11 +1194,11 @@ A release should represent a functioning milestone.
 
 # Current v0.0.x Rule
 
-Until explicitly instructed to begin `v0.1.0`, including throughout `v0.0.4`–`v0.0.6`:
+Until explicitly instructed to begin `v0.1.0`, including throughout `v0.0.4`–`v0.0.9`:
 
 # DO NOT WRITE FUNCTIONAL APPLICATION CODE.
 
-During `v0.0.1` through `v0.0.6`, acceptable changes include:
+During `v0.0.1` through `v0.0.9`, acceptable changes include:
 
 - Markdown documentation
 - diagrams
@@ -1170,6 +1208,7 @@ During `v0.0.1` through `v0.0.6`, acceptable changes include:
 - domain, event, state, and lifecycle specifications
 - identity, pairing, synchronization, cryptography, and threat-model documents
 - implementation, ABI, storage, component, test, and accessibility contracts
+- migration, portability, retention, contributor, development, style, release, debugging, and preflight specifications
 - roadmap changes
 - README
 - license

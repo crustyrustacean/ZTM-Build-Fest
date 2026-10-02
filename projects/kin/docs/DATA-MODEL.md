@@ -46,6 +46,12 @@ The envelope is a domain contract, not the eventual JS/WASM byte encoding. The f
 
 See [DOMAIN](DOMAIN.md) for definitions and release scope, and [LIFECYCLES](LIFECYCLES.md) for transition rules. These are specifications, not implemented features.
 
+## Data evolution and ownership
+
+Application, event, ABI/protocol, IndexedDB, and export-format versions are independent. Persisted event bytes remain immutable as the in-memory domain model evolves; supported older versions require explicit decoders, and unknown newer versions must not be silently skipped or rewritten. See [VERSIONING](VERSIONING.md) and [MIGRATIONS](MIGRATIONS.md).
+
+Household members should be able to obtain a usable copy of their event data. Future portable export/import must validate and replay before changing existing state; see [PORTABILITY](PORTABILITY.md). Archival, device revocation, member removal, and full household deletion are separate operations described in [RETENTION](RETENTION.md).
+
 ## Why events
 
 An event history can support reconstruction after reload, household history, event-derived “Since You Last Looked,” offline changes, multiple devices, and later synchronization reconciliation. Those are future capabilities, not claims that history, sync, or conflict resolution exists today. Event retention and deletion also have privacy implications described in [PRIVACY](PRIVACY.md).

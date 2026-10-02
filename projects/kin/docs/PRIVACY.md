@@ -58,7 +58,7 @@ The planning design for these boundaries is documented in [Identity](IDENTITY.md
 
 ## Data lifecycle questions
 
-Before remote sync, the project must specify which data is retained, how event history can be corrected or deleted, how deletion propagates to devices and backups, what metadata remains visible to a service, and how exports work. Event-oriented history is not an excuse to keep personal data indefinitely.
+Event-oriented history is not an excuse to keep personal data indefinitely. The planning policy distinguishes routine archival, household deletion, device revocation, and member removal in [RETENTION](RETENTION.md), and specifies user-controlled portable copies in [PORTABILITY](PORTABILITY.md). Exact deletion propagation, backup windows, and service metadata retention must be finalized before remote sync ships; the policy documents are not implemented guarantees.
 
 ## Claims boundary
 

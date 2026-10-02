@@ -2,7 +2,7 @@
 
 > A private, lightweight household coordination app for the little things families need to know, remember, hand off, or discuss.
 
-**Current status: `v0.0.6` — implementation-ready planning milestone. No usable application has been implemented.** Product, domain, privacy, architecture, UX, trust, and implementation contracts are documented; the first coded prototype is planned next for `v0.1.0`. There is nothing to install or run yet.
+**Current status: `v0.0.7` — Data Durability & Evolution. No usable application has been implemented.** This planning release defines persistent-contract versioning, migration safety, data portability, retention, and deletion boundaries. Contributor guidance and implementation preflight remain future planning releases; the first coded prototype is planned for `v0.1.0`.
 
 ## The problem
 
@@ -24,6 +24,9 @@ The intended technical direction is Rust compiled to WebAssembly, native Web Com
 - `v0.0.4` — Household Domain Specification (`kin-v0.0.4`)
 - `v0.0.5` — Trust, Identity, and Synchronization Design (`kin-v0.0.5`)
 - `v0.0.6` — Implementation Contract (`kin-v0.0.6`)
+- `v0.0.7` — Data Durability & Evolution (`kin-v0.0.7`)
+- `v0.0.8` — Developer & Contributor Experience
+- `v0.0.9` — Implementation Preflight
 - `v0.1.0` — First functional prototype
 
 ## Install and run
@@ -56,6 +59,10 @@ AI-assisted development tools are being used for brainstorming, product planning
 - [Web Component contract](docs/COMPONENTS.md)
 - [Testing contract](docs/TESTING.md)
 - [Accessibility contract](docs/ACCESSIBILITY.md)
+- [Persistent contract versioning](docs/VERSIONING.md)
+- [Migration safety](docs/MIGRATIONS.md)
+- [Portable household data](docs/PORTABILITY.md)
+- [Retention and deletion](docs/RETENTION.md)
 - [UX flows](docs/UX.md)
 - [Roadmap](docs/ROADMAP.md)
 - [v0.1.0 implementation specification](docs/V0.1.0.md)

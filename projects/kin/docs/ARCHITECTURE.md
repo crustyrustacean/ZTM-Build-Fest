@@ -95,4 +95,4 @@ The goal is not “dependencies are bad.” The goal is to understand and use Ru
 
 ## Decisions still open
 
-The domain event envelope, event naming, ordering requirements, and replay behavior are specified in [Events](EVENTS.md) and [State](STATE.md). The v0.0.6 [implementation](IMPLEMENTATION.md), [ABI](ABI.md), and [storage](STORAGE.md) contracts now define the planned module responsibilities, browser support floor, buffer protocol, and IndexedDB schema/migration boundary. The examples in this document are not a wire format.
+The domain event envelope, event naming, ordering requirements, and replay behavior are specified in [Events](EVENTS.md) and [State](STATE.md). The v0.0.6 [implementation](IMPLEMENTATION.md), [ABI](ABI.md), and [storage](STORAGE.md) contracts define module responsibilities, browser support, buffer protocol, and initial IndexedDB shape. Persistent contract versioning and non-destructive evolution are specified in [VERSIONING](VERSIONING.md) and [MIGRATIONS](MIGRATIONS.md). The examples in this document are not a wire format.

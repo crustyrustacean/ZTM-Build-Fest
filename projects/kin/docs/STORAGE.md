@@ -60,6 +60,6 @@ IndexedDB stores events. Rust derives household state from those events. Do not 
 
 ## Migration and deletion
 
-Increment the IndexedDB schema version for future structural changes. Each migration must be transactional, preserve event bytes and ordering where possible, and fail with a recoverable message rather than silently discarding data. Event schema version and ABI protocol version are separate from the IndexedDB database version.
+Increment the IndexedDB schema version only for structural database changes. Each migration must be transactional, preserve event bytes and ordering where possible, and fail with a recoverable message rather than silently discarding data. Event schema version, ABI protocol version, application version, and portable export version are independent from the IndexedDB database version. On an unsupported version or failed upgrade, preserve the existing database and do not clear it as a fallback. See [VERSIONING](VERSIONING.md) and [MIGRATIONS](MIGRATIONS.md) for compatibility and recovery policy.
 
-v0.1.0 has no archive/delete event and no remote data. A local “clear all data” control and permanent erasure semantics require explicit UX and privacy design; do not silently delete history as a side effect of completing an item. Future remote deletion, backup retention, and event compaction are outside this storage contract.
+v0.1.0 has no archive/delete event and no remote data. Future archive, portable copy, and household deletion policy is specified in [RETENTION](RETENTION.md) and [PORTABILITY](PORTABILITY.md); those operations are not implemented here. Do not silently delete history as a side effect of completing an item. Future remote deletion, backup retention, and event compaction remain outside this storage contract.
