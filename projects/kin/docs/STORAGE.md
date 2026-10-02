@@ -1,6 +1,6 @@
 # Local Event Storage
 
-**Status:** IndexedDB schema 1 remains canonical for Item and Handoff events. No persisted bytes are migrated; stores/indexes are unchanged.
+**Status:** Talk is implemented alongside Today, Needs and Handoff. See [V0.4.0](V0.4.0.md) for the current scope, compatibility contract and release evidence.
 
 The compose input keeps a best-effort in-progress text and classification draft in the current tab's `sessionStorage`, retaining the existing text key for legacy drafts. This transient data is not an event or household-state source of truth, is cleared only when the exact submitted draft succeeds or the user clears text, and is unavailable across tabs.
 
@@ -70,3 +70,7 @@ Archive is an Item or Handoff tombstone event; it does not delete source events 
 ## Handoff storage
 
 The independent draft key is `kin.handoff.draft`; it is best-effort, tab-scoped, and cleared only if successful submitted text still matches. Handoff shares atomic append/counter transactions and content-free invalidation.
+
+## v0.4.0 Talk
+
+IndexedDB remains schema 1 without structural migration. Talk commands use the existing atomic event/counter transaction and Rust validation. Independent best-effort session draft kin.talk.draft clears only after its matching submission succeeds; older retry/completion preserves newer text. Content-free invalidation remains { type: "events-changed" }. See [V0.4.0](V0.4.0.md).

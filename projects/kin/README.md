@@ -2,7 +2,7 @@
 
 > A private, lightweight household coordination app for the little things families need to know, remember, hand off, or discuss.
 
-**Current status: `v0.3.5` — Build & Run Convenience.** Kin separates household items into Today and Needs, defaults fast capture to Needs, and supports completion, reopening, and archival. Rust remains the only domain reducer; IndexedDB schema 1 remains canonical, v0.1.x event bytes remain unchanged, and no runtime framework or remote service is present. Handoff adds short context capture, acknowledgement, and archival with protocol v3. Actor IDs remain local placeholders, not verified people.
+**Current status: `v0.4.0` — Talk.** Kin separates household items into Today and Needs, defaults fast capture to Needs, and supports completion, reopening, and archival. Rust remains the only domain reducer; IndexedDB schema 1 remains canonical, v0.1.x event bytes remain unchanged, and no runtime framework or remote service is present. Handoff adds short context capture, acknowledgement, and archival with protocol v3. Actor IDs remain local placeholders, not verified people.
 
 ## The problem
 
@@ -12,7 +12,7 @@ Kin aims to make useful household context easier to share and find. It is not a 
 
 ## Intended direction
 
-Kin is intended as a private, lightweight shared household operating layer. Today and Needs views, lightweight classification, capture, completion, reopening, and archival are implemented locally. Handoff capture, acknowledgement, and recent context are implemented locally. Talk, Pulse, Routines, and Since You Last Looked remain future concepts.
+Kin is intended as a private, lightweight shared household operating layer. Today and Needs views, lightweight classification, capture, completion, reopening, and archival are implemented locally. Handoff capture, acknowledgement, and recent context are implemented locally. Talk captures short topics for later, with Open/Resolved lists, resolve, reopen, and archive. Resolved is workflow state only, not agreement or an objective solution. Pulse, Routines, and Since You Last Looked remain future concepts.
 
 The intended technical direction is Rust compiled to WebAssembly, native Web Components, vanilla JavaScript, and browser APIs, with a local-first start and no external framework unless a demonstrated requirement justifies one.
 
@@ -47,6 +47,7 @@ The intended technical direction is Rust compiled to WebAssembly, native Web Com
 - `v0.3.3` — Handoff Hardening & Polish (`kin-v0.3.3`)
 - `v0.3.4` — Handoff Retry Recovery (`kin-v0.3.4`)
 - `v0.3.5` — Build & Run Convenience (`kin-v0.3.5`)
+- `v0.4.0` — Talk (`kin-v0.4.0`)
 - See the [changelog](CHANGELOG.md) for the completed release history.
 
 ## Install, build, and run

@@ -397,3 +397,13 @@ kin-handoff-list { display: block; }
 @media (max-width: 420px) {
   .handoff-form .add-button { grid-column: 1 / -1; }
 }
+
+kin-talk-list { display: block; }
+.talk-section { margin-top: 28px; padding-top: 28px; border-top: 1px solid var(--line); }
+.talk-hint { color: var(--muted); line-height: 1.5; }
+.talk-form { grid-template-columns: minmax(0, 1fr) auto; }
+.talk-row { grid-template-columns: minmax(0, 1fr); }
+.talk-row .item-action { justify-content: flex-start; max-width: none; }
+@media (max-width: 420px) {
+  .talk-form .add-button { grid-column: 1 / -1; }
+}

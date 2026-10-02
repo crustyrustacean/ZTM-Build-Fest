@@ -1,6 +1,6 @@
 # Architecture
 
-**Status:** Today, Needs, and Handoff are implemented. Rust owns domain replay; browser components capture intents and render projection. No runtime dependency or remote service exists.
+**Status:** Talk is implemented alongside Today, Needs and Handoff. See [V0.4.0](V0.4.0.md) for the current scope, compatibility contract and release evidence.
 
 ## System shape
 

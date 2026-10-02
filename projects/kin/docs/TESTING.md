@@ -1,6 +1,6 @@
 # v0.1.0 Testing Contract
 
-**Status:** The complete prior regression suite is retained and extended for Handoff. See V0.3.0 for the release gate and CHANGELOG for actual results/environments.
+**Status:** Talk is implemented alongside Today, Needs and Handoff. See [V0.4.0](V0.4.0.md) for the current scope, compatibility contract and release evidence.
 
 ## Rust domain tests
 

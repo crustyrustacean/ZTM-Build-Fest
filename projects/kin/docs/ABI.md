@@ -1,6 +1,6 @@
 # JavaScript–WASM ABI
 
-**Status:** Protocols v1/v2 remain supported unchanged. Protocol v3 explicitly carries Item + Handoff state; current browser calls use v3.
+**Status:** Talk is implemented alongside Today, Needs and Handoff. See [V0.4.0](V0.4.0.md) for the current scope, compatibility contract and release evidence.
 
 ## Target and exports
 
@@ -116,7 +116,7 @@ size  field
 N     text bytes
 ```
 
-Items remain serialized in original add-event order, including archived tombstones so the caller can make a filtered view without becoming a reducer. The browser hides archived items from ordinary lists. Protocol v3 is written by new browser instances. `KERR` retains the v1 header/version and stable numeric error codes for both request versions.
+Items remain serialized in original add-event order, including archived tombstones so the caller can make a filtered view without becoming a reducer. The browser hides archived items from ordinary lists. Protocol v4 is written by new browser instances. `KERR` retains the v1 header/version and stable numeric error codes for both request versions.
 
 ## Ownership and lifetime
 
@@ -140,10 +140,14 @@ The function may grow memory while parsing or building output. JavaScript must r
 
 The high-level bridge owns loading/instantiation, ABI export checks, buffer allocation/copy/free, memory view refresh, binary protocol encode/decode, and conversion of stable ABI errors to UI-safe messages. It must not implement event replay or state transitions.
 
-## Protocol version 3 (current)
+## Protocol version 3 (legacy Handoff)
 
 Requests retain the 12-byte KINE header and 88-byte envelope with explicit version 3. All v2 events plus schema-1 kinds 5 HANDOFF_ADDED, 6 HANDOFF_ACKNOWLEDGED, and 7 HANDOFF_ARCHIVED are supported. Add payload: handoff_id[16], text_length:u32, strict UTF-8 text (1–4096 bytes). Reference payloads: exactly handoff_id[16]. Existing codes/payloads are unchanged.
 
 KINS v3 header: magic[4], version:u16=3, reserved:u16=0, item_count:u32, handoff_count:u32 (16 bytes). All v2-layout Item records precede Handoff records. A Handoff record is handoff_id[16], created_by[16], created_at:i64, status:u8 (0 unacknowledged, 1 acknowledged, 2 archived), reserved[3]=0, text_length:u32, text. Fixed record size is 48 bytes. Collections retain original add order including tombstones; combined count is at most 10,000. The 64 MiB bound remains. Empty v3 output is 16 bytes. KERR stays version 1.
 
 Protocols v1/v2 reject Handoff events and cannot serialize Handoff projection, including archived state. They never silently omit it. Protocol v1 still rejects Needs/archived Item state. See [V0.3.0](V0.3.0.md).
+
+## v0.4.0 Talk
+
+Protocol v4 requests retain the 12-byte KINE header and 88-byte envelope, version 4. KINS header: magic[4], version:u16=4, reserved:u16=0, item_count:u32, handoff_count:u32, talk_count:u32 (20 bytes). All v2 Item records precede v3 Handoff records and Talk records. Talk: talk_id[16], created_by[16], created_at:i64, status:u8 (0 open, 1 resolved, 2 archived), reserved[3]=0, text_length:u32, text[N]. Combined count is at most 10,000; 64 MiB limits, little-endian integers, strict UTF-8, exact lengths and KERR v1 remain unchanged. Protocols 1–3 reject Talk events/state, including tombstones, with unsupported category 3. Browser writes v4. See [V0.4.0](V0.4.0.md).

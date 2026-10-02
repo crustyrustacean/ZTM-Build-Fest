@@ -1,6 +1,6 @@
 # Development Workflow
 
-**Status:** current workflow for the v0.3.5 Today + Needs + Handoff prototype.
+**Status:** Talk is implemented alongside Today, Needs and Handoff. See [V0.4.0](V0.4.0.md) for the current scope, compatibility contract and release evidence.
 
 ## Build and run
 

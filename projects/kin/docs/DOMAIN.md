@@ -1,6 +1,6 @@
 # Household Domain
 
-**Status:** Items and Handoffs are implemented locally. Later entities remain future specifications; actors are local placeholders, not verified people.
+**Status:** Talk is implemented alongside Today, Needs and Handoff. See [V0.4.0](V0.4.0.md) for the current scope, compatibility contract and release evidence.
 
 ## Scope and relationships
 
@@ -55,7 +55,7 @@ A Handoff is a short context transfer one household member wants another to know
 
 ## TalkItem
 
-A TalkItem captures “This matters, but right now may not be the right moment.” It can be open, resolved, reopened, and eventually archived. It is a coordination reminder, not therapy, diagnosis, mediation, or a verdict. Kin must not add blame scores, sentiment scores, winner/loser logic, or automated interpretation. Talk is planned for v0.4.0 and is not implemented.
+A TalkItem captures “This matters, but right now may not be the right moment.” It can be open, resolved, reopened, and eventually archived. It is a coordination reminder, not therapy, diagnosis, mediation, or a verdict. Kin must not add blame scores, sentiment scores, winner/loser logic, or automated interpretation. Talk is implemented; resolution makes no claim of agreement or objective solution.
 
 ## Pulse
 

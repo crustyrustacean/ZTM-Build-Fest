@@ -1,6 +1,6 @@
 # Data Migrations
 
-**Status:** No structural migration is required in v0.3.0. Legacy Item bytes and Handoff bytes coexist in schema 1; normalization is in memory only.
+**Status:** Talk is implemented alongside Today, Needs and Handoff. See [V0.4.0](V0.4.0.md) for the current scope, compatibility contract and release evidence.
 
 ## Migration categories
 

@@ -1,6 +1,6 @@
 # Roadmap
 
-This roadmap is a planning baseline, not a promise of dates. The current release is `v0.3.5 — Build & Run Convenience`. The planned v0.3.0–v0.3.3 line, v0.3.4 recovery patch, and v0.3.5 developer workflow patch are complete. Stop for user evaluation before v0.3.6 or v0.4.0 Talk. Historical planning releases remain preserved.
+Current release: `v0.4.0 — Talk`. Continue through v0.4.1 correctness, v0.4.2 resilience/accessibility, and v0.4.3 hardening/polish, then stop for evaluation. Pulse remains future work.
 
 ## Planning releases
 
@@ -130,7 +130,7 @@ Completed: add project-local PowerShell and POSIX shell launchers that build the
 
 ### `v0.4.0` — Talk
 
-Add capture and revisit state for topics to discuss later, including resolved/unresolved state. Keep the experience nonjudgmental: no blame or scoring.
+Implemented: short Talk capture, Open/Resolved lists, resolve, reopen and terminal archive. Resolution is workflow state only. See [V0.4.0](V0.4.0.md).
 
 ### `v0.5.0` — Pulse
 
@@ -158,4 +158,4 @@ Focus on polish, reliability, accessibility, mobile UX, privacy documentation, o
 
 ## Scope discipline
 
-Each roadmap item is future work unless explicitly marked as completed. Authentication, passkeys, encryption, remote services, pairing, and synchronization remain unimplemented and out of scope for v0.3.x. Releases through `v0.0.12` were documentation-only; v0.1.0 is the first coded release. Handoff is implemented in v0.3.0; v0.4.0 Talk remains future work.
+Each roadmap item is future work unless explicitly marked as completed. Authentication, passkeys, encryption, remote services, pairing, and synchronization remain unimplemented and out of scope for v0.3.x. Releases through `v0.0.12` were documentation-only; v0.1.0 is the first coded release. Handoff is implemented in v0.3.0; Talk is implemented; Pulse remains future work.

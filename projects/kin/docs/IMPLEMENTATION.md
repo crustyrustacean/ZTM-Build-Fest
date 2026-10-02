@@ -1,6 +1,6 @@
 # v0.1.0 Implementation Contract
 
-**Status:** Today, Needs, and Handoff are implemented; Rust is the sole reducer. Talk and later capabilities remain future work.
+**Status:** Talk is implemented alongside Today, Needs and Handoff. See [V0.4.0](V0.4.0.md) for the current scope, compatibility contract and release evidence.
 
 ## Proposed project layout
 
@@ -70,3 +70,7 @@ The target remains the latest two stable major releases of desktop and mobile Ch
 ## Handoff implementation
 
 `web/components/kin-handoff-list.js` owns capture/list presentation; kin-app owns command orchestration. The frozen domain and protocol contract is [V0.3.0](V0.3.0.md).
+
+## v0.4.0 Talk
+
+rust/src/event.rs and state.rs add distinct TalkId/TalkStatus/TalkState; protocol.rs adds explicit v4. web/components/kin-talk-list.js presents Talk; kin-app.js reuses canonical refresh and suspended retry infrastructure. No framework or runtime dependency is added. See [V0.4.0](V0.4.0.md).

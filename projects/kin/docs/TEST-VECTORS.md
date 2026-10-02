@@ -246,3 +246,7 @@ Handoff tests reject every shortened payload, overlong references, unsupported s
 ## v0.3.3 hardening evidence
 
 Rust checks truncated Handoff request/event headers, reserved fields, extreme text lengths and a deterministic 10,000-event mixed projection. Real WASM tests reject every truncated Handoff result boundary and trailing bytes, observe memory growth during 10,000-Handoff replay, and verify independent host-owned results across success/error/empty/repeated calls. The complete earlier regression suite remains required.
+
+## v0.4.0 Talk
+
+Vector 020: protocol 4, schema 1, kind 8 adds an open topic; kind 9 resolves (repeated 9 is a valid no-op), 10 reopens (including open no-op), and 11 archives. Unknown references and archived mutations fail category 4. Earlier protocols reject every Talk kind/state with category 3. See [V0.4.0](V0.4.0.md).

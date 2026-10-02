@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
 
-import { encodeAddedRecord, encodeHandoffAddedRecord, encodeHandoffAcknowledgedRecord, encodeHandoffArchivedRecord, loadKinEngine } from "./kin-engine.js";
+import { encodeTalkAddedRecord, encodeTalkResolvedRecord, encodeTalkReopenedRecord, encodeTalkArchivedRecord, encodeAddedRecord, encodeHandoffAddedRecord, encodeHandoffAcknowledgedRecord, encodeHandoffArchivedRecord, loadKinEngine } from "./kin-engine.js";
 
 const zeroId = new Uint8Array(16);
 
@@ -182,7 +182,7 @@ test("real WASM ABI clears stale result and error buffers across versions", asyn
 test("bridge decodes real v1 and v2 completed results as Today, not Need", async (context) => {
   const instantiate = WebAssembly.instantiate;
   let requestedVersion = 1;
-  // The browser writes v3 only. A test transport shim requests v1 from the
+  // The browser writes v4 only. A test transport shim requests v1 from the
   // real encoder so the bridge's historical decoder is exercised as well.
   context.mock.method(WebAssembly, "instantiate", async (...args) => {
     const { instance } = await instantiate(...args);
@@ -202,7 +202,7 @@ test("bridge decodes real v1 and v2 completed results as Today, not Need", async
   const wasm = await readFile(new URL("./kin_engine.wasm", import.meta.url));
   const engine = await loadKinEngine(`data:application/wasm;base64,${wasm.toString("base64")}`);
   for (requestedVersion of [1, 2]) {
-    assert.deepEqual(engine.applyEvents([]), { items: [], handoffs: [] });
+    assert.deepEqual(engine.applyEvents([]), { items: [], handoffs: [], talks: [] });
     for (const completed of [false, true]) {
       const records = [legacyRecord(1, 1)];
       if (completed) records.push(legacyRecord(2, 2));
@@ -263,6 +263,7 @@ test("bridge rejects malformed Handoff result fields and recovers", async contex
     const { instance } = await instantiate(...args);
     const abi = instance.exports;
     return { instance: { exports: { ...abi, kin_apply_events(pointer, length) {
+      new DataView(abi.memory.buffer).setUint16(pointer + 4, 3, true);
       const status = abi.kin_apply_events(pointer, length);
       if (status === 0) mutate(new Uint8Array(abi.memory.buffer, abi.kin_result_ptr(), abi.kin_result_len()));
       return status;
@@ -326,9 +327,35 @@ test("large Handoff replay grows WASM memory and preserves independent repeated 
   for(let iteration=0;iteration<4;iteration++) {
     const bad=handoff(1);new DataView(bad.buffer).setUint16(2,99,true);
     assert.throws(()=>engine.applyEvents([bad]),error=>error.code===3);
-    assert.deepEqual(engine.applyEvents([]),{items:[],handoffs:[]});
+    assert.deepEqual(engine.applyEvents([]),{items:[],handoffs:[],talks:[]});
     assert.deepEqual(engine.applyEvents(records),state);
   }
   assert.equal(state.handoffs[0].text.length,4096,"host-owned result survives later calls");
   assert.throws(()=>engine.applyEvents([...records,records[0]]),error=>error.code===5);
+});
+
+function talk(sequence, kind = 8, text = "Weekend plans") {
+  const values = {eventId:new Uint8Array(16).fill(sequence),householdId:new Uint8Array(16).fill(0xaa),
+    actorId:new Uint8Array(16).fill(0xbb),deviceId:new Uint8Array(16).fill(0xcc),
+    timestamp:sequence,logicalTime:sequence,talkId:new Uint8Array(16).fill(0x33),text};
+  return ({8:encodeTalkAddedRecord,9:encodeTalkResolvedRecord,10:encodeTalkReopenedRecord,11:encodeTalkArchivedRecord})[kind](values);
+}
+
+test("Talk real WASM mixed replay, lifecycle and legacy compatibility", async () => {
+  const wasm = await readFile(new URL("./kin_engine.wasm", import.meta.url));
+  const engine = await loadKinEngine(`data:application/wasm;base64,${wasm.toString("base64")}`);
+  const records = [legacyRecord(1,1),handoff(2),talk(3)];
+  const originals = records.map(row=>row.slice());
+  assert.equal(engine.applyEvents(records).talks[0].status,"open");
+  for (const [kind,status] of [[9,"resolved"],[10,"open"],[11,"archived"]]) {
+    records.push(talk(records.length+1,kind));
+    const state=engine.applyEvents(records);
+    assert.equal(state.talks[0].status,status);
+    assert.equal(state.items.length,1);assert.equal(state.handoffs.length,1);
+  }
+  assert.deepEqual(records.slice(0,3),originals);
+  assert.throws(()=>engine.applyEvents([...records,talk(7,10)]),error=>error.code===4);
+  const apply=await rawEngine();
+  for (const version of [1,2,3]) for (const kind of [8,9,10,11]) apply(version,[talk(1,kind)],3);
+  assert.deepEqual(apply(4,[]),new Uint8Array([75,73,78,83,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]));
 });

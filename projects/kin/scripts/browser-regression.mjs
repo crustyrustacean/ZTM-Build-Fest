@@ -1,5 +1,6 @@
 // Node 22+ and a Chromium-family executable; no npm packages required.
 // Uses a fresh temporary profile and loopback server, never an existing Kin DB.
+import { talkRegressions, talkPeerRegressions } from "./talk-regression.mjs";
 import assert from "node:assert/strict";
 import { handoffRegressions, handoffPeerRegressions } from "./handoff-regression.mjs";
 import { spawn } from "node:child_process";
@@ -788,6 +789,7 @@ try {
   const first = await tab();
   console.log(await first.evaluate(`(${regressions.toString()})()`));
   console.log(await first.evaluate(`(${handoffRegressions.toString()})()`));
+  console.log(await first.evaluate(`(${talkRegressions.toString()})()`));
   const state = await first.evaluate('JSON.stringify(document.querySelector("kin-app").state)');
   await first.send("Page.reload");
   await until(() => first.evaluate("window.kinExpectedState === undefined"));
@@ -862,6 +864,23 @@ try {
   assert.equal(await first.evaluate('document.activeElement === document.querySelector("#handoff-text")'), true);
   assert.equal(await first.evaluate('document.querySelector("kin-app").state.handoffs.at(-1).status'), "acknowledged");
   console.log("PASS Handoff draft reload, keyboard capture/acknowledgement, focus restoration");
+  assert.equal(await first.evaluate('document.querySelector("#talk-text").value'), "Newer talk draft");
+  await first.evaluate('document.querySelector("#talk-text").focus()');
+  for (const type of ["keyDown", "keyUp"]) await first.send("Input.dispatchKeyEvent", {
+    type, key: "Enter", code: "Enter", windowsVirtualKeyCode: 13,
+    ...(type === "keyDown" ? { text: "\r" } : {}),
+  });
+  await ready(first);
+  assert.equal(await first.evaluate('document.querySelector("#talk-text").value'), "");
+  await first.evaluate('document.querySelector("kin-talk-list .complete-button").focus()');
+  for (const type of ["keyDown", "keyUp"]) await first.send("Input.dispatchKeyEvent", {
+    type, key: "Enter", code: "Enter", windowsVirtualKeyCode: 13,
+    ...(type === "keyDown" ? { text: "\r" } : {}),
+  });
+  await ready(first);
+  assert.equal(await first.evaluate('document.activeElement === document.querySelector("#talk-text")'), true);
+  assert.equal(await first.evaluate('document.querySelector("kin-app").state.talks.at(-1).status'), "resolved");
+  console.log("PASS Talk draft reload, keyboard capture/resolution, focus restoration");
   const second = await tab();
   await second.evaluate(`window.peerReads=0; window.peerReplays=0; window.peerMessages=[];
     { const a=document.querySelector('kin-app'); const load=a.store.loadEvents.bind(a.store); const replay=a.engine.applyEvents;
@@ -1046,6 +1065,7 @@ try {
   );
 
   await handoffPeerRegressions(first, second, until);
+  await talkPeerRegressions(first, second, until);
   await first.evaluate(`(()=>{
     const app=document.querySelector('kin-app');
     const item=[...app.querySelectorAll('kin-item')]

@@ -1,6 +1,6 @@
 # Entity Lifecycles
 
-**Status:** Item and Handoff lifecycles are implemented. Later lifecycles remain specifications.
+**Status:** Talk is implemented alongside Today, Needs and Handoff. See [V0.4.0](V0.4.0.md) for the current scope, compatibility contract and release evidence.
 
 ## Item
 
@@ -61,7 +61,7 @@ TALK_ADDED
                archived
 ```
 
-A TalkItem begins open. It can be resolved, reopened from resolved, or archived. Archive is terminal absent a future explicit restore operation. These are workflow states only; they do not determine who is right or whether a topic is objectively settled. Talk is planned for v0.4.0.
+A TalkItem begins open. It can be resolved, reopened from resolved, or archived. Archive is terminal absent a future explicit restore operation. These are workflow states only; they do not determine who is right or whether a topic is objectively settled. Talk is implemented; repeated resolve/reopen are valid no-ops and unknown/archived mutations fail.
 
 ## Pulse
 

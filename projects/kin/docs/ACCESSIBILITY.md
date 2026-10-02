@@ -1,6 +1,6 @@
 # Accessibility Contract
 
-**Status:** Today/Needs accessibility is retained. Handoff uses semantic lists, a dedicated labeled form, visible actions, textual status, and focus restoration. Testing gaps are recorded in the changelog.
+**Status:** Talk is implemented alongside Today, Needs and Handoff. See [V0.4.0](V0.4.0.md) for the current scope, compatibility contract and release evidence.
 
 ## Baseline requirements
 
@@ -46,3 +46,7 @@ Handoff add/acknowledge/archive restore its input focus. Peer refresh restores f
 ## v0.3.2 resilience and accessibility
 
 The browser runner covers delayed Handoff persistence across reconnect/peer refresh, newer draft ownership, sessionStorage denial, acknowledgement/archive failure and abort retry, rapid repeated retry, and stale actions without invalidation delivery. Handoff semantics, focus, announcements, disabled controls and touch targets are checked under the existing accessibility modes. No screen-reader or native desktop zoom certification is claimed.
+
+## v0.4.0 Talk
+
+Talk uses semantic heading/lists, native labels/buttons, textual status and input focus restoration after add/resolve/reopen/archive and peer action replacement. Busy state disables all controls. Require 48px targets, 320px reflow and accessibility modes; do not claim untested assistive-technology certification. See [V0.4.0](V0.4.0.md).

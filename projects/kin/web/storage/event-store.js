@@ -1,5 +1,9 @@
 import {
   encodeAddedRecord,
+  encodeTalkAddedRecord,
+  encodeTalkResolvedRecord,
+  encodeTalkReopenedRecord,
+  encodeTalkArchivedRecord,
   encodeHandoffAddedRecord,
   encodeHandoffAcknowledgedRecord,
   encodeHandoffArchivedRecord,
@@ -156,7 +160,19 @@ export class EventStore {
           };
           let kind;
           let encodedEvent;
-          if (command.type === "add-handoff") {
+          if (command.type === "add-talk") {
+            kind = "TALK_ADDED";
+            encodedEvent = encodeTalkAddedRecord({ ...identity, talkId: randomId(), text: command.text });
+          } else if (command.type === "resolve-talk") {
+            kind = "TALK_RESOLVED";
+            encodedEvent = encodeTalkResolvedRecord({ ...identity, talkId: idFromHex(command.talkId) });
+          } else if (command.type === "reopen-talk") {
+            kind = "TALK_REOPENED";
+            encodedEvent = encodeTalkReopenedRecord({ ...identity, talkId: idFromHex(command.talkId) });
+          } else if (command.type === "archive-talk") {
+            kind = "TALK_ARCHIVED";
+            encodedEvent = encodeTalkArchivedRecord({ ...identity, talkId: idFromHex(command.talkId) });
+          } else if (command.type === "add-handoff") {
             kind = "HANDOFF_ADDED";
             encodedEvent = encodeHandoffAddedRecord({ ...identity, handoffId: randomId(), text: command.text });
           } else if (command.type === "acknowledge-handoff") {
@@ -414,6 +430,10 @@ function validateEventRow(row) {
     HANDOFF_ADDED: 5,
     HANDOFF_ACKNOWLEDGED: 6,
     HANDOFF_ARCHIVED: 7,
+    TALK_ADDED: 8,
+    TALK_RESOLVED: 9,
+    TALK_REOPENED: 10,
+    TALK_ARCHIVED: 11,
   }[row.kind];
   const supportedVersion =
     (row.kind === "ITEM_ADDED" && [1, 2].includes(row.event_version)) ||

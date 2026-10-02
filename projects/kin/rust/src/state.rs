@@ -3,6 +3,7 @@ use std::collections::BTreeMap;
 use crate::error::KinError;
 use crate::event::{
     ActorId, EventEnvelope, EventId, EventKind, HandoffId, HouseholdId, ItemClassification, ItemId,
+    TalkId,
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -38,17 +39,36 @@ pub struct HandoffState {
     pub status: HandoffStatus,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum TalkStatus {
+    Open,
+    Resolved,
+    Archived,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TalkState {
+    pub talk_id: TalkId,
+    pub text: String,
+    pub created_by: ActorId,
+    pub created_at: i64,
+    pub status: TalkStatus,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct HouseholdState {
     pub household_id: Option<HouseholdId>,
     pub items: Vec<ItemState>,
     pub handoffs: Vec<HandoffState>,
+    pub talks: Vec<TalkState>,
 }
 
 pub fn rebuild(events: &[EventEnvelope]) -> Result<HouseholdState, KinError> {
     let mut household_id = None;
     let mut items = Vec::new();
     let mut handoffs = Vec::new();
+    let mut talks = Vec::new();
+    let mut talk_positions = BTreeMap::new();
     let mut handoff_positions = BTreeMap::new();
     let mut item_positions = BTreeMap::new();
     let mut event_bytes = BTreeMap::<EventId, Vec<u8>>::new();
@@ -75,6 +95,36 @@ pub fn rebuild(events: &[EventEnvelope]) -> Result<HouseholdState, KinError> {
         }
 
         match &event.kind {
+            EventKind::TalkAdded { talk_id, text } => {
+                if text.trim().is_empty() || talk_positions.contains_key(talk_id) {
+                    return Err(KinError::InvalidEvent);
+                }
+                talk_positions.insert(*talk_id, talks.len());
+                talks.push(TalkState {
+                    talk_id: *talk_id,
+                    text: text.clone(),
+                    created_by: event.actor_id,
+                    created_at: event.timestamp,
+                    status: TalkStatus::Open,
+                });
+            }
+            EventKind::TalkResolved { talk_id }
+            | EventKind::TalkReopened { talk_id }
+            | EventKind::TalkArchived { talk_id } => {
+                let position = talk_positions
+                    .get(talk_id)
+                    .copied()
+                    .ok_or(KinError::InvalidEvent)?;
+                let talk = &mut talks[position];
+                if talk.status == TalkStatus::Archived {
+                    return Err(KinError::InvalidEvent);
+                }
+                talk.status = match event.kind {
+                    EventKind::TalkResolved { .. } => TalkStatus::Resolved,
+                    EventKind::TalkReopened { .. } => TalkStatus::Open,
+                    _ => TalkStatus::Archived,
+                };
+            }
             EventKind::HandoffAdded { handoff_id, text } => {
                 if text.trim().is_empty() || handoff_positions.contains_key(handoff_id) {
                     return Err(KinError::InvalidEvent);
@@ -165,6 +215,7 @@ pub fn rebuild(events: &[EventEnvelope]) -> Result<HouseholdState, KinError> {
         household_id,
         items,
         handoffs,
+        talks,
     })
 }
 
@@ -181,6 +232,15 @@ mod tests {
         let event_id = EventId(id(event_number));
         let mut canonical_bytes = vec![event_number, logical_time as u8];
         match &kind {
+            EventKind::TalkAdded { talk_id, text } => {
+                canonical_bytes.extend_from_slice(&talk_id.0);
+                canonical_bytes.extend_from_slice(text.as_bytes());
+            }
+            EventKind::TalkResolved { talk_id }
+            | EventKind::TalkReopened { talk_id }
+            | EventKind::TalkArchived { talk_id } => {
+                canonical_bytes.extend_from_slice(&talk_id.0);
+            }
             EventKind::HandoffAdded { handoff_id, text } => {
                 canonical_bytes.extend_from_slice(&handoff_id.0);
                 canonical_bytes.extend_from_slice(text.as_bytes());

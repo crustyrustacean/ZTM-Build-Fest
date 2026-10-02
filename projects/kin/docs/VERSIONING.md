@@ -1,6 +1,6 @@
 # Persistent Contract Versioning
 
-**Status:** Protocols 1/2/3 and supported Item/Handoff schemas have explicit decoders. IndexedDB remains schema 1; no source-event migration exists.
+**Status:** Talk is implemented alongside Today, Needs and Handoff. See [V0.4.0](V0.4.0.md) for the current scope, compatibility contract and release evidence.
 
 ## Independent version axes
 
@@ -50,4 +50,8 @@ This separates durable history from evolving in-memory types and enables old his
 
 ## Backward and forward guarantees
 
-Kin has published v0.1.x event history. v0.2.0 explicitly reads schema-v1 legacy item events, normalizes them in memory, and preserves their exact bytes; it writes schema-v2 `ITEM_ADDED` and schema-v1 lifecycle events. Protocols v1/v2/v3 are supported, with v3 written by current clients. Protocols v1/v2 reject Handoff history rather than return lossy state. IndexedDB remains schema 1. A client with no decoder for a future event must preserve it and fail closed, not pretend it has derived complete household state.
+Kin has published v0.1.x event history. v0.2.0 explicitly reads schema-v1 legacy item events, normalizes them in memory, and preserves their exact bytes; it writes schema-v2 `ITEM_ADDED` and schema-v1 lifecycle events. Protocols v1/v2/v3 are supported, with v4 written by current clients. Protocols v1/v2 reject Handoff history rather than return lossy state. IndexedDB remains schema 1. A client with no decoder for a future event must preserve it and fail closed, not pretend it has derived complete household state.
+
+## v0.4.0 Talk
+
+Current compatibility: protocols 1/2/3/4; writer v4; Item add schemas 1/2, lifecycle and Handoff/Talk schema 1. IndexedDB schema 1. Legacy events retain exact source bytes. Protocols 1–3 reject Talk rather than omit it. See [V0.4.0](V0.4.0.md).

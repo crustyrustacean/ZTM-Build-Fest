@@ -2,6 +2,14 @@
 
 This file records completed Kin releases. The `v0.0.x` releases are planning and documentation milestones; they do not represent implemented application features. The first implementation milestone remains `v0.1.0`.
 
+## [0.4.0] — Talk
+
+- Added one-field topic capture, Open/Resolved lists, resolve, reopen and terminal archive. Resolution is workflow state only; no agreement, blame or verified-person claim is made.
+- Added distinct Rust Talk types and schema-1 event codes 8–11, with explicit protocol v4. Protocols 1–3 and prior event bytes remain unchanged; older protocols reject Talk. IndexedDB stays schema 1 with no migration.
+- Reused atomic storage, independent drafts, original-command retry, suspended-refresh recovery, content-free peer invalidation and safe rendering. No runtime dependency or remote service.
+
+Validation evidence is recorded in [V0.4.0](docs/V0.4.0.md).
+
 ## [0.3.5] — Build & Run Convenience
 
 ### Improved

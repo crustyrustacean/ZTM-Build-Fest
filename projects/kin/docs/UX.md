@@ -1,6 +1,6 @@
 # UX
 
-**Status:** Today, Needs, and Handoff are implemented. Talk, Pulse, and Since You Last Looked remain conceptual.
+**Status:** Talk is implemented alongside Today, Needs and Handoff. See [V0.4.0](V0.4.0.md) for the current scope, compatibility contract and release evidence.
 
 ## Primary question
 
@@ -94,7 +94,7 @@ Talk about:
 Weekend plans
 ```
 
-A future structured conversation might optionally ask “What do I need?”, “What am I willing to compromise on?”, or “What is a boundary?” This is secondary to everyday coordination and must not turn Kin into a relationship counselor or judge.
+Talk uses one short topic field. Resolve, Reopen and Archive manage workflow only. No agreement, objective solution or partner confirmation is implied. Structured conversations, compromise/boundary forms, chat and counseling are excluded.
 
 ## Pulse
 
