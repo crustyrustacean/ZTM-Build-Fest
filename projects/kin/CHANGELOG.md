@@ -2,6 +2,21 @@
 
 This file records completed Kin releases. The `v0.0.x` releases are planning and documentation milestones; they do not represent implemented application features. The first implementation milestone remains `v0.1.0`.
 
+## [0.1.0]
+
+### Added
+
+- Delivered the local Household Heartbeat flow using native Web Components, Rust/WASM event validation and replay, and IndexedDB event persistence.
+- Added and completed household items, with deterministic state reconstruction after reload.
+- Added the manual versioned binary ABI, local identity placeholders, bounded protocol parsing, and regression tests for replay and malformed input.
+- Added project-local build and static-serving instructions.
+
+### Validation
+
+- Rust unit and protocol tests passed; the `wasm32-unknown-unknown` release build succeeded.
+- Browser checks passed for add, complete, reload, inert rendering of script-like text, keyboard submission, narrow layout, and same-origin-only requests.
+- Windows 10 x64 was exercised using the integrated VS Code browser (Code 1.139.1, Electron 43.6.0, Chromium 150.0.7871.250). Firefox, Safari, standalone Chrome, and assistive-technology testing were not performed.
+
 ## [0.0.12]
 
 ### Added

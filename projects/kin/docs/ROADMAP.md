@@ -1,6 +1,6 @@
 # Roadmap
 
-This roadmap is a planning baseline, not a promise of delivery dates. Releases may change as the product is tested. Kin is at the documentation-only `v0.0.12` changelog and release-history milestone; no application code or executable developer tooling exists. Planning/specification is complete through v0.0.9, and v0.1.0 remains the first coded release when authorized.
+This roadmap is a planning baseline, not a promise of delivery dates. Releases may change as the product is tested. Kin's current release is `v0.1.0` Household Heartbeat, the first functional local prototype. The `v0.0.1`–`v0.0.12` planning and documentation history remains preserved; later product increments remain future work.
 
 ## Planning releases
 
@@ -58,9 +58,9 @@ Each minor release represents a new product capability. Its initial stabilizatio
 
 ### `v0.1.0` — Household Heartbeat
 
-Build the smallest end-to-end technical foundation: Rust compiled to WebAssembly, a native `<kin-app>` custom element, an explicit JS/WASM boundary, an event model with `ITEM_ADDED` and `ITEM_COMPLETED`, Rust state reconstruction, local browser persistence, adding and completing a simple household item, and refresh/replay. Use a temporary local identity only. No partner login, sync, or other product areas.
+Implemented: Rust compiled to WebAssembly, a native `<kin-app>` with focused child custom elements, the manual versioned JS/WASM ABI, `ITEM_ADDED` and `ITEM_COMPLETED`, deterministic Rust replay, IndexedDB event-only persistence, and add/complete/reload behavior using local placeholder identities. No partner login, sync, or other product areas are included. See [V0.1.0.md](V0.1.0.md) for the frozen contract and release checks.
 
-The detailed boundary and acceptance scope are in [V0.1.0.md](V0.1.0.md).
+The detailed boundary and acceptance scope are in [V0.1.0.md](V0.1.0.md); release history is in [CHANGELOG](../CHANGELOG.md).
 
 ## Product increments
 

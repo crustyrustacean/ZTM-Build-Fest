@@ -1,6 +1,6 @@
 # v0.1.0 Testing Contract
 
-**Status:** required future validation; no test code or runtime exists. Accessibility requirements are in [ACCESSIBILITY](ACCESSIBILITY.md); the event/protocol behavior is in [EVENTS](EVENTS.md) and [ABI](ABI.md).
+**Status:** v0.1.0 Rust unit/protocol tests and browser acceptance checks are available. Continue using this contract for regression coverage. Accessibility requirements are in [ACCESSIBILITY](ACCESSIBILITY.md); event/protocol behavior is in [EVENTS](EVENTS.md) and [ABI](ABI.md).
 
 ## Rust domain tests
 

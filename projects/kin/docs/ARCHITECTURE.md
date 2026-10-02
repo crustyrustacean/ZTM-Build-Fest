@@ -1,6 +1,6 @@
 # Architecture
 
-**Status:** design for future implementation. No runtime, source code, build pipeline, or dependencies exist yet. This document records intended ownership boundaries, not a completed architecture.
+**Status:** the v0.1.0 local Household Heartbeat architecture is implemented. This document records current ownership boundaries and future design direction; it does not claim later product areas exist.
 
 ## System shape
 
@@ -51,7 +51,7 @@ Rust must not manipulate the DOM. It should be possible to test domain behavior 
 
 ## Manual WebAssembly boundary
 
-The v0.1.0 implementation is specified to target `wasm32-unknown-unknown` and use the explicit JavaScript-to-WASM ABI in [ABI](ABI.md). Initial constraints are no `wasm-bindgen`, `web-sys`, `js-sys`, `serde`, or framework runtime. This boundary is specified, not implemented.
+The v0.1.0 implementation targets `wasm32-unknown-unknown` and uses the explicit JavaScript-to-WASM ABI in [ABI](ABI.md). It has no `wasm-bindgen`, `web-sys`, `js-sys`, `serde`, or framework runtime dependency.
 
 A manual ABI is specified for v0.1.0 in [ABI](ABI.md), including exported function signatures, versioned request/result encoding, ownership and lifetimes, errors, bounds, and repeated-call behavior. JavaScript allocates/copies input and decodes output; Rust reads validated input ranges and returns a well-defined result. The browser layer retains ownership of DOM, storage, cryptographic APIs, networking, and lifecycle integration.
 

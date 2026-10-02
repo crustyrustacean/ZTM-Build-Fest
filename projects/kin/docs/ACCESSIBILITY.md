@@ -1,6 +1,6 @@
 # Accessibility Contract
 
-**Status:** requirements for the future v0.1.0 UI. No application interface is implemented. Accessibility is part of release acceptance, not a final cleanup task.
+**Status:** baseline v0.1.0 accessibility requirements are implemented in the native UI. This contract remains the regression checklist for future changes.
 
 ## Baseline requirements
 

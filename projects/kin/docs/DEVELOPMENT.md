@@ -1,8 +1,8 @@
 # Development Workflow
 
-**Status:** intended future workflow. Kin is currently documentation-only; there is no Cargo manifest, source tree, build command, server, or runnable app. The sequence below is a plan, not an executable setup guide.
+**Status:** current workflow for the v0.1.x local prototype.
 
-## Planned setup
+## Build and run
 
 ```text
 clone the ZTM Build Fest repository
@@ -23,7 +23,14 @@ serve the static web files from localhost
 open the supported browser and exercise v0.1.0
 ```
 
-The exact commands will be added only after the implementation layout and build process exist. Never run Cargo from the Build Fest repository root for Kin; manifests and generated artifacts belong under `projects/kin/`.
+From the repository root in PowerShell:
+
+```powershell
+.\projects\kin\build-wasm.ps1
+py -m http.server 8000 --directory projects/kin/web
+```
+
+Open `http://localhost:8000`. On macOS/Linux, from `projects/kin/`, run `cargo build --target wasm32-unknown-unknown --release`, copy `target/wasm32-unknown-unknown/release/kin.wasm` to `web/wasm/kin_engine.wasm`, then serve `web/` with `python3 -m http.server 8000 --directory web`. Never run Cargo from the Build Fest repository root for Kin; generated artifacts belong under `projects/kin/`.
 
 ## First-class operating systems
 
@@ -42,8 +49,8 @@ No npm dependency tree or framework runtime is planned. If static serving later 
 
 ## Browser capabilities
 
-The intended baseline is specified in [IMPLEMENTATION](IMPLEMENTATION.md): WebAssembly, ES modules, Custom Elements, IndexedDB, CustomEvent, text encoders/decoders, and secure-context browser APIs. WebAuthn and Web Crypto for content security belong to later identity/sync work, not v0.1.0 authentication or encryption. Record exact browser and OS versions actually tested when implementation starts; the support target is not a current compatibility claim.
+The application requires WebAssembly, ES modules, Custom Elements, IndexedDB, `CustomEvent`, text encoders/decoders, and secure-context browser APIs. WebAuthn and Web Crypto for content security belong to later identity/sync work, not v0.1.0 authentication or encryption. Desktop Chrome was exercised in the integrated VS Code browser; this does not certify the full browser support target.
 
 ## Development data
 
-Use synthetic household text only. Never copy private family messages, health details, credentials, or real household history into test fixtures, screenshots, bug reports, or logs. Once a local prototype exists, document a deliberate reset procedure that clearly removes only the developer's local test household and never points at production data. No reset command or storage implementation exists today.
+Use synthetic household text only. Never copy private family messages, health details, credentials, or real household history into test fixtures, screenshots, bug reports, or logs. Local test data can be removed through the browser's site-data controls for the local origin. Kin does not include a reset command that could accidentally remove household data.

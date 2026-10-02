@@ -2,7 +2,7 @@
 
 > A private, lightweight household coordination app for the little things families need to know, remember, hand off, or discuss.
 
-**Current status: `v0.0.12` — Changelog & Release History. No usable application has been implemented.** Planning/specification through `v0.0.9` is complete; `v0.0.10` established GitHub community documentation, `v0.0.11` recorded the implementation-cycle release discipline, and `v0.0.12` established a project changelog. Rust/WASM, Web Components, and IndexedDB are specified but not implemented. `v0.1.0` remains the first implementation milestone and has not begun.
+**Current status: `v0.1.0` — Household Heartbeat.** Kin now provides a local household item loop: add items, complete items, persist immutable events in IndexedDB, and reconstruct state through a Rust/WASM engine after reload. Planning/specification through `v0.0.9` and community/release documentation through `v0.0.12` remain preserved in history.
 
 ## The problem
 
@@ -12,11 +12,11 @@ Kin aims to make useful household context easier to share and find. It is not a 
 
 ## Intended direction
 
-Kin is planned as a private, lightweight shared household operating layer, initially for one household and two adults. Its long-term concepts include Today, Needs, Handoff, Talk, Pulse, and Since You Last Looked. These are not implemented features.
+Kin is intended as a private, lightweight shared household operating layer. Today’s simple item view and local add/complete loop are implemented. Needs classification, Handoff, Talk, Pulse, Routines, and Since You Last Looked remain future concepts.
 
 The intended technical direction is Rust compiled to WebAssembly, native Web Components, vanilla JavaScript, and browser APIs, with a local-first start and no external framework unless a demonstrated requirement justifies one.
 
-## Planned releases
+## Release history
 
 - `v0.0.1` — Product definition and principles (`kin-v0.0.1`)
 - `v0.0.2` — Architecture, event model, and privacy design (`kin-v0.0.2`)
@@ -30,15 +30,28 @@ The intended technical direction is Rust compiled to WebAssembly, native Web Com
 - `v0.0.10` — GitHub Community & Project Documentation (`kin-v0.0.10`)
 - `v0.0.11` — Implementation Cycle Handoff (`kin-v0.0.11`)
 - `v0.0.12` — Changelog & Release History (`kin-v0.0.12`)
-- `v0.1.0` — First functional prototype
+- `v0.1.0` — Household Heartbeat (`kin-v0.1.0`)
+- See the [changelog](CHANGELOG.md) for the completed release history.
 
 ## Install, build, and run
 
-There is currently no application to install, build, or run. Releases through `v0.0.12` are documentation-only; no application source, build tooling, or runtime dependencies have been added. The future `v0.1.0` implementation specification is available at [V0.1.0](docs/V0.1.0.md), but it is not executable software.
+Requirements: Rust/Cargo with the `wasm32-unknown-unknown` target, Python 3 for the optional static server, and a modern browser with WebAssembly, ES modules, Custom Elements, and IndexedDB.
+
+From the repository root in PowerShell:
+
+```powershell
+rustup target add wasm32-unknown-unknown
+.\projects\kin\build-wasm.ps1
+py -m http.server 8000 --directory projects/kin/web
+```
+
+Then open `http://localhost:8000`. macOS/Linux can build from `projects/kin/` with `cargo build --target wasm32-unknown-unknown --release`, copy `target/wasm32-unknown-unknown/release/kin.wasm` to `web/wasm/kin_engine.wasm`, then serve `web/` with `python3 -m http.server 8000 --directory web`.
+
+Kin stores household events in the current browser profile's IndexedDB. It does not provide accounts, backup, encryption, pairing, or cross-device sync; browser storage is not a security boundary against device compromise or extensions. Use synthetic household text while evaluating this prototype.
 
 ## AI usage
 
-AI-assisted development tools are being used for brainstorming, product planning, architecture exploration, documentation, and implementation support. Kin is not currently designed around an AI runtime. The intended privacy posture is that household content is not sent to an AI service by default.
+AI-assisted development tools are used for brainstorming, product planning, architecture exploration, documentation, implementation support, debugging, and testing. Kin has no AI runtime, analytics, backend, or third-party runtime dependency; household events are processed locally and are not transmitted by the application.
 
 ## License
 

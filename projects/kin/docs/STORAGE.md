@@ -1,6 +1,6 @@
 # Local Event Storage
 
-**Status:** IndexedDB contract for v0.1.0; nothing is persisted by the current planning-only repository. ABI bytes are specified in [ABI](ABI.md); domain event identity and ordering are in [EVENTS](EVENTS.md).
+**Status:** v0.1.0 IndexedDB event storage is implemented. Kin persists canonical event bytes and local context; ABI bytes are specified in [ABI](ABI.md), and domain event identity and ordering are in [EVENTS](EVENTS.md).
 
 ## Database
 

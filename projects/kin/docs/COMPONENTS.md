@@ -1,6 +1,6 @@
 # Web Component Contract
 
-**Status:** component and communication specification for v0.1.0. No custom elements or application UI are implemented.
+**Status:** v0.1.0 native custom elements and command communication are implemented. Later components and product areas remain out of scope.
 
 ## Component responsibilities
 
