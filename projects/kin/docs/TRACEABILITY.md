@@ -66,3 +66,7 @@ User-authorized follow-up patch: a failed canonical refresh retains the original
 ## v0.4.0 Talk
 
 Authority: V0.4.0. protocol.rs tests lifecycle, identity, mixed replay and fail-closed downgrade. kin-engine.test.mjs tests real WASM. scripts/talk-regression.mjs runs inside the complete browser suite and covers atomic persistence, drafts, retries, repeated refresh failure, supersession and stale peers. See [V0.4.0](V0.4.0.md).
+
+## v0.4.1 correctness evidence
+
+Talk correctness audit passes the full lifecycle matrix, every truncated payload, overlong references, unsupported schemas, empty/oversized/invalid UTF-8 and blank text, exact v4 records, malformed status/reserved/count/length fields and combined entity limits. Exact pre-Talk writer/result fixtures remain unchanged. Browser tests verify event/counter rollback, retry once, metadata preservation and invalid-transition non-append. No production defect was found. Passed 56 Rust and 17 Node/real-WASM tests, formatting, Clippy, version consistency, release WASM, both build scripts and both launchers (page/WASM HTTP 200), and the complete Chrome 154.0.8037.59 browser suite on Windows x64/Node 22.12.0; POSIX via WSL. Previously listed platform/assistive-technology gaps remain.

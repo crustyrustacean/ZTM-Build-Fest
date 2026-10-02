@@ -106,3 +106,7 @@ User-authorized follow-up patch: a failed canonical refresh retains the original
 ## v0.3.5 build and run workflow
 
 Validate both launchers through the existing platform build scripts, confirm the server serves `web/` on loopback port 8000, and run the complete browser regression suite against the generated WASM. The launch workflow changes no application behavior.
+
+## v0.4.1 correctness evidence
+
+Talk correctness audit passes the full lifecycle matrix, every truncated payload, overlong references, unsupported schemas, empty/oversized/invalid UTF-8 and blank text, exact v4 records, malformed status/reserved/count/length fields and combined entity limits. Exact pre-Talk writer/result fixtures remain unchanged. Browser tests verify event/counter rollback, retry once, metadata preservation and invalid-transition non-append. No production defect was found. Passed 56 Rust and 17 Node/real-WASM tests, formatting, Clippy, version consistency, release WASM, both build scripts and both launchers (page/WASM HTTP 200), and the complete Chrome 154.0.8037.59 browser suite on Windows x64/Node 22.12.0; POSIX via WSL. Previously listed platform/assistive-technology gaps remain.

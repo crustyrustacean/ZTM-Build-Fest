@@ -359,3 +359,53 @@ test("Talk real WASM mixed replay, lifecycle and legacy compatibility", async ()
   for (const version of [1,2,3]) for (const kind of [8,9,10,11]) apply(version,[talk(1,kind)],3);
   assert.deepEqual(apply(4,[]),new Uint8Array([75,73,78,83,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]));
 });
+
+test("Talk payload codes, schemas, Unicode and byte limits", () => {
+  const text="\uFEFF"+"\u{1f95b}".repeat(1023)+"x";
+  for (const kind of [8,9,10,11]) {
+    const row=talk(1,kind,text),view=new DataView(row.buffer);
+    assert.equal(view.getUint16(0,true),1);assert.equal(view.getUint16(2,true),kind);
+    assert.equal(row.length,kind===8?108+4096:104);
+  }
+  assert.throws(()=>talk(1,8,text+"x"),/4096/);
+  assert.throws(()=>talk(1,8,"\uD800"),/valid Unicode/);
+});
+
+test("v4 rejects malformed Talk records, headers and combined counts", async context => {
+  const instantiate=WebAssembly.instantiate;let mutate=()=>{};
+  context.mock.method(WebAssembly,"instantiate",async (...args)=>{
+    const {instance}=await instantiate(...args);const abi=instance.exports;
+    return {instance:{exports:{...abi,kin_apply_events(pointer,length){
+      const status=abi.kin_apply_events(pointer,length);
+      if(status===0)mutate(new Uint8Array(abi.memory.buffer,abi.kin_result_ptr(),abi.kin_result_len()));
+      return status;
+    }}}};
+  });
+  const wasm=await readFile(new URL("./kin_engine.wasm",import.meta.url));
+  const engine=await loadKinEngine(`data:application/wasm;base64,${wasm.toString("base64")}`);
+  const mutations=[bytes=>bytes[0]=0,bytes=>bytes[4]=99,bytes=>bytes[6]=1,bytes=>bytes[7]=1,
+    bytes=>bytes[60]=3,...[61,62,63].map(offset=>bytes=>bytes[offset]=1),bytes=>bytes[68]=255,
+    bytes=>new DataView(bytes.buffer,bytes.byteOffset).setBigInt64(52,2n**60n,true),
+    ...[0,4097,0xffffffff].map(length=>bytes=>new DataView(bytes.buffer,bytes.byteOffset).setUint32(64,length,true)),
+    ...[8,12,16].map(offset=>bytes=>new DataView(bytes.buffer,bytes.byteOffset).setUint32(offset,0xffffffff,true)),
+    bytes=>{const v=new DataView(bytes.buffer,bytes.byteOffset);v.setUint32(8,3333,true);v.setUint32(12,3333,true);v.setUint32(16,3335,true);}];
+  for(mutate of mutations) assert.throws(()=>engine.applyEvents([talk(1)]),error=>error.code===6);
+  mutate=()=>{};assert.equal(engine.applyEvents([talk(1)]).talks[0].text,"Weekend plans");
+});
+
+test("exact pre-Talk event writer bytes and v3 result remain unchanged",async()=>{
+  const old=legacyRecord(1,1);
+  const identity={eventId:new Uint8Array(16).fill(1),householdId:new Uint8Array(16).fill(0xaa),
+    actorId:new Uint8Array(16).fill(0xbb),deviceId:new Uint8Array(16).fill(0xcc),timestamp:1,logicalTime:1};
+  const expected=new Uint8Array(116);expected.set(old.subarray(0,88));expected[0]=2;expected[84]=28;
+  expected.fill(0x11,88,104);expected[104]=1;expected[108]=4;expected.set([77,105,108,107],112);
+  assert.deepEqual(encodeAddedRecord({...identity,itemId:new Uint8Array(16).fill(0x11),text:"Milk"}),expected);
+  for(const kind of [5,6,7]) {
+    const fixture=legacyRecord(kind===5?1:2,1);fixture[2]=kind;fixture.fill(0x22,88,104);
+    assert.deepEqual(handoff(1,kind,"Milk"),fixture);
+  }
+  const apply=await rawEngine();
+  const expectedV3=new Uint8Array(68);expectedV3.set([75,73,78,83,3,0,0,0,0,0,0,0,1,0,0,0]);
+  expectedV3.fill(0x22,16,32);expectedV3.fill(0xbb,32,48);expectedV3[48]=1;expectedV3[60]=4;expectedV3.set([77,105,108,107],64);
+  assert.deepEqual(apply(3,[handoff(1,5,"Milk")]),expectedV3);
+});

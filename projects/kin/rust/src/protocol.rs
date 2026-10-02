@@ -1178,4 +1178,86 @@ mod tests {
             }
         }
     }
+    #[test]
+    fn talk_payload_boundaries_and_versions_fail_closed() {
+        for kind in [8, 9, 10, 11] {
+            let record = talk_record(kind, 1);
+            for length in 0..record.len() - 88 {
+                let mut truncated = record[..88 + length].to_vec();
+                truncated[84..88].copy_from_slice(&(length as u32).to_le_bytes());
+                assert_eq!(
+                    decode_request(&request_with(&truncated, 4, 1)),
+                    Err(KinError::MalformedProtocol)
+                );
+            }
+            let mut trailing = record.clone();
+            trailing.push(0);
+            let length = (trailing.len() - 88) as u32;
+            trailing[84..88].copy_from_slice(&length.to_le_bytes());
+            assert_eq!(
+                decode_request(&request_with(&trailing, 4, 1)),
+                Err(KinError::MalformedProtocol)
+            );
+            for version in [0u16, 2, 3, u16::MAX] {
+                let mut invalid = record.clone();
+                invalid[..2].copy_from_slice(&version.to_le_bytes());
+                assert_eq!(
+                    decode_request(&request_with(&invalid, 4, 1)),
+                    Err(KinError::UnsupportedVersion)
+                );
+            }
+            let mut extreme = record.clone();
+            extreme[84..88].copy_from_slice(&u32::MAX.to_le_bytes());
+            assert_eq!(
+                decode_request(&request_with(&extreme, 4, 1)),
+                Err(KinError::MalformedProtocol)
+            );
+        }
+    }
+
+    #[test]
+    fn talk_text_and_exact_result_record() {
+        for text in [vec![], vec![b'x'; 4097], vec![0xff]] {
+            let mut row = added_record(&text);
+            row[2..4].copy_from_slice(&8u16.to_le_bytes());
+            assert_eq!(talk_replay(&[row]), Err(KinError::MalformedProtocol));
+        }
+        let mut row = added_record(b" \t\n");
+        row[2..4].copy_from_slice(&8u16.to_le_bytes());
+        assert_eq!(talk_replay(&[row]), Err(KinError::InvalidEvent));
+        for (kind, status) in [(8, 0), (9, 1), (10, 0), (11, 2)] {
+            let mut rows = vec![talk_record(8, 1)];
+            if kind != 8 {
+                rows.push(talk_record(kind, 2));
+            }
+            let state = talk_replay(&rows).unwrap();
+            let bytes = encode_state(&state, 4).unwrap();
+            assert_eq!(
+                &bytes[..20],
+                &[75, 73, 78, 83, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0]
+            );
+            assert_eq!(&bytes[20..36], &[0x11; 16]);
+            assert_eq!(&bytes[36..52], &[0xbb; 16]);
+            assert_eq!(&bytes[52..60], &1i64.to_le_bytes());
+            assert_eq!(&bytes[60..64], &[status, 0, 0, 0]);
+            assert_eq!(&bytes[64..68], &18u32.to_le_bytes());
+            assert_eq!(&bytes[68..], b"Dishwasher running");
+        }
+    }
+
+    #[test]
+    fn v4_combined_entity_limit() {
+        let mut state = talk_replay(&[
+            added_record(b"Milk"),
+            handoff_record(5, 2),
+            talk_record(8, 3),
+        ])
+        .unwrap();
+        state.items.resize(3333, state.items[0].clone());
+        state.handoffs.resize(3333, state.handoffs[0].clone());
+        state.talks.resize(3334, state.talks[0].clone());
+        assert!(encode_state(&state, 4).is_ok());
+        state.talks.push(state.talks[0].clone());
+        assert_eq!(encode_state(&state, 4), Err(KinError::SizeLimit));
+    }
 }

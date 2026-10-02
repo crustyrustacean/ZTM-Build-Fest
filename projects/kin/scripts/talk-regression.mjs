@@ -226,4 +226,3 @@ export async function talkPeerRegressions(first, second, until) {
   assert.equal(await second.evaluate('document.activeElement===document.querySelector("#talk-text")'),true);
   console.log("PASS Talk cross-tab canonical convergence, content-free invalidation, stale resolution/archive retries after refresh failures with and without notification, peer focus");
 }
-

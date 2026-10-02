@@ -250,3 +250,7 @@ Rust checks truncated Handoff request/event headers, reserved fields, extreme te
 ## v0.4.0 Talk
 
 Vector 020: protocol 4, schema 1, kind 8 adds an open topic; kind 9 resolves (repeated 9 is a valid no-op), 10 reopens (including open no-op), and 11 archives. Unknown references and archived mutations fail category 4. Earlier protocols reject every Talk kind/state with category 3. See [V0.4.0](V0.4.0.md).
+
+## v0.4.1 correctness evidence
+
+Talk correctness audit passes the full lifecycle matrix, every truncated payload, overlong references, unsupported schemas, empty/oversized/invalid UTF-8 and blank text, exact v4 records, malformed status/reserved/count/length fields and combined entity limits. Exact pre-Talk writer/result fixtures remain unchanged. Browser tests verify event/counter rollback, retry once, metadata preservation and invalid-transition non-append. No production defect was found. Passed 56 Rust and 17 Node/real-WASM tests, formatting, Clippy, version consistency, release WASM, both build scripts and both launchers (page/WASM HTTP 200), and the complete Chrome 154.0.8037.59 browser suite on Windows x64/Node 22.12.0; POSIX via WSL. Previously listed platform/assistive-technology gaps remain.
