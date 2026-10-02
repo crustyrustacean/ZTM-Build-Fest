@@ -2,7 +2,7 @@
 
 > A private, lightweight household coordination app for the little things families need to know, remember, hand off, or discuss.
 
-**Current status: `v0.1.3` — Household Heartbeat Hardening.** Kin provides a local household item loop: add items, complete items, persist immutable events in IndexedDB, and reconstruct state through a Rust/WASM engine after reload. The `.1.1` and `.1.2` patches hardened correctness, interruption recovery, and accessibility; `.1.3` audits the durable core, privacy, dependencies, and release documentation. Planning/specification through `v0.0.9` and community/release documentation through `v0.0.12` remain preserved in history.
+**Current status: `v0.1.5` — Final 0.1.x Stabilization.** Kin provides a local household item loop: add items, complete items, persist immutable events in IndexedDB, and reconstruct state through a Rust/WASM engine after reload. The `v0.1.1` and `v0.1.2` patches hardened correctness, interruption recovery, and accessibility; `v0.1.3` audited the durable core, privacy, dependencies, and release documentation. `v0.1.4` improved resilience and tooling; `v0.1.5` fixes retry draft ownership and closes the stabilization line without adding a product capability. The next development target is `v0.2.0`.
 
 ## The problem
 
@@ -34,6 +34,8 @@ The intended technical direction is Rust compiled to WebAssembly, native Web Com
 - `v0.1.1` — Core Correctness (`kin-v0.1.1`)
 - `v0.1.2` — Resilience & Accessibility (`kin-v0.1.2`)
 - `v0.1.3` — Household Heartbeat Hardening (`kin-v0.1.3`)
+- `v0.1.4` — Household Heartbeat Maintenance (`kin-v0.1.4`)
+- `v0.1.5` — Final 0.1.x Stabilization (`kin-v0.1.5`)
 - See the [changelog](CHANGELOG.md) for the completed release history.
 
 ## Install, build, and run
@@ -48,7 +50,7 @@ rustup target add wasm32-unknown-unknown
 py -m http.server 8000 --directory projects/kin/web
 ```
 
-Then open `http://localhost:8000`. macOS/Linux can build from `projects/kin/` with `cargo build --target wasm32-unknown-unknown --release`, copy `target/wasm32-unknown-unknown/release/kin.wasm` to `web/wasm/kin_engine.wasm`, then serve `web/` with `python3 -m http.server 8000 --directory web`.
+Then open `http://localhost:8000`. On macOS/Linux, build and copy the local WASM artifact with `sh projects/kin/build-wasm.sh`, then serve with `python3 -m http.server 8000 --directory projects/kin/web`.
 
 Kin stores household events in the current browser profile's IndexedDB and may keep the in-progress compose draft in tab-scoped `sessionStorage`. It does not provide accounts, backup, encryption, pairing, or cross-device sync; browser storage is not a security boundary against device compromise or extensions. Use synthetic household text while evaluating this prototype.
 

@@ -202,16 +202,21 @@ export class EventStore {
               event_version: 1,
               encoded_event: encodedEvent,
             };
-            const addRequest = events.add(row);
-            const contextWrite = contextStore.put({
-              ...context,
-              next_logical_time: logicalTime + 1n,
-            });
-            addRequest.onerror = () =>
-              abortWith(transaction, storageError(addRequest.error));
-            contextWrite.onerror = () =>
-              abortWith(transaction, storageError(contextWrite.error));
-            finish(candidateState);
+            try {
+              const addRequest = events.add(row);
+              const contextWrite = contextStore.put({
+                ...context,
+                next_logical_time: logicalTime + 1n,
+              });
+              addRequest.onerror = () =>
+                abortWith(transaction, storageError(addRequest.error));
+              contextWrite.onerror = () =>
+                abortWith(transaction, storageError(contextWrite.error));
+              finish(candidateState);
+            } catch (error) {
+              // Request creation can throw before an onerror handler exists.
+              abortWith(transaction, storageError(error));
+            }
           };
           existingRequest.onerror = () =>
             abortWith(transaction, storageError(existingRequest.error));
@@ -319,7 +324,7 @@ function transactionResult(transaction, schedule) {
 
 function abortWith(transaction, error) {
   try {
-    transaction.__kinFailure = error;
+    transaction.__kinFailure ??= error;
     transaction.abort();
   } catch {
     transaction.__kinFailure ??= error;
@@ -327,10 +332,11 @@ function abortWith(transaction, error) {
 }
 
 function storageError(cause) {
-  const error = new EventStoreError(
-    "Kin could not safely access local household storage. Your saved information was not intentionally deleted.",
-    cause,
-  );
+  const message =
+    cause?.name === "QuotaExceededError"
+      ? "Kin couldn't save because local browser storage is full. Free some space, then try again. Your saved information was not deleted."
+      : "Kin could not safely access local household storage. Your saved information was not intentionally deleted.";
+  const error = new EventStoreError(message, cause);
   return error;
 }
 

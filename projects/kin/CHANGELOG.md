@@ -2,6 +2,50 @@
 
 This file records completed Kin releases. The `v0.0.x` releases are planning and documentation milestones; they do not represent implemented application features. The first implementation milestone remains `v0.1.0`.
 
+## [0.1.5] — Final 0.1.x Stabilization
+
+### Fixed
+
+- Prevented a successful retry of an earlier failed add from clearing a newer compose draft. Draft clearing now belongs to the captured, successfully persisted submission, including delayed normal adds; retry still uses the original command.
+- Retained failed-command retry feedback after a successful peer refresh and kept reconnects from restarting the engine or unlocking an in-flight save.
+- Aborted synchronous IndexedDB write-request failures with their original storage-error guidance.
+- Stopped the PowerShell build script before copying a stale WASM artifact when Cargo fails.
+
+### Tests
+
+- All 32 Rust tests, 3 built-in Node bridge tests, formatting, Clippy with warnings denied, the WASM release build, both build scripts, and version consistency passed. Injected Cargo failures stop both build paths before copying an artifact.
+- Added a dependency-free browser regression runner covering normal add/clear, failed add with unchanged or edited draft, synchronous/asynchronous injected quota failures, repeated retry exactly once, commit/abort behavior, and delayed completion across reconnect.
+- Browser checks also passed for startup, completion, reload/Rust replay, keyboard submission, draft restoration and sessionStorage denial, successful peer refresh retaining retry, two-tab content-free invalidation and canonical reload, malformed-row preservation, Unicode, inert script-like text, focus restoration/outline, 320px reflow, and busy-state cleanup.
+
+### Validation
+
+- Tested on Windows x64 with Rust 1.93.0, Node 22.12.0, and headless Edge 154.0.4258.48 through local CDP. Shell build validation used Git Bash on Windows. Page requests stayed same-origin; no uncaught errors or CSP violations occurred. The automatic favicon 404 is excluded from console assertions.
+- Firefox, Safari, standalone Chrome, native browser zoom, NVDA, and VoiceOver were not tested for this patch. Quota failures were injected; the host disk was not filled.
+- No new product capability or dependency was added. This closes planned 0.1.x stabilization; the next development target is v0.2.0.
+
+## [0.1.4]
+
+### Fixed
+
+- Preserved the original IndexedDB write failure cause so quota errors receive actionable retry guidance without losing the draft or changing the event log.
+
+### Improved
+
+- Refreshed same-origin peer tabs from the canonical IndexedDB event stream through Rust replay using content-free BroadcastChannel invalidations.
+- Added cross-platform build and version-consistency tooling, an explicit WASM-focused Rust toolchain pin, and a same-origin Content Security Policy.
+- Expanded malformed protocol, deterministic replay, storage retry, cross-tab, and accessibility regression coverage.
+
+### Tests
+
+- 32 Rust tests and 3 built-in Node bridge tests passed.
+- `cargo fmt --check`, Clippy with warnings denied, `wasm32-unknown-unknown` release build, both build scripts, and the version-consistency check passed.
+- Browser checks passed for add/complete/reload, keyboard submission, Unicode and inert rendering, malformed-row preservation, quota abort/retry, two-tab refresh, 320px layout, and same-origin requests.
+
+### Validation
+
+- Tested on Windows 10 x64 with Rust 1.93.0, Node 22.12.0, and headless Edge 154.0.4258.48 through local CDP; CSP loaded with no CSP violations. An automatic `/favicon.ico` request returned 404.
+- Forced-colors, increased text spacing, and 320px reflow were checked in the integrated VS Code browser (Code 1.139.1, Electron 43.6.0, Chromium 150). Native 200% browser zoom, Firefox, Safari, standalone Chrome, NVDA, and VoiceOver remain unverified.
+
 ## [0.1.3]
 
 ### Audited
@@ -64,12 +108,13 @@ This file records completed Kin releases. The `v0.0.x` releases are planning and
 
 ### Added
 
-- Corrected the preserved bug-report template's prototype status and updated the implementation file map without removing v0.0.10 community guidance.
+- Established a project-scoped changelog and documented how release entries are maintained.
+
+### Changed
 
 - Updated Kin's current release references through `v0.0.12`; `v0.0.9` remains the specification freeze and `v0.1.0` remains the first implementation milestone.
 
-- All 25 Rust tests and 3 built-in Node bridge tests passed; formatting, Clippy, the `wasm32-unknown-unknown` build, and the browser reload/persistence checks passed.
-- Browser checks covered malformed-row preservation, Unicode roundtrip, keyboard/draft recovery, 320px/360px/640px reflow, and same-origin-only requests.
+## [0.0.11]
 
 ### Added
 

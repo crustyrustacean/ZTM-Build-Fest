@@ -31,6 +31,18 @@ Verify null/zero pointers, undersized and oversized buffers, overflow-safe range
 
 ## Browser-level validation
 
+The v0.1.5 browser regression runner uses Node 22+ built-ins and a local Chromium-family executable. Build WASM first, then run from the repository root (PowerShell example):
+
+```powershell
+node projects/kin/scripts/browser-regression.mjs 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'
+```
+
+It starts a loopback static server and an isolated headless browser profile, runs against the shipped CSP and real Rust/WASM/IndexedDB, and removes its temporary profile afterward. It does not access the user's existing Kin database. No npm install is needed. The runner fails on assertion errors, uncaught browser errors, CSP errors, or third-party page requests; the automatic favicon 404 is ignored.
+
+Regression cases include unchanged/edited drafts after failed add, exact original-command retry, rapid and stale retry clicks, delayed add completion, reconnect during a pending save, and peer refresh retaining a failed-command retry. Both synchronous and asynchronous quota categories are injected without exhausting disk space. A separate real transaction abort after request success verifies rollback and retry. The remaining checks cover the existing add/complete/replay, storage, cross-tab, Unicode, rendering, focus, and narrow-layout flows below. Automated focus checks assert focus ownership and a 3px outline; they do not certify screen-reader announcements or visual contrast.
+
+The focused v0.1.5 audit retained Rust as the authoritative validator/reducer, IndexedDB as the canonical event source, and content-free BroadcastChannel signals. Defects fixed were draft ownership, retry feedback lost on successful peer refresh, reconnect unlocking pending work, synchronous write-request error handling, and PowerShell failure propagation. No state-management layer or new domain behavior was introduced.
+
 Manually exercise or use a lightweight browser-native harness to verify:
 
 - WASM loads and exports match the ABI contract.
@@ -43,8 +55,22 @@ Manually exercise or use a lightweight browser-native harness to verify:
 - Storage/ABI failures reach an understandable error state without claiming success.
 - A compose draft survives a same-tab reload and clears only after successful persistence; the draft is not written to the event store.
 - Focus returns to a usable control after add and completion, and `aria-busy` clears after success or failure.
+- A quota-exceeded write preserves the event count, announces a storage-full message, exposes retry, and a later retry persists exactly one event.
+- With two same-origin tabs open, a successful write in one invalidates the other; the peer reloads canonical events and reruns Rust replay. Verify the notification carries no event or household content.
+- CSP smoke: load the page under its shipped same-origin policy and inspect the console for CSP violation messages.
+- Accessibility stress: test forced-colors, text-spacing overrides, 320px reflow, 200% browser zoom, and visible focus around actions.
 - No household-content, backend, analytics, or third-party network requests occur; serving local static assets from the application origin is expected.
 - Browser console has no uncaught errors.
 - Keyboard interaction, focus visibility, status announcements, and a narrow mobile viewport work.
+
+## Cross-browser and assistive-technology checklist
+
+These environments are not certified by the Windows/Edge checks recorded so far. Mark each item verified only after running it against a release build:
+
+- [ ] Firefox desktop: startup, add/complete/reload, storage failure, CSP console, 320px reflow.
+- [ ] Safari desktop: startup, add/complete/reload, storage failure, CSP console, 320px reflow.
+- [ ] Standalone Chrome desktop: startup, add/complete/reload, storage failure, CSP console, 320px reflow.
+- [ ] NVDA with Firefox or Chrome: labels, status/error announcements, completion, and focus restoration.
+- [ ] VoiceOver with Safari: labels, status/error announcements, completion, and focus restoration.
 
 Do not introduce an external test framework just for convenience. Record tested browser/runtime versions and manual steps in the release notes when implementation begins.
