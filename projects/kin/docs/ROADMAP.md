@@ -1,6 +1,6 @@
 # Roadmap
 
-This roadmap is a planning baseline, not a promise of delivery dates. Releases may change as the product is tested. Kin's current release is `v0.1.4` Household Heartbeat Maintenance, continuing patches to the local prototype without introducing a new product capability. The `v0.0.1`–`v0.0.12` planning and documentation history remains preserved; later product increments remain future work.
+This roadmap is a planning baseline, not a promise of delivery dates. Releases may change as the product is tested. Kin's current release is `v0.1.5` Final 0.1.x Stabilization, closing the local prototype stabilization line without introducing a new product capability. The next development target is `v0.2.0`. The `v0.0.1`–`v0.0.12` planning and documentation history remains preserved; later product increments remain future work.
 
 ## Planning releases
 
@@ -77,6 +77,10 @@ Audits the Rust/JavaScript ownership boundary, future-capability leverage, depen
 ### `v0.1.4` — Household Heartbeat Maintenance
 
 Continues approved correctness, resilience, accessibility, test, and tooling improvements to the existing Household Heartbeat. No new product capability.
+
+### `v0.1.5` — Final 0.1.x Stabilization
+
+Associates draft clearing with the successfully persisted submission, preserves newer drafts during retry or delayed completion, and adds browser-native regressions. Fixes PowerShell build failure propagation. No new product capability; no further 0.1.x polishing is planned.
 
 ## Product increments
 

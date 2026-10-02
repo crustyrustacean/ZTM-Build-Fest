@@ -31,6 +31,18 @@ Verify null/zero pointers, undersized and oversized buffers, overflow-safe range
 
 ## Browser-level validation
 
+The v0.1.5 browser regression runner uses Node 22+ built-ins and a local Chromium-family executable. Build WASM first, then run from the repository root (PowerShell example):
+
+```powershell
+node projects/kin/scripts/browser-regression.mjs 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'
+```
+
+It starts a loopback static server and an isolated headless browser profile, runs against the shipped CSP and real Rust/WASM/IndexedDB, and removes its temporary profile afterward. It does not access the user's existing Kin database. No npm install is needed. The runner fails on assertion errors, uncaught browser errors, CSP errors, or third-party page requests; the automatic favicon 404 is ignored.
+
+Regression cases include unchanged/edited drafts after failed add, exact original-command retry, rapid and stale retry clicks, delayed add completion, reconnect during a pending save, and peer refresh retaining a failed-command retry. Both synchronous and asynchronous quota categories are injected without exhausting disk space. A separate real transaction abort after request success verifies rollback and retry. The remaining checks cover the existing add/complete/replay, storage, cross-tab, Unicode, rendering, focus, and narrow-layout flows below. Automated focus checks assert focus ownership and a 3px outline; they do not certify screen-reader announcements or visual contrast.
+
+The focused v0.1.5 audit retained Rust as the authoritative validator/reducer, IndexedDB as the canonical event source, and content-free BroadcastChannel signals. Defects fixed were draft ownership, retry feedback lost on successful peer refresh, reconnect unlocking pending work, synchronous write-request error handling, and PowerShell failure propagation. No state-management layer or new domain behavior was introduced.
+
 Manually exercise or use a lightweight browser-native harness to verify:
 
 - WASM loads and exports match the ABI contract.
