@@ -116,7 +116,7 @@ size  field
 N     text bytes
 ```
 
-Items remain serialized in original add-event order, including archived tombstones so the caller can make a filtered view without becoming a reducer. The browser hides archived items from ordinary lists. Protocol v4 is written by new browser instances. `KERR` retains the v1 header/version and stable numeric error codes for both request versions.
+Items remain serialized in original add-event order, including archived tombstones so the caller can make a filtered view without becoming a reducer. The browser hides archived items from ordinary lists. Protocol v4 is written by new browser instances. `KERR` retains the v1 header/version and stable numeric error codes across all supported request protocol versions.
 
 ## Ownership and lifetime
 
