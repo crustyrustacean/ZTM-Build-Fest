@@ -1,6 +1,6 @@
 # Entity Lifecycles
 
-**Status:** Current through v0.5.3 Pulse; earlier version sections are historical contracts. See Pulse below.
+**Status:** Current through v0.6.0 Since You Last Looked; earlier version sections are historical contracts. See Pulse and v0.6.0 below.
 
 ## Item
 
@@ -83,3 +83,7 @@ Routine occurrences, Agreements, Household membership, credentials, and trusted 
 ## v0.5.0 Pulse
 
 SET replaces its actor’s context; CLEAR removes it (absent clear is valid). Expiry derives from as_of >= expires_at, never an event. Latest expired records remain projected until replaced/cleared; no history UI. See [V0.5.0](V0.5.0.md).
+
+## v0.6.0 Since You Last Looked
+
+No household entity lifecycle or domain event is added. The summary describes existing Item, Handoff and Talk lifecycle events. The local installation cursor is view metadata, not a household lifecycle or acknowledgement event. See [V0.6.0](V0.6.0.md).

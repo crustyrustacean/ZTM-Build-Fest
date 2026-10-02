@@ -1,10 +1,12 @@
 # Privacy
 
-**Status:** Current through v0.5.3 Pulse; earlier version sections are historical contracts. See Pulse below.
+**Status:** Current through v0.6.0 Since You Last Looked; earlier version sections are historical contracts. See Pulse and v0.6.0 below.
 
 The in-progress compose draft may be held in tab-scoped `sessionStorage` to survive a reload. It is not part of the event log, is not shared with another tab, and is cleared after successful save or explicit clear. Browser site-data controls remove both the event store and any draft.
 
 Same-origin tabs may exchange the fixed `events-changed` notification over `BroadcastChannel` after a committed write. The notification contains no household or event content; each tab reloads the event log from IndexedDB and reconstructs its own view locally.
+
+Since You Last Looked stores only a local event cursor and local timestamp in the existing `local_context` singleton. A cursor means that this installation explicitly advanced through a boundary; it does not identify a person or assert that a named member read anything. Viewing or marking the summary does not write a household event. The additional `view-state-changed` BroadcastChannel message is a fixed, content-free marker; it carries no cursor, IDs, count, text, actor, or device.
 
 Household information can be highly personal. Future implementation must minimize exposure and communicate clearly what is stored and shared.
 
@@ -71,3 +73,7 @@ Documentation describes intent, not verified security properties. Kin must not b
 ## v0.5.0 Pulse
 
 Fixed Pulse value/expiry stay in local canonical events. No analytics, history UI, scores, interpretation, external service or content-bearing broadcasts. Expiry hides current detail without deleting source events. No actor ID/name is displayed. See [V0.5.0](V0.5.0.md).
+
+## v0.6.0 Since You Last Looked
+
+The summary derives household changes without monitoring people. It includes no read receipt, member-view tracking, actor attribution, contribution analytics, individual event timestamps, activity timeline, or summary history. It is processed locally, with no analytics, AI, or external service. See [V0.6.0](V0.6.0.md).

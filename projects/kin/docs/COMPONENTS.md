@@ -1,6 +1,6 @@
 # Web Component Contract
 
-**Status:** Current through v0.5.3 Pulse; earlier version sections are historical contracts. See Pulse below.
+**Status:** Current through v0.6.0 Since You Last Looked; earlier version sections are historical contracts. See Pulse and v0.6.0 below.
 
 ## Component responsibilities
 
@@ -54,3 +54,7 @@ kin-talk-list owns the single labeled input and semantic Open/Resolved lists. Bu
 ## v0.5.0 Pulse
 
 kin-pulse provides native Current capacity/For selects and Set pulse/Change/Clear buttons. kin:set-pulse {value,hours} and kin:clear-pulse bubble/composed. KinApp freezes SET timestamp/expiry and owns persistence, time refresh and retry. Component renders Rust status only. See [V0.5.0](V0.5.0.md).
+
+## v0.6.0 Since You Last Looked
+
+`kin-catch-up` receives the Rust-derived summary, local `last_looked_at`, and the immutable mapped snapshot boundary. It renders a semantic heading/list, concise browser-owned household wording, omitted count, textual empty state, and an explicit Caught up button. It dispatches `kin:caught-up` without cursor data; KinApp owns transactional marking, busy/focus/feedback, refresh and content-free `view-state-changed` BroadcastChannel invalidation. It does not access IndexedDB or infer actors.

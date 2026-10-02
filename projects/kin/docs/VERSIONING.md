@@ -1,18 +1,18 @@
 # Persistent Contract Versioning
 
-**Status:** Current through v0.5.3 Pulse; earlier version sections are historical contracts. See Pulse below.
+**Status:** Current through v0.6.0 Since You Last Looked; earlier version sections are historical contracts. See Pulse and v0.6.0 below.
 
 ## Independent version axes
 
 Kin version numbers describe product releases; they do not version every persistent or transport contract.
 
-| Version axis             | Example                     | Governs                                                                  |
-| ------------------------ | --------------------------- | ------------------------------------------------------------------------ |
-| Application version      | `v0.1.0`, `v0.2.0`          | A Kin product release, source snapshot, and namespaced Git tag.          |
-| Event schema version     | `event_version = 1`         | The payload/envelope interpretation for one persisted event kind.        |
-| ABI/protocol version     | `protocol_version = 1, 2, 3, 4, or 5` | The byte-level JavaScript ↔ WASM request/result contract.                |
-| IndexedDB schema version | database `version = 1`      | Object stores, indexes, and local record structure managed by IndexedDB. |
-| Export format version    | `format_version = 1`        | The portable archive manifest and event-container representation.        |
+| Version axis             | Example                                  | Governs                                                                  |
+| ------------------------ | ---------------------------------------- | ------------------------------------------------------------------------ |
+| Application version      | `v0.1.0`, `v0.2.0`                       | A Kin product release, source snapshot, and namespaced Git tag.          |
+| Event schema version     | `event_version = 1`                      | The payload/envelope interpretation for one persisted event kind.        |
+| ABI/protocol version     | `protocol_version = 1, 2, 3, 4, 5, or 6` | The byte-level JavaScript ↔ WASM request/result contract.                |
+| IndexedDB schema version | database `version = 1`                   | Object stores, indexes, and local record structure managed by IndexedDB. |
+| Export format version    | `format_version = 1`                     | The portable archive manifest and event-container representation.        |
 
 These numbers evolve independently. An application release may keep the same event, protocol, storage, or export version; a contract may change between application versions. Never infer compatibility from equal version numbers or silently bump one axis as a proxy for another.
 
@@ -50,7 +50,7 @@ This separates durable history from evolving in-memory types and enables old his
 
 ## Backward and forward guarantees
 
-Kin has published v0.1.x event history. v0.2.0 explicitly reads schema-v1 legacy item events, normalizes them in memory, and preserves their exact bytes; it writes schema-v2 `ITEM_ADDED` and schema-v1 lifecycle events. Protocols v1/v2/v3/v4/v5 are supported, with v5 written by current clients. Protocols v1/v2 reject Handoff history rather than return lossy state. IndexedDB remains schema 1. A client with no decoder for a future event must preserve it and fail closed, not pretend it has derived complete household state.
+Kin has published v0.1.x event history. v0.2.0 explicitly reads schema-v1 legacy item events, normalizes them in memory, and preserves their exact bytes; it writes schema-v2 `ITEM_ADDED` and schema-v1 lifecycle events. Protocols v1/v2/v3/v4/v5/v6 are supported, with v6 written by current clients. Protocols v1/v2 reject Handoff history rather than return lossy state. IndexedDB remains schema 1. A client with no decoder for a future event must preserve it and fail closed, not pretend it has derived complete household state.
 
 ## v0.4.0 Talk
 
@@ -59,3 +59,7 @@ Current compatibility: protocols 1/2/3/4; writer v4; Item add schemas 1/2, lifec
 ## v0.5.0 Pulse
 
 Supported protocols 1/2/3/4/5; writer v5; Pulse kinds 12/13 schema 1; previous schemas unchanged. IndexedDB schema 1, no byte migration. Protocols 1–4 reject Pulse histories, even cleared histories. See [V0.5.0](V0.5.0.md).
+
+## v0.6.0 Since You Last Looked
+
+Supported protocols 1–6; current writer v6. Protocol v6 preserves explicit v5 `as_of` and adds the stable summary cursor/result; v1–v5 bytes and behavior remain unchanged. Event schema stays 1/2 for existing kinds, codes 1–13 remain unchanged, and IndexedDB remains schema 1 with no migration. See [V0.6.0](V0.6.0.md).

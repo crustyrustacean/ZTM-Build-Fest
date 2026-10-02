@@ -140,6 +140,7 @@ export class EventStore {
         try {
           loadedEvents = validateEventRows(loadedEvents);
           validateContext(context);
+          validateCursorBoundary(context, loadedEvents);
           if (loadedEvents.length >= MAX_EVENT_COUNT) {
             throw new EventStoreError(
               "Kin has reached its local event limit. Your saved information was not deleted.",
@@ -154,7 +155,8 @@ export class EventStore {
           }
           const eventId = randomId();
           const asOf = Date.now();
-          const timestamp = command.type === "set-pulse" ? command.timestamp : asOf;
+          const timestamp =
+            command.type === "set-pulse" ? command.timestamp : asOf;
           const identity = {
             eventId,
             householdId: context.household_id,
@@ -167,31 +169,58 @@ export class EventStore {
           let encodedEvent;
           if (command.type === "set-pulse") {
             kind = "PULSE_SET";
-            encodedEvent = encodePulseSetRecord({ ...identity, value: command.value, expiresAt: command.expiresAt });
+            encodedEvent = encodePulseSetRecord({
+              ...identity,
+              value: command.value,
+              expiresAt: command.expiresAt,
+            });
           } else if (command.type === "clear-pulse") {
             kind = "PULSE_CLEARED";
             encodedEvent = encodePulseClearedRecord(identity);
           } else if (command.type === "add-talk") {
             kind = "TALK_ADDED";
-            encodedEvent = encodeTalkAddedRecord({ ...identity, talkId: randomId(), text: command.text });
+            encodedEvent = encodeTalkAddedRecord({
+              ...identity,
+              talkId: randomId(),
+              text: command.text,
+            });
           } else if (command.type === "resolve-talk") {
             kind = "TALK_RESOLVED";
-            encodedEvent = encodeTalkResolvedRecord({ ...identity, talkId: idFromHex(command.talkId) });
+            encodedEvent = encodeTalkResolvedRecord({
+              ...identity,
+              talkId: idFromHex(command.talkId),
+            });
           } else if (command.type === "reopen-talk") {
             kind = "TALK_REOPENED";
-            encodedEvent = encodeTalkReopenedRecord({ ...identity, talkId: idFromHex(command.talkId) });
+            encodedEvent = encodeTalkReopenedRecord({
+              ...identity,
+              talkId: idFromHex(command.talkId),
+            });
           } else if (command.type === "archive-talk") {
             kind = "TALK_ARCHIVED";
-            encodedEvent = encodeTalkArchivedRecord({ ...identity, talkId: idFromHex(command.talkId) });
+            encodedEvent = encodeTalkArchivedRecord({
+              ...identity,
+              talkId: idFromHex(command.talkId),
+            });
           } else if (command.type === "add-handoff") {
             kind = "HANDOFF_ADDED";
-            encodedEvent = encodeHandoffAddedRecord({ ...identity, handoffId: randomId(), text: command.text });
+            encodedEvent = encodeHandoffAddedRecord({
+              ...identity,
+              handoffId: randomId(),
+              text: command.text,
+            });
           } else if (command.type === "acknowledge-handoff") {
             kind = "HANDOFF_ACKNOWLEDGED";
-            encodedEvent = encodeHandoffAcknowledgedRecord({ ...identity, handoffId: idFromHex(command.handoffId) });
+            encodedEvent = encodeHandoffAcknowledgedRecord({
+              ...identity,
+              handoffId: idFromHex(command.handoffId),
+            });
           } else if (command.type === "archive-handoff") {
             kind = "HANDOFF_ARCHIVED";
-            encodedEvent = encodeHandoffArchivedRecord({ ...identity, handoffId: idFromHex(command.handoffId) });
+            encodedEvent = encodeHandoffArchivedRecord({
+              ...identity,
+              handoffId: idFromHex(command.handoffId),
+            });
           } else if (command.type === "add") {
             kind = "ITEM_ADDED";
             encodedEvent = encodeAddedRecord({
@@ -224,10 +253,13 @@ export class EventStore {
             );
           }
 
-          candidateState = engine.applyEvents([
-            ...loadedEvents.map((event) => event.encoded_event),
-            encodedEvent,
-          ], asOf);
+          candidateState = engine.applyEvents(
+            [...loadedEvents.map((event) => event.encoded_event), encodedEvent],
+            asOf,
+            context.last_looked_event_id === null
+              ? null
+              : idToHex(context.last_looked_event_id),
+          );
 
           const existingRequest = events.index("event_id").get(eventId);
           existingRequest.onsuccess = () => {
@@ -242,7 +274,25 @@ export class EventStore {
                 );
                 return;
               }
-              finish(candidateState);
+              const currentState = engine.applyEvents(
+                loadedEvents.map((storedEvent) => storedEvent.encoded_event),
+                asOf,
+                context.last_looked_event_id === null
+                  ? null
+                  : idToHex(context.last_looked_event_id),
+              );
+              const tail = loadedEvents.at(-1);
+              finish({
+                state: currentState,
+                snapshotBoundary: tail
+                  ? {
+                      eventId: idToHex(tail.event_id),
+                      localSequence: tail.local_sequence,
+                      snapshotThroughEventId: idToHex(tail.event_id),
+                      snapshotThroughLocalSequence: tail.local_sequence,
+                    }
+                  : null,
+              });
               return;
             }
 
@@ -258,7 +308,19 @@ export class EventStore {
               encoded_event: encodedEvent,
             };
             try {
+              const appendResult = {
+                state: candidateState,
+                snapshotBoundary: null,
+              };
               const addRequest = events.add(row);
+              addRequest.onsuccess = () => {
+                appendResult.snapshotBoundary = {
+                  eventId: idToHex(eventId),
+                  localSequence: addRequest.result,
+                  snapshotThroughEventId: idToHex(eventId),
+                  snapshotThroughLocalSequence: addRequest.result,
+                };
+              };
               const contextWrite = contextStore.put({
                 ...context,
                 next_logical_time: logicalTime + 1n,
@@ -267,7 +329,7 @@ export class EventStore {
                 abortWith(transaction, storageError(addRequest.error));
               contextWrite.onerror = () =>
                 abortWith(transaction, storageError(contextWrite.error));
-              finish(candidateState);
+              finish(appendResult);
             } catch (error) {
               // Request creation can throw before an onerror handler exists.
               abortWith(transaction, storageError(error));
@@ -306,38 +368,225 @@ export class EventStore {
     });
   }
 
-  ensureContext() {
-    const transaction = this.database.transaction(CONTEXT_STORE, "readwrite");
-    const contexts = transaction.objectStore(CONTEXT_STORE);
-    const request = contexts.get(CONTEXT_KEY);
-    let context;
+  getCatchUpState() {
+    const transaction = this.database.transaction(
+      [EVENT_STORE, CONTEXT_STORE],
+      "readonly",
+    );
+    const eventsRequest = transaction.objectStore(EVENT_STORE).getAll();
+    const contextRequest = transaction
+      .objectStore(CONTEXT_STORE)
+      .get(CONTEXT_KEY);
 
     return transactionResult(transaction, (finish) => {
+      let loadedEvents;
+      let context;
+      let eventsReady = false;
+      let contextReady = false;
+      const complete = () => {
+        if (!eventsReady || !contextReady) return;
+        try {
+          loadedEvents = validateEventRows(loadedEvents);
+          validateContext(context);
+          validateCursorBoundary(context, loadedEvents);
+          const tail = loadedEvents.at(-1);
+          finish({
+            events: loadedEvents,
+            cursor: {
+              eventId: context.last_looked_event_id
+                ? idToHex(context.last_looked_event_id)
+                : null,
+              localSequence: context.last_looked_local_sequence,
+              lastLookedAt: context.last_looked_at,
+            },
+            through: tail
+              ? {
+                  eventId: idToHex(tail.event_id),
+                  localSequence: tail.local_sequence,
+                }
+              : null,
+          });
+        } catch (error) {
+          abortWith(transaction, error);
+        }
+      };
+      eventsRequest.onsuccess = () => {
+        loadedEvents = eventsRequest.result;
+        eventsReady = true;
+        complete();
+      };
+      contextRequest.onsuccess = () => {
+        context = contextRequest.result;
+        contextReady = true;
+        complete();
+      };
+      eventsRequest.onerror = () =>
+        abortWith(transaction, storageError(eventsRequest.error));
+      contextRequest.onerror = () =>
+        abortWith(transaction, storageError(contextRequest.error));
+    });
+  }
+
+  markCaughtUpThrough(snapshotBoundary) {
+    const transaction = this.database.transaction(
+      [EVENT_STORE, CONTEXT_STORE],
+      "readwrite",
+    );
+    const eventsStore = transaction.objectStore(EVENT_STORE);
+    const eventsRequest = eventsStore.getAll();
+    const contextStore = transaction.objectStore(CONTEXT_STORE);
+    const contextRequest = contextStore.get(CONTEXT_KEY);
+
+    return transactionResult(transaction, (finish) => {
+      let loadedEvents;
+      let context;
+      let eventsReady = false;
+      let contextReady = false;
+      const complete = () => {
+        if (!eventsReady || !contextReady) return;
+        try {
+          loadedEvents = validateEventRows(loadedEvents);
+          validateContext(context);
+          validateCursorBoundary(context, loadedEvents);
+          const boundary = validateSnapshotBoundary(snapshotBoundary);
+          const snapshotTail =
+            boundary.snapshotThroughLocalSequence === 0
+              ? null
+              : loadedEvents.find(
+                  (row) =>
+                    row.local_sequence ===
+                    boundary.snapshotThroughLocalSequence,
+                );
+          if (
+            !snapshotTail ||
+            idToHex(snapshotTail.event_id) !==
+              boundary.snapshotThroughEventId ||
+            boundary.localSequence > boundary.snapshotThroughLocalSequence
+          ) {
+            throw invalidCatchUpState();
+          }
+          const requested = loadedEvents.find(
+            (row) => row.local_sequence === boundary.localSequence,
+          );
+          if (!requested || idToHex(requested.event_id) !== boundary.eventId) {
+            throw invalidCatchUpState();
+          }
+          if (boundary.localSequence <= context.last_looked_local_sequence) {
+            finish({
+              advanced: false,
+              cursor: catchUpCursor(context),
+            });
+            return;
+          }
+
+          const updatedContext = {
+            ...context,
+            last_looked_event_id: requested.event_id,
+            last_looked_local_sequence: requested.local_sequence,
+            last_looked_at: Date.now(),
+          };
+          const write = contextStore.put(updatedContext);
+          write.onerror = () =>
+            abortWith(transaction, storageError(write.error));
+          finish({
+            advanced: true,
+            cursor: catchUpCursor(updatedContext),
+          });
+        } catch (error) {
+          abortWith(transaction, error);
+        }
+      };
+      eventsRequest.onsuccess = () => {
+        loadedEvents = eventsRequest.result;
+        eventsReady = true;
+        complete();
+      };
+      contextRequest.onsuccess = () => {
+        context = contextRequest.result;
+        contextReady = true;
+        complete();
+      };
+      eventsRequest.onerror = () =>
+        abortWith(transaction, storageError(eventsRequest.error));
+      contextRequest.onerror = () =>
+        abortWith(transaction, storageError(contextRequest.error));
+    });
+  }
+
+  ensureContext() {
+    const transaction = this.database.transaction(
+      [EVENT_STORE, CONTEXT_STORE],
+      "readwrite",
+    );
+    const eventRequest = transaction.objectStore(EVENT_STORE).getAll();
+    const contexts = transaction.objectStore(CONTEXT_STORE);
+    const request = contexts.get(CONTEXT_KEY);
+    let loadedEvents;
+    let context;
+    let eventsReady = false;
+    let contextReady = false;
+
+    return transactionResult(transaction, (finish) => {
+      const initialize = () => {
+        if (!eventsReady || !contextReady) return;
+        try {
+          loadedEvents = validateEventRows(loadedEvents);
+          if (!context) {
+            if (loadedEvents.length) throw invalidCatchUpState();
+            context = {
+              key: CONTEXT_KEY,
+              household_id: randomId(),
+              actor_id: randomId(),
+              device_id: randomId(),
+              next_logical_time: 1n,
+              last_looked_event_id: null,
+              last_looked_local_sequence: 0,
+              last_looked_at: Date.now(),
+            };
+            const write = contexts.add(context);
+            write.onerror = () =>
+              abortWith(transaction, storageError(write.error));
+            finish(context);
+            return;
+          }
+
+          validateContext(context, { allowUninitialized: true });
+          validateEventHousehold(context, loadedEvents);
+          if (!hasCatchUpMetadata(context)) {
+            const tail = loadedEvents.at(-1);
+            context = {
+              ...context,
+              last_looked_event_id: tail
+                ? Uint8Array.from(asBytes(tail.event_id))
+                : null,
+              last_looked_local_sequence: tail?.local_sequence ?? 0,
+              last_looked_at: Date.now(),
+            };
+            const write = contexts.put(context);
+            write.onerror = () =>
+              abortWith(transaction, storageError(write.error));
+          } else {
+            validateCursorBoundary(context, loadedEvents);
+          }
+          finish(context);
+        } catch (error) {
+          abortWith(transaction, error);
+        }
+      };
       request.onsuccess = () => {
         context = request.result;
-        if (context) {
-          try {
-            validateContext(context);
-            finish(context);
-          } catch (error) {
-            abortWith(transaction, error);
-          }
-          return;
-        }
-
-        context = {
-          key: CONTEXT_KEY,
-          household_id: randomId(),
-          actor_id: randomId(),
-          device_id: randomId(),
-          next_logical_time: 1n,
-        };
-        const write = contexts.add(context);
-        write.onerror = () => abortWith(transaction, storageError(write.error));
-        finish(context);
+        contextReady = true;
+        initialize();
       };
       request.onerror = () =>
         abortWith(transaction, storageError(request.error));
+      eventRequest.onsuccess = () => {
+        loadedEvents = eventRequest.result;
+        eventsReady = true;
+        initialize();
+      };
+      eventRequest.onerror = () =>
+        abortWith(transaction, storageError(eventRequest.error));
     });
   }
 
@@ -479,7 +728,7 @@ function validateEventRow(row) {
   }
 }
 
-function validateContext(context) {
+function validateContext(context, { allowUninitialized = false } = {}) {
   if (
     context?.key !== CONTEXT_KEY ||
     !isId(context.household_id) ||
@@ -493,6 +742,87 @@ function validateContext(context) {
       "Kin found invalid local household identity data. The stored data was preserved.",
     );
   }
+  const catchUpFields = [
+    "last_looked_event_id",
+    "last_looked_local_sequence",
+    "last_looked_at",
+  ];
+  const presentFields = catchUpFields.filter((field) =>
+    Object.prototype.hasOwnProperty.call(context, field),
+  );
+  if (presentFields.length === 0 && allowUninitialized) return;
+  if (
+    presentFields.length !== catchUpFields.length ||
+    !Number.isSafeInteger(context.last_looked_local_sequence) ||
+    context.last_looked_local_sequence < 0 ||
+    !Number.isSafeInteger(context.last_looked_at) ||
+    Math.abs(context.last_looked_at) > 8_640_000_000_000_000 ||
+    (context.last_looked_local_sequence === 0
+      ? context.last_looked_event_id !== null
+      : !isId(context.last_looked_event_id))
+  ) {
+    throw invalidCatchUpState();
+  }
+}
+
+function hasCatchUpMetadata(context) {
+  return [
+    "last_looked_event_id",
+    "last_looked_local_sequence",
+    "last_looked_at",
+  ].some((field) => Object.prototype.hasOwnProperty.call(context, field));
+}
+
+function validateEventHousehold(context, events) {
+  if (
+    events.some(
+      (event) => !bytesEqual(event.household_id, context.household_id),
+    )
+  ) {
+    throw invalidCatchUpState();
+  }
+}
+
+function validateCursorBoundary(context, events) {
+  validateEventHousehold(context, events);
+  if (context.last_looked_local_sequence === 0) return;
+  const cursor = events.find(
+    (event) => event.local_sequence === context.last_looked_local_sequence,
+  );
+  if (!cursor || !bytesEqual(cursor.event_id, context.last_looked_event_id)) {
+    throw invalidCatchUpState();
+  }
+}
+
+function catchUpCursor(context) {
+  return {
+    eventId: context.last_looked_event_id
+      ? idToHex(context.last_looked_event_id)
+      : null,
+    localSequence: context.last_looked_local_sequence,
+    lastLookedAt: context.last_looked_at,
+  };
+}
+
+function validateSnapshotBoundary(boundary) {
+  if (
+    !boundary ||
+    !/^[0-9a-f]{32}$/.test(boundary.eventId) ||
+    !/^[0-9a-f]{32}$/.test(boundary.snapshotThroughEventId) ||
+    !Number.isSafeInteger(boundary.localSequence) ||
+    boundary.localSequence < 1 ||
+    !Number.isSafeInteger(boundary.snapshotThroughLocalSequence) ||
+    boundary.snapshotThroughLocalSequence < boundary.localSequence
+  ) {
+    throw invalidCatchUpState();
+  }
+  return boundary;
+}
+
+function invalidCatchUpState() {
+  return new EventStoreError(
+    "Kin found invalid local catch-up data. Your household events were preserved.",
+  );
 }
 
 function isId(value) {

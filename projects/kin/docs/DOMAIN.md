@@ -1,6 +1,6 @@
 # Household Domain
 
-**Status:** Current through v0.5.3 Pulse; earlier version sections are historical contracts. See Pulse below.
+**Status:** Current through v0.6.0 Since You Last Looked; earlier version sections are historical contracts. See Pulse and v0.6.0 below.
 
 ## Scope and relationships
 
@@ -76,3 +76,7 @@ An Event is an immutable, identified fact describing a domain change. The v0.2.0
 ## v0.5.0 Pulse
 
 Pulse is the latest capacity per actor: enum Good/Okay/Drained/RoughDay/NeedQuiet, set_at, expires_at, active/expired status. No PulseId, arbitrary text, name or acknowledgement. Actor IDs remain unverified placeholders. See [V0.5.0](V0.5.0.md).
+
+## v0.6.0 Since You Last Looked
+
+The summary is a derived household projection over existing Item, Handoff and Talk events. It adds no domain entity or event kind. The catch-up cursor belongs to one browser installation's local UI context; it does not represent a member, device identity claim, acknowledgement, or read receipt. Pulse events advance the snapshot boundary but do not create summary entries. See [V0.6.0](V0.6.0.md).

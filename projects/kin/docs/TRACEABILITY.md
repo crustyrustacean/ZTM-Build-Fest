@@ -1,6 +1,6 @@
 # v0.1.0 Requirement Traceability
 
-**Status:** Current through v0.5.3 Pulse; earlier version sections are historical contracts. See Pulse below.
+**Status:** Current through v0.6.0 Since You Last Looked; earlier version sections are historical contracts. See Pulse and v0.6.0 below.
 
 | Requirement                                        | Specification authority                                                                 | v0.1.0 validation                                                                  |
 | -------------------------------------------------- | --------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
@@ -92,3 +92,17 @@ Rust tests: actor independence, replacement/clear, expiry boundary, explicit-tim
 Fixed focus restoration when expiry hides the focused active Pulse action: return to the native capacity selector. Added simulated suspension/missed timer and visibility return, delayed focus refresh, forward/backward wall-clock projections, late timer non-append, missed peer invalidation, original SET/CLEAR retries through quota/transaction abort and repeated refresh failure, supersession, rapid repeated intents and reconnect during busy save. Native keyboard tests exercise value/duration/Set/Change/Clear focus order and activation. Pulse labels, semantic heading, 48px targets and visible focus pass in forced colors; 320px reflow, increased spacing, reduced motion and 200% page-scale emulation pass with previous features retained.
 
 Passed 67 Rust and 24 Node/real-WASM tests, fmt, Clippy, release WASM, version consistency, complete Chrome browser suite, PowerShell and WSL POSIX WASM builds and both build/run launchers (page/WASM HTTP 200). Windows x64, Rust 1.93.0, Node 22.12.0, Chrome 154.0.8037.59. Sleep and clock changes are deterministic browser fault injection, not a physical device suspend or OS clock modification. Firefox, Safari, native desktop zoom, NVDA and VoiceOver remain unverified.
+
+## v0.6.0 Since You Last Looked
+
+| Requirement                                                                 | Authority                                                               | Validation                                                                                            |
+| --------------------------------------------------------------------------- | ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| Rust owns summary meaning; actor IDs and entry timestamps are absent        | [V0.6.0](V0.6.0.md), [STATE](STATE.md), ADR 0002                        | Rust projection tests, real-WASM structured records, and browser text-only rendering.                 |
+| Protocol v1–v5 remain unchanged; v6 retains explicit time and stable cursor | [ABI](ABI.md), [VERSIONING](VERSIONING.md), [V0.6.0](V0.6.0.md)         | Legacy byte fixtures and exact v6 request/result offsets.                                             |
+| First run with existing history initializes at the tail atomically          | [STORAGE](STORAGE.md), [V0.6.0](V0.6.0.md)                              | Browser strips optional local fields, initializes at the tail, and checks event/counter preservation. |
+| Only the rendered snapshot boundary may advance the cursor                  | [V0.6.0](V0.6.0.md)                                                     | Browser append-after-render race and beyond-snapshot rejection.                                       |
+| Cursor advancement is transactional and monotonic                           | [STORAGE](STORAGE.md), [V0.6.0](V0.6.0.md)                              | Newer-then-stale direct IndexedDB writes; event count and logical time remain unchanged.              |
+| Pulse is omitted from entries but included in the actual through-boundary   | [EVENTS](EVENTS.md), [V0.6.0](V0.6.0.md)                                | Rust, real-WASM and browser mixed-stream checks.                                                      |
+| Summary is capped at eight and reports exact total/omitted counts           | [V0.6.0](V0.6.0.md), [UX](UX.md)                                        | Rust cap/order/count tests and browser omitted-copy assertions.                                       |
+| Cross-tab view invalidation is content-free                                 | [STORAGE](STORAGE.md), [PRIVACY](PRIVACY.md)                            | Browser checks exact `{ type: "view-state-changed" }` and canonical convergence.                      |
+| No read receipts, member tracking, activity timeline, or history browser    | [PRINCIPLES](PRINCIPLES.md), [PRIVACY](PRIVACY.md), [V0.6.0](V0.6.0.md) | Contract and UI surface audit; no event kinds or stores added.                                        |

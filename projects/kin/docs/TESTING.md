@@ -1,6 +1,6 @@
 # v0.1.0 Testing Contract
 
-**Status:** Current through v0.5.3 Pulse; earlier version sections are historical contracts. See Pulse below.
+**Status:** Current through v0.6.0 Since You Last Looked; earlier version sections are historical contracts. See Pulse and v0.6.0 below.
 
 ## Rust domain tests
 
@@ -128,3 +128,9 @@ Architecture/product/privacy audit confirms Rust-only reduction; separate Item/H
 Pulse coverage is in rust/src/pulse_tests.rs, web/wasm/kin-engine.test.mjs and scripts/pulse-regression.mjs, called by the complete browser runner. All prior regressions remain; actual milestone evidence and gaps are in V0.5.0. See [V0.5.0](V0.5.0.md).
 
 Optional local visual evidence: set `KIN_VISUAL_CHECK=1` when running the browser regression script. Screenshots are written only to ignored `projects/kin/target/pulse-active-320.png` and `pulse-change-320.png`. They contain synthetic regression data.
+
+## v0.6.0 Since You Last Looked
+
+`rust/src/catchup_tests.rs` and protocol tests cover summary selection, stable cursor lookup, missing-cursor failure, duplicate delivery, Pulse exclusion, actual through-boundary, ordering, eight-entry cap, total count, and exact v6 bytes. `web/wasm/kin-engine.test.mjs` runs the real WASM ABI for v1–v6 compatibility and summary decoding. `scripts/catch-up-regression.mjs`, called by the complete browser runner, exercises legacy first-run history, cursor initialization racing with append, an event arriving after render, stale-tab monotonicity, beyond-snapshot rejection, truncation/omitted count, explicit no-event marking, keyboard/focus, and cross-tab view-state invalidation. The existing Item, Handoff, Talk, Pulse, storage, retry, 10,000-event, CSP, same-origin, and accessibility-mode regressions remain required.
+
+Do not claim Firefox, Safari, native desktop zoom, NVDA, or VoiceOver coverage unless those environments are actually exercised. Chromium 200% page-scale emulation is not native desktop zoom.

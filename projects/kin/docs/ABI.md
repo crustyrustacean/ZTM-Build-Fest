@@ -1,6 +1,6 @@
 # JavaScript–WASM ABI
 
-**Status:** Current through v0.5.3 Pulse; earlier version sections are historical contracts. See Pulse below.
+**Status:** Current through v0.6.0 Since You Last Looked; earlier version sections are historical contracts. See Pulse and v0.6.0 below.
 
 ## Target and exports
 
@@ -116,7 +116,7 @@ size  field
 N     text bytes
 ```
 
-Items remain serialized in original add-event order, including archived tombstones so the caller can make a filtered view without becoming a reducer. The browser hides archived items from ordinary lists. Protocol v5 is written by new browser instances. `KERR` retains the v1 header/version and stable numeric error codes across all supported request protocol versions.
+Items remain serialized in original add-event order, including archived tombstones so the caller can make a filtered view without becoming a reducer. The browser hides archived items from ordinary lists. Protocol v6 is the current browser writer; see the additive v5 and v6 contracts below. `KERR` retains the v1 header/version and stable numeric error codes across all supported request protocol versions.
 
 ## Ownership and lifetime
 
@@ -132,7 +132,7 @@ Items remain serialized in original add-event order, including archived tombston
 
 ## Call behavior
 
-`kin_apply_events` accepts one complete, ordered event batch using protocol version 1, 2, 3, 4, or 5. It validates the entire request and reconstructs from scratch. On success it publishes a complete result in the requested protocol version and returns zero. On failure it publishes an error and no partial result; stored IndexedDB bytes remain untouched. Unknown protocol/event versions fail with a stable unsupported-version code; malformed payload, bounds overflow, and invalid state transitions fail deterministically.
+`kin_apply_events` accepts one complete, ordered event batch using protocol version 1, 2, 3, 4, 5, or 6. It validates the entire request and reconstructs from scratch. On success it publishes a complete result in the requested protocol version and returns zero. On failure it publishes an error and no partial result; stored IndexedDB bytes remain untouched. Unknown protocol/event versions fail with a stable unsupported-version code; malformed payload, bounds overflow, and invalid state transitions fail deterministically.
 
 The function may grow memory while parsing or building output. JavaScript must reacquire `memory.buffer` after the call before copying result/error bytes. Length arithmetic is checked for overflow in both languages. Cap a request and result at 64 MiB, a request at 10,000 events, and individual item text at 4096 UTF-8 bytes for v0.1.0; reject larger input before unbounded allocation. The matching 10,000-event storage limit is specified in [STORAGE](STORAGE.md).
 
@@ -155,3 +155,9 @@ Protocol v4 requests retain the 12-byte KINE header and 88-byte envelope, versio
 ## v0.5.0 Pulse
 
 Protocol v5 KINE: magic[4], version:u16=5, reserved:u16=0, event_count:u32, as_of:i64 (20 bytes). KINS adds pulse_count:u32 after talk_count (24-byte header), followed by unchanged Item/Handoff/Talk records and 40-byte Pulse records: actor_id[16], set_at:i64, expires_at:i64, value:u8, status:u8, reserved[6]=0. Integers little-endian; Pulse/as_of timestamps in ±8,640,000,000,000,000ms and expiry > set_at. Protocols 1–4 unchanged and reject Pulse. KERR remains v1. Browser applyEvents(records, asOf) requires time. Full offsets/error categories are in the frozen contract. See [V0.5.0](V0.5.0.md).
+
+## v0.6.0 Since You Last Looked
+
+Protocol v6 is additive; v1–v5 request/result layouts and supported behavior remain unchanged. The v6 request is exactly 40 bytes: `KINE`, version 6, reserved zero, event_count:u32, explicit `as_of:i64`, cursor_present:u8, reserved[3]=0, cursor_event_id[16]. An absent cursor requires all-zero ID bytes. A present cursor must exactly match an event in the ordered stream or the request fails with invalid-event status 4.
+
+The v6 result header is exactly 52 bytes: `KINS`, version 6, reserved zero, Item/Handoff/Talk/Pulse counts, summary_count, summary_total_count, through-present:u8, reserved[3]=0, and summary_through_event_id[16] (all zero when absent). It is followed by unchanged v2 Item, v3 Handoff, v4 Talk and v5 Pulse records, then at most eight summary records. Each summary record is event_id[16], kind:u8 (1–11), entity_kind:u8, classification:u8 (0 Today, 1 Needs, 255 absent), reserved:u8=0, text_length:u32, and strict UTF-8 text. Pulse entries are excluded, but the through ID is the exact last event in the input stream, including Pulse. Full offsets, bounds, validation and ownership are in [V0.6.0](V0.6.0.md).

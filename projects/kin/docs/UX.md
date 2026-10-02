@@ -1,6 +1,6 @@
 # UX
 
-**Status:** Today, Needs, Handoff and Talk are implemented. Pulse is implemented; Since You Last Looked remains conceptual.
+**Status:** Today, Needs, Handoff, Talk, Pulse and Since You Last Looked are implemented locally. The catch-up summary is bounded and never attributes changes to people.
 
 ## Primary question
 
@@ -12,7 +12,7 @@ The home view should make useful context scannable and keep capture close at han
 
 ## Current home hierarchy
 
-The implemented view presents Today and Needs as separate sections, with active and completed items grouped within each. Archived items are omitted. Handoff follows with dedicated capture, needs-attention context, and recent acknowledged context; archived rows are hidden. Talk follows with one short topic field and Open/Resolved groups, newest additions first. Resolve/Reopen change workflow state; Archive hides the topic while retaining its history.
+The implemented view presents Since You Last Looked first, followed by Today and Needs as separate sections with active and completed items grouped within each. The catch-up summary is bounded to eight entries and omits per-entry timestamps and actor attribution. Archived Items are omitted. Handoff follows with dedicated capture, needs-attention context, and recent acknowledged context; archived rows are hidden. Talk follows with one short topic field and Open/Resolved groups, newest additions first. Resolve/Reopen change workflow state; Archive hides the topic while retaining its history.
 
 ## Future home concepts
 
@@ -112,18 +112,20 @@ It is context, not a mood score, diagnosis, historical ranking, or prompt to inf
 
 ## Since You Last Looked
 
-The eventual summary should show meaningful changes since a household member last checked:
+The current summary shows up to eight meaningful Item, Handoff, and Talk changes since this browser installation's explicit local cursor. It reports an omitted-change count, excludes Pulse and has one explicit Caught up action. The cursor advances only through the frozen upper boundary represented by the rendered snapshot; opening Kin never advances it.
 
 ```text
 Since 8:14 AM
 
-+ Milk added
-✓ Electric bill handled
-+ Dinner changed
-! Weekend plans added to Talk
+Buy milk added to Needs
+Electric bill handled
+Weekend plans added to Talk
+2 earlier changes
+
+[ Caught up ]
 ```
 
-It should be compact and useful, derived from events, and should not become a surveillance feed or expose activity beyond what the household expects.
+Entries have no actor attribution or individual timestamps. This is a household-change summary, not a timeline, history browser, read receipt, or member-view tracker. Empty text is “You're caught up.” Marking the summary writes only local installation metadata.
 
 ## Interaction constraints
 

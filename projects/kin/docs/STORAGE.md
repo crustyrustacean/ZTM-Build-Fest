@@ -1,6 +1,6 @@
 # Local Event Storage
 
-**Status:** Current through v0.5.3 Pulse; earlier version sections are historical contracts. See Pulse below.
+**Status:** Current through v0.6.0 Since You Last Looked; earlier version sections are historical contracts. See Pulse and v0.6.0 below.
 
 The compose input keeps a best-effort in-progress text and classification draft in the current tab's `sessionStorage`, retaining the existing text key for legacy drafts. This transient data is not an event or household-state source of truth, is cleared only when the exact submitted draft succeeds or the user clears text, and is unavailable across tabs.
 
@@ -18,7 +18,8 @@ object store: events
 object store: local_context
   keyPath: key
   singleton: key = "installation"
-  fields: household_id, actor_id, device_id, next_logical_time
+    fields: household_id, actor_id, device_id, next_logical_time,
+      last_looked_event_id, last_looked_local_sequence, last_looked_at
 ```
 
 Use one object store for the ordered domain event history and one singleton context record for local IDs and the next logical-time counter. Those values are generated locally and do not represent accounts, verified members, or trusted devices. Do not store a second authoritative mutable household state.
@@ -78,3 +79,9 @@ IndexedDB remains schema 1 without structural migration. Talk commands use the e
 ## v0.5.0 Pulse
 
 IndexedDB remains schema 1; no migration or second authority. Pulse shares atomic event/counter transactions. Original failed SET retry preserves timestamp/value/expiry. BroadcastChannel remains exactly { type: "events-changed" }; peers reload canonical events through Rust with explicit time. See [V0.5.0](V0.5.0.md).
+
+## v0.6.0 Since You Last Looked
+
+The three catch-up fields extend the existing `local_context` singleton; database version remains 1 with no store, key, or index change. A legacy context with all three fields absent is initialized in a read/write transaction over `events` and `local_context`, capturing the current tail without changing events or `next_logical_time`. Partial/corrupt metadata fails closed. `getCatchUpState()` reads ordered events and the local cursor in one readonly transaction. `markCaughtUpThrough(snapshotBoundary)` verifies the request and captured snapshot tail rows, then transactionally advances only when its local sequence is newer. It changes no canonical event and preserves `next_logical_time`.
+
+Protocol v6 carries the stable cursor event ID; IndexedDB `local_sequence` stays browser-only. `events-changed` remains content-free. After a cursor commit, tabs send only `{ type: "view-state-changed" }`; receivers reread IndexedDB and recompute. Neither message includes an ID, cursor, count, text, actor, or device. See [V0.6.0](V0.6.0.md).

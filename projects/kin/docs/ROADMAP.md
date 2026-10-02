@@ -1,6 +1,6 @@
 # Roadmap
 
-Current release: `v0.5.3 — Pulse Hardening & Polish`. Authorized Pulse line stops after v0.5.3 for evaluation.
+Current release: `v0.6.0 — Since You Last Looked`. The authorized catch-up stabilization line is v0.6.0–v0.6.3; stop after v0.6.3 for evaluation.
 
 ## Planning releases
 
@@ -150,7 +150,19 @@ Implemented: fixed actor-scoped capacity, set/replace/clear, deterministic expli
 
 ### `v0.6.0` — Since You Last Looked
 
-Derive a compact summary from event additions, completions, changes, new handoffs, and Talk updates. This is intended to become a signature capability while respecting member expectations and privacy.
+Completed: derive a bounded, Rust-owned summary of Item, Handoff and Talk changes since this installation's explicit local cursor. Pulse is excluded. Protocol v6 preserves the exact snapshot boundary; IndexedDB remains schema 1 and no household event records a view. See [V0.6.0](V0.6.0.md).
+
+### `v0.6.1` — Summary Correctness
+
+Audit cursor and projection edge cases without adding capability.
+
+### `v0.6.2` — Summary Resilience & Accessibility
+
+Audit storage failures, cross-tab convergence and accessibility without adding capability.
+
+### `v0.6.3` — Summary Hardening & Polish
+
+Audit protocol bounds, privacy and visual polish without adding capability; stop for user evaluation.
 
 ### `v0.7.0` — Routines
 
@@ -170,4 +182,4 @@ Focus on polish, reliability, accessibility, mobile UX, privacy documentation, o
 
 ## Scope discipline
 
-Each roadmap item is future work unless explicitly marked as completed. Authentication, passkeys, encryption, remote services, pairing, and synchronization remain unimplemented and out of scope for v0.5.x. Releases through `v0.0.12` were documentation-only; v0.1.0 is the first coded release. Handoff is implemented in v0.3.0; Talk is implemented; Pulse is implemented in v0.5.0.
+Each roadmap item is future work unless explicitly marked as completed. Authentication, passkeys, encryption, remote services, pairing, synchronization and Routines remain unimplemented and out of scope for v0.6.x. Releases through `v0.0.12` were documentation-only; v0.1.0 is the first coded release. Handoff is implemented in v0.3.0; Talk in v0.4.0; Pulse in v0.5.0; Since You Last Looked in v0.6.0.

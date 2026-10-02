@@ -2,8 +2,11 @@ use std::collections::BTreeMap;
 use std::sync::Mutex;
 
 use crate::error::KinError;
-use crate::protocol::{decode_request, encode_state, ERROR_PROTOCOL_VERSION, MAX_PROTOCOL_BYTES};
-use crate::state::{rebuild, rebuild_at};
+use crate::protocol::{
+    decode_request_with_summary, encode_state, encode_state_v6, ERROR_PROTOCOL_VERSION,
+    MAX_PROTOCOL_BYTES, PROTOCOL_V6,
+};
+use crate::state::{rebuild, rebuild_at, summarize_validated};
 
 struct AbiState {
     allocations: BTreeMap<u32, Box<[u8]>>,
@@ -132,12 +135,19 @@ pub extern "C" fn kin_apply_events(pointer: u32, length: u32) -> i32 {
             // The WASM caller borrows an in-bounds byte range for this call only.
             std::slice::from_raw_parts(pointer as *const u8, length as usize)
         };
-        decode_request(input).and_then(|(protocol_version, events, as_of)| {
-            match as_of {
-                Some(time) => rebuild_at(&events, time),
-                None => rebuild(&events),
-            }
-            .and_then(|household| encode_state(&household, protocol_version))
+        decode_request_with_summary(input).and_then(|request| {
+            let state = match request.as_of {
+                Some(time) => rebuild_at(&request.events, time),
+                None => rebuild(&request.events),
+            };
+            state.and_then(|household| {
+                if request.protocol_version == PROTOCOL_V6 {
+                    summarize_validated(&request.events, request.summary_cursor, &household)
+                        .and_then(|summary| encode_state_v6(&household, &summary))
+                } else {
+                    encode_state(&household, request.protocol_version)
+                }
+            })
         })
     };
 

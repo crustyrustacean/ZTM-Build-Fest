@@ -1,6 +1,6 @@
 # Accessibility Contract
 
-**Status:** Current through v0.5.3 Pulse; earlier version sections are historical contracts. See Pulse below.
+**Status:** Current through v0.6.0 Since You Last Looked; earlier version sections are historical contracts. See Pulse and v0.6.0 below.
 
 ## Baseline requirements
 
@@ -70,3 +70,7 @@ Pulse uses semantic heading, labeled native selects/buttons, textual state, visi
 Fixed focus restoration when expiry hides the focused active Pulse action: return to the native capacity selector. Added simulated suspension/missed timer and visibility return, delayed focus refresh, forward/backward wall-clock projections, late timer non-append, missed peer invalidation, original SET/CLEAR retries through quota/transaction abort and repeated refresh failure, supersession, rapid repeated intents and reconnect during busy save. Native keyboard tests exercise value/duration/Set/Change/Clear focus order and activation. Pulse labels, semantic heading, 48px targets and visible focus pass in forced colors; 320px reflow, increased spacing, reduced motion and 200% page-scale emulation pass with previous features retained.
 
 Passed 67 Rust and 24 Node/real-WASM tests, fmt, Clippy, release WASM, version consistency, complete Chrome browser suite, PowerShell and WSL POSIX WASM builds and both build/run launchers (page/WASM HTTP 200). Windows x64, Rust 1.93.0, Node 22.12.0, Chrome 154.0.8037.59. Sleep and clock changes are deterministic browser fault injection, not a physical device suspend or OS clock modification. Firefox, Safari, native desktop zoom, NVDA and VoiceOver remain unverified.
+
+## v0.6.0 Since You Last Looked
+
+The catch-up section uses a semantic heading and unordered list, a visible native “Caught up” button, a textual empty state, and no color-only state or per-entry timestamps. Enter/Space operate the button natively; focus moves to the heading if the button disappears after clearing. The global status is polite and cursor-write/refresh errors are assertive. Browser regressions check the 48px target, 320px reflow, forced colors, increased text spacing, reduced motion, focus and 200% page-scale emulation. Screen-reader certification and native desktop zoom are not claimed without direct testing.
