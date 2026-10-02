@@ -2,6 +2,13 @@
 
 This file records completed Kin releases. The `v0.0.x` releases are planning and documentation milestones; they do not represent implemented application features. The first implementation milestone remains `v0.1.0`.
 
+## [0.3.3] — Handoff Hardening & Polish
+
+- Added deterministic Handoff header/extreme-length checks, 10,000-event mixed replay, every truncated result boundary, trailing result rejection, and real WASM memory growth with repeated success/error/empty replay.
+- Reconciled current product, protocol, storage, component, accessibility, roadmap and release documentation. Confirmed Rust remains the sole reducer, IndexedDB schema 1 is canonical, history is immutable, peer messages carry no content, and no runtime dependencies, remote services, identity claims or timing analytics were introduced.
+- Passed 51 Rust tests, 13 Node bridge/real-WASM tests, formatting, Clippy, release WASM compilation, both build scripts, version consistency and the full browser suite (Windows x64, Node 22.12.0, headless Chrome 154.0.8037.59; POSIX build in WSL Ubuntu 22.04).
+- Native desktop 200% zoom, Firefox, Safari, NVDA and VoiceOver remain untested. The planned Handoff line stops here for user evaluation; v0.3.4 and v0.4.0 have not begun.
+
 ## [0.3.2] — Handoff Resilience & Accessibility
 
 - Extended browser regression coverage for Handoff delayed saves, reconnect and queued peer refresh, newer draft ownership, sessionStorage denial, acknowledgement/archive write failures, abort rollback, and rapid retry exactly once.

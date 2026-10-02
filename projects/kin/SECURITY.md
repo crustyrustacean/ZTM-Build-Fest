@@ -1,10 +1,10 @@
 # Security Policy
 
-**Current security status:** Kin's v0.1.x prototype runs locally in the browser and stores household events in IndexedDB. There is no backend, authentication, sync service, or implemented encryption. Browser-local storage is not protection against device compromise, shared profiles, or malicious extensions. The security architecture and threat model are specifications, not guarantees.
+**Current security status:** Kin's v0.3.x prototype runs locally in the browser and stores household events in IndexedDB. There is no backend, authentication, sync service, or implemented encryption. Browser-local storage is not protection against device compromise, shared profiles, or malicious extensions. The security architecture and threat model are specifications, not guarantees.
 
 ## Supported versions
 
-Kin is a prototype and has no staffed security-support commitment or guaranteed response time. `v0.0.x` releases contain documentation only; the `v0.1.x` line is pre-release software. Follow the private reporting guidance below and include only synthetic data.
+Kin is a prototype and has no staffed security-support commitment or guaranteed response time. `v0.0.x` releases contain documentation only; the `v0.3.x` line is pre-release software. Follow the private reporting guidance below and include only synthetic data.
 
 ## Reporting a vulnerability
 

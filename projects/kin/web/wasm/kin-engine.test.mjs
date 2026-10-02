@@ -285,3 +285,50 @@ test("bridge rejects malformed Handoff result fields and recovers", async contex
     assert.equal(engine.applyEvents([handoff(1)]).handoffs[0].text, "Dishwasher running");
   }
 });
+
+test("bridge fails closed at every truncated Handoff result boundary", async context => {
+  const instantiate = WebAssembly.instantiate;
+  let resultLength;
+  context.mock.method(WebAssembly, "instantiate", async (...args) => {
+    const { instance } = await instantiate(...args);
+    const abi = instance.exports;
+    return { instance: { exports: { ...abi, kin_result_len: () => resultLength ?? abi.kin_result_len() } } };
+  });
+  const wasm = await readFile(new URL("./kin_engine.wasm", import.meta.url));
+  const engine = await loadKinEngine(`data:application/wasm;base64,${wasm.toString("base64")}`);
+  for (resultLength = 0; resultLength < 16+48+18; resultLength++) {
+    assert.throws(() => engine.applyEvents([handoff(1)]), error => error.code === 6);
+  }
+  resultLength = 16+48+18+1;
+  assert.throws(() => engine.applyEvents([handoff(1)]), error => error.code === 6);
+  resultLength = undefined;
+  assert.equal(engine.applyEvents([handoff(1)]).handoffs.length,1);
+});
+
+test("large Handoff replay grows WASM memory and preserves independent repeated results", async context => {
+  const instantiate = WebAssembly.instantiate;
+  let memory;
+  context.mock.method(WebAssembly,"instantiate",async(...args)=>{
+    const result=await instantiate(...args); memory=result.instance.exports.memory; return result;
+  });
+  const wasm = await readFile(new URL("./kin_engine.wasm", import.meta.url));
+  const engine = await loadKinEngine(`data:application/wasm;base64,${wasm.toString("base64")}`);
+  const initial = memory.buffer.byteLength;
+  const id = number => { const bytes=new Uint8Array(16); new DataView(bytes.buffer).setUint32(0,number,true); return bytes; };
+  const records=Array.from({length:10000},(_,index)=>encodeHandoffAddedRecord({
+    eventId:id(index+1), handoffId:id(index+1), householdId:zeroId, actorId:zeroId, deviceId:zeroId,
+    timestamp:index,logicalTime:index+1,text:index<1000 ? "x".repeat(4096) : "x",
+  }));
+  const state=engine.applyEvents(records);
+  assert.ok(memory.buffer.byteLength>initial,"real memory growth occurred");
+  assert.equal(state.handoffs.length,10000);
+  assert.equal(state.handoffs[999].text.length,4096);
+  for(let iteration=0;iteration<4;iteration++) {
+    const bad=handoff(1);new DataView(bad.buffer).setUint16(2,99,true);
+    assert.throws(()=>engine.applyEvents([bad]),error=>error.code===3);
+    assert.deepEqual(engine.applyEvents([]),{items:[],handoffs:[]});
+    assert.deepEqual(engine.applyEvents(records),state);
+  }
+  assert.equal(state.handoffs[0].text.length,4096,"host-owned result survives later calls");
+  assert.throws(()=>engine.applyEvents([...records,records[0]]),error=>error.code===5);
+});

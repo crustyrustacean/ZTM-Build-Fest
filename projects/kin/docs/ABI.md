@@ -127,7 +127,7 @@ Items remain serialized in original add-event order, including archived tombston
 - Rust owns result/error buffers. `kin_result_ptr/len` refer to the most recent successful result; `kin_error_ptr/len` refer to the most recent failed call. The inactive pair returns `(0, 0)`.
 - Result/error bytes stay valid until the next `kin_apply_events` call or module teardown. JavaScript must copy them into host-owned memory before another call. The bridge must not retain a view that may become stale if WASM memory grows.
 - Each call clears the previous result and error before processing. Repeated calls are independent full replays; the module has no hidden household state between calls.
-- A valid empty household response is a non-empty protocol result containing a zero item count. A zero-length error/result accessor means that no buffer is available, not a successful empty state.
+- A valid empty household response is a non-empty protocol result containing zero entity counts (12 bytes for v1/v2, 16 for v3). A zero-length error/result accessor means that no buffer is available, not a successful empty state.
 - Output allocation is released by Rust on the next apply call/module teardown; JavaScript must not call `kin_free` on result/error pointers.
 
 ## Call behavior

@@ -68,7 +68,7 @@ The two classifications are fixed. Do not add category management or require mor
 
 ## Handoff
 
-A handoff should transfer actionable context in a few short entries, rather than demand a formal report:
+Handoff currently captures one short text entry and prioritizes unacknowledged context. Acknowledged entries stay in Recent until archived, newest additions first. There is no history browser or time-based expiry. The following earlier structured example is illustrative content only; it is not implemented categories or child records:
 
 ```text
 Kid
