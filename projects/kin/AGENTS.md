@@ -100,7 +100,7 @@ If an unrelated parent-repository file was modified accidentally, revert that ch
 
 # Current Development Stage
 
-Kin uses semantic versions. The current release is `v0.3.4` — Handoff Retry Recovery. The completed approved line is v0.3.0–v0.3.3 on the dedicated `kin-v0.3.0-development` branch, based on validated `kin-v0.2.4` commit `284b1993e51d379a45840756afd1104993243e07`. Follow the frozen `docs/V0.3.0.md` contract. After the planned line, the user authorized an additional patch for concrete missed defects. v0.3.4 fixes retry loss across refresh failures. Stop for evaluation after this patch; do not begin another patch or v0.4.0, merge to kin-main, or push automatically.
+Kin uses semantic versions. The current release is `v0.3.5` — Build & Run Convenience. The completed approved Handoff line is v0.3.0–v0.3.4 on the dedicated `kin-v0.3.0-development` branch, based on validated `kin-v0.2.4` commit `284b1993e51d379a45840756afd1104993243e07`. Follow the frozen `docs/V0.3.0.md` contract. v0.3.4 fixes retry loss across refresh failures; v0.3.5 adds local build-and-run scripts without changing application behavior. Stop for evaluation after this patch; do not begin v0.3.6 or v0.4.0, merge to kin-main, or push automatically.
 
 The pre-implementation releases are:
 
@@ -1064,6 +1064,7 @@ kin-v0.3.1
 kin-v0.3.2
 kin-v0.3.3
 kin-v0.3.4
+kin-v0.3.5
 kin-v1.0.0
 ```
 

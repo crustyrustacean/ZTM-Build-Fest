@@ -102,3 +102,7 @@ Rust checks truncated Handoff request/event headers, reserved fields, extreme te
 ## v0.3.4 retry recovery
 
 User-authorized follow-up patch: a failed canonical refresh retains the original failed command and feedback in transient application memory. Repeated refresh failure offers refresh retry first; successful Rust replay restores the command retry unless canonical state invalidates it. No automatic append occurs on refresh recovery. New commands supersede suspended retries. Browser regressions cover Handoff add/acknowledge/archive, Item add, repeated failure, newer drafts, stale peer actions and supersession. This is not persisted household state or a new capability.
+
+## v0.3.5 build and run workflow
+
+Validate both launchers through the existing platform build scripts, confirm the server serves `web/` on loopback port 8000, and run the complete browser regression suite against the generated WASM. The launch workflow changes no application behavior.

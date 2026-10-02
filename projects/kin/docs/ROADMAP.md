@@ -1,6 +1,6 @@
 # Roadmap
 
-This roadmap is a planning baseline, not a promise of dates. The current release is `v0.3.4 — Handoff Retry Recovery`. The planned v0.3.0–v0.3.3 line and user-authorized v0.3.4 recovery patch are complete. Stop for user evaluation before another patch or v0.4.0 Talk. Historical planning releases remain preserved.
+This roadmap is a planning baseline, not a promise of dates. The current release is `v0.3.5 — Build & Run Convenience`. The planned v0.3.0–v0.3.3 line, v0.3.4 recovery patch, and v0.3.5 developer workflow patch are complete. Stop for user evaluation before v0.3.6 or v0.4.0 Talk. Historical planning releases remain preserved.
 
 ## Planning releases
 
@@ -123,6 +123,10 @@ Completed: parser boundaries, 10,000-event replay, real WASM memory growth, arch
 ### `v0.3.4` — Handoff Retry Recovery
 
 Completed: preserve failed command retries through repeated canonical-refresh failures. Reconcile stale actions after recovery and discard superseded retries. No new capability. Stop for evaluation.
+
+### `v0.3.5` — Build & Run Convenience
+
+Completed: add project-local PowerShell and POSIX shell launchers that build the WASM module through the established scripts and serve the web app on loopback port 8000. No product capability or runtime dependency added.
 
 ### `v0.4.0` — Talk
 

@@ -2,6 +2,20 @@
 
 This file records completed Kin releases. The `v0.0.x` releases are planning and documentation milestones; they do not represent implemented application features. The first implementation milestone remains `v0.1.0`.
 
+## [0.3.5] — Build & Run Convenience
+
+### Improved
+
+- Added project-local PowerShell and POSIX shell workflows that reuse the established WASM build scripts, then serve `projects/kin/web` on loopback port 8000.
+- Updated the README and development instructions to use the one-command workflow.
+- Preserved the existing build boundary, dependency policy, and stale-artifact failure behavior.
+
+### Validation
+
+- Passed `cargo fmt --check`, Clippy with warnings denied, 51 Rust tests, release WASM build, both existing build scripts, both new launchers, 13 Node bridge/real-WASM tests, version consistency, and the complete browser regression runner.
+- Windows x64 used PowerShell 5.1, Rust 1.93.0, Python 3.13.14, Node 22.12.0, and headless Edge 154.0.4258.48. POSIX validation used WSL Ubuntu 22.04.5, Rust 1.93.0, and Python 3.10.12. Each launcher served the page and WASM asset successfully with HTTP 200.
+- No product capability, event format, protocol, IndexedDB schema, or runtime dependency changed.
+
 ## [0.3.4] — Handoff Retry Recovery
 
 ### Fixed

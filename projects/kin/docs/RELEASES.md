@@ -1,6 +1,6 @@
 # Release Process
 
-**Status:** Annotated local Kin milestones use kin-v0.3.0-development. Do not merge to kin-main or push automatically; stop after v0.3.3.
+**Status:** Kin development uses the `kin-v0.3.0-development` branch. v0.3.5 is the final authorized patch in this line; stop for evaluation afterward. Do not merge to kin-main automatically.
 
 ## Release sequence
 
