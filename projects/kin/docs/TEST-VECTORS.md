@@ -238,3 +238,7 @@ Expected: Rust derives 10,000 ordered active items with exactly 5,000 items in e
 ## Vector 019 — Handoff
 
 Protocol 3, kind 5/schema 1, common envelope, handoff_id = 22222222222222222222222222222222, text = Dishwasher running. Result: unacknowledged Handoff with envelope author/time. Append kind 6/schema 1 with a distinct event ID and increasing logical time: acknowledged. Repeat acknowledgement: valid no-op. Append kind 7: archived. Subsequent mutation fails with code 4. Protocols 1/2 reject kinds 5–7 and Handoff output with code 3. Exact duplicate delivery is ignored; conflicting event-ID reuse fails.
+
+## v0.3.1 correctness evidence
+
+Handoff tests reject every shortened payload, overlong references, unsupported schemas, extreme lengths, invalid UTF-8 and whitespace-only domain text. Exact v3 result records and separate entity namespaces are checked. Actor provenance comes from envelopes; same and different acknowledging actors both succeed. Browser fault injection verifies event/counter rollback, retry once, and metadata mismatch preservation; Node tests reject malformed Handoff result fields and recover on the next call.

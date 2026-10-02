@@ -862,4 +862,86 @@ mod tests {
             }
         }
     }
+    #[test]
+    fn handoff_payload_boundaries_and_versions_fail_closed() {
+        for kind in [5, 6, 7] {
+            let record = handoff_record(kind, 1);
+            for length in 0..record.len() - 88 {
+                let mut truncated = record[..88 + length].to_vec();
+                truncated[84..88].copy_from_slice(&(length as u32).to_le_bytes());
+                assert_eq!(
+                    decode_request(&request_with(&truncated, 3, 1)),
+                    Err(KinError::MalformedProtocol)
+                );
+            }
+            let mut trailing = record.clone();
+            trailing.push(0);
+            let length = (trailing.len() - 88) as u32;
+            trailing[84..88].copy_from_slice(&length.to_le_bytes());
+            assert_eq!(
+                decode_request(&request_with(&trailing, 3, 1)),
+                Err(KinError::MalformedProtocol)
+            );
+            for version in [0u16, 2, 3, u16::MAX] {
+                let mut invalid = record.clone();
+                invalid[..2].copy_from_slice(&version.to_le_bytes());
+                assert_eq!(
+                    decode_request(&request_with(&invalid, 3, 1)),
+                    Err(KinError::UnsupportedVersion)
+                );
+            }
+            let mut extreme = record.clone();
+            extreme[84..88].copy_from_slice(&u32::MAX.to_le_bytes());
+            assert_eq!(
+                decode_request(&request_with(&extreme, 3, 1)),
+                Err(KinError::MalformedProtocol)
+            );
+        }
+    }
+
+    #[test]
+    fn handoff_text_validation_and_actor_provenance() {
+        for text in [vec![], vec![b'x'; 4097], vec![0xff]] {
+            let mut record = added_record(&text);
+            record[2..4].copy_from_slice(&5u16.to_le_bytes());
+            assert_eq!(handoff_replay(&[record]), Err(KinError::MalformedProtocol));
+        }
+        let mut blank = added_record(b" \t\n");
+        blank[2..4].copy_from_slice(&5u16.to_le_bytes());
+        assert_eq!(handoff_replay(&[blank]), Err(KinError::InvalidEvent));
+        for same_actor in [false, true] {
+            let added = handoff_record(5, 1);
+            let mut ack = handoff_record(6, 2);
+            if !same_actor {
+                ack[36..52].fill(0xdd);
+            }
+            let (_, events) =
+                decode_request(&request_with(&[added, ack.clone()].concat(), 3, 2)).unwrap();
+            assert_eq!(
+                events[1].actor_id,
+                ActorId(if same_actor { [0xbb; 16] } else { [0xdd; 16] })
+            );
+            assert_eq!(events[1].canonical_bytes, ack);
+            let state = rebuild(&events).unwrap();
+            assert_eq!(state.handoffs[0].created_by, ActorId([0xbb; 16]));
+            assert_eq!(state.handoffs[0].status, HandoffStatus::Acknowledged);
+        }
+    }
+
+    #[test]
+    fn handoff_ids_have_separate_namespace_and_exact_result_bytes() {
+        let legacy = added_record(b"Item");
+        let added = handoff_record(5, 2); // same raw entity ID; distinct typed namespace
+        let state = handoff_replay(&[legacy, added]).unwrap();
+        assert_eq!(state.items.len(), 1);
+        assert_eq!(state.handoffs.len(), 1);
+        let bytes = encode_state(&state, 3).unwrap();
+        let offset = 16 + 48 + 4;
+        assert_eq!(&bytes[offset..offset + 16], &[0x11; 16]);
+        assert_eq!(&bytes[offset + 16..offset + 32], &[0xbb; 16]);
+        assert_eq!(&bytes[offset + 32..offset + 40], &1i64.to_le_bytes());
+        assert_eq!(&bytes[offset + 40..offset + 44], &[0; 4]);
+        assert_eq!(&bytes[offset + 44..offset + 48], &18u32.to_le_bytes());
+        assert_eq!(&bytes[offset + 48..], b"Dishwasher running");
+    }
 }

@@ -2,6 +2,12 @@
 
 This file records completed Kin releases. The `v0.0.x` releases are planning and documentation milestones; they do not represent implemented application features. The first implementation milestone remains `v0.1.0`.
 
+## [0.3.1] — Handoff Correctness
+
+- Added exhaustive Handoff payload truncation, exact reference lengths, schema rejection, extreme lengths, invalid Unicode, actor provenance, separate ID namespace, and exact result-layout regressions.
+- Added malformed result-field recovery and Handoff-specific event/counter rollback, exactly-once retry, metadata mismatch and canonical-byte preservation tests. No new capability or contract change.
+- Passed 49 Rust tests, 11 Node bridge/real-WASM tests, formatting, Clippy, release WASM build, both build scripts, version check, and the full browser regression runner (Windows x64, Node 22.12.0, headless Chrome 154.0.8037.59; POSIX build in WSL Ubuntu 22.04). Native desktop zoom, Firefox, Safari, NVDA and VoiceOver remain unverified.
+
 ## [0.3.0] — Handoff
 
 ### Added

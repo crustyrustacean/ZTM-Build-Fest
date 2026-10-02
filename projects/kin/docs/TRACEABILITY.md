@@ -46,3 +46,7 @@
 ## v0.3.0 Handoff
 
 Authority: [V0.3.0](V0.3.0.md), ABI, EVENTS, LIFECYCLES. Rust protocol tests cover typed projection, lifecycle, identity, deduplication, and mixed replay. Node tests cover actual WASM and v1/v2/v3 compatibility. Browser Handoff regressions cover persistence, drafts, retry ownership, inert rendering, neutral labels, and cross-tab stale intent.
+
+## v0.3.1 correctness evidence
+
+Handoff tests reject every shortened payload, overlong references, unsupported schemas, extreme lengths, invalid UTF-8 and whitespace-only domain text. Exact v3 result records and separate entity namespaces are checked. Actor provenance comes from envelopes; same and different acknowledging actors both succeed. Browser fault injection verifies event/counter rollback, retry once, and metadata mismatch preservation; Node tests reject malformed Handoff result fields and recover on the next call.

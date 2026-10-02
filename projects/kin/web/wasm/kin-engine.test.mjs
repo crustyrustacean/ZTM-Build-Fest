@@ -246,3 +246,42 @@ test("protocol v3 mixed replay preserves legacy bytes and Handoff lifecycle", as
   for (const version of [1,2]) apply(version,[handoff(1)],3);
   assert.deepEqual(apply(3,[]),new Uint8Array([75,73,78,83,3,0,0,0,0,0,0,0,0,0,0,0]));
 });
+
+test("Handoff text encoder preserves Unicode and enforces byte bounds", () => {
+  const text = "\uFEFF" + "🥛".repeat(1023) + "x";
+  const record = handoff(1, 5, text);
+  assert.equal(new TextDecoder("utf-8", { ignoreBOM: true }).decode(record.subarray(108)), text);
+  assert.equal(record.length, 108 + 4096);
+  assert.throws(() => handoff(1, 5, text + "x"), /4096/);
+  assert.throws(() => handoff(1, 5, "\uD800"), /valid Unicode/);
+});
+
+test("bridge rejects malformed Handoff result fields and recovers", async context => {
+  const instantiate = WebAssembly.instantiate;
+  let mutate = () => {};
+  context.mock.method(WebAssembly, "instantiate", async (...args) => {
+    const { instance } = await instantiate(...args);
+    const abi = instance.exports;
+    return { instance: { exports: { ...abi, kin_apply_events(pointer, length) {
+      const status = abi.kin_apply_events(pointer, length);
+      if (status === 0) mutate(new Uint8Array(abi.memory.buffer, abi.kin_result_ptr(), abi.kin_result_len()));
+      return status;
+    } } } };
+  });
+  const wasm = await readFile(new URL("./kin_engine.wasm", import.meta.url));
+  const engine = await loadKinEngine(`data:application/wasm;base64,${wasm.toString("base64")}`);
+  for (const mutation of [
+    bytes => bytes[56] = 3,
+    ...[57,58,59].map(offset => bytes => bytes[offset] = 1),
+    bytes => new DataView(bytes.buffer,bytes.byteOffset).setUint32(60,0,true),
+    bytes => new DataView(bytes.buffer,bytes.byteOffset).setUint32(60,0xffffffff,true),
+    bytes => new DataView(bytes.buffer,bytes.byteOffset).setUint32(12,10001,true),
+    bytes => bytes[64] = 255,
+    bytes => new DataView(bytes.buffer,bytes.byteOffset).setBigInt64(48,1n<<62n,true),
+  ]) {
+    mutate = mutation;
+    assert.throws(() => engine.applyEvents([handoff(1)]), error => error.code === 6);
+    mutate = () => {};
+    assert.equal(engine.applyEvents([handoff(1)]).handoffs[0].text, "Dishwasher running");
+  }
+});

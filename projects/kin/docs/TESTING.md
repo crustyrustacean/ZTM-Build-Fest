@@ -86,3 +86,7 @@ Do not introduce an external test framework just for convenience. Record tested 
 ## Handoff
 
 Coverage in protocol.rs, kin-engine.test.mjs, and scripts/handoff-regression.mjs (called by the browser runner) exercises mixed replay, lifecycle, legacy rejection, immutable storage, inert text, drafts/retries, and cross-tab canonical state.
+
+## v0.3.1 correctness evidence
+
+Handoff tests reject every shortened payload, overlong references, unsupported schemas, extreme lengths, invalid UTF-8 and whitespace-only domain text. Exact v3 result records and separate entity namespaces are checked. Actor provenance comes from envelopes; same and different acknowledging actors both succeed. Browser fault injection verifies event/counter rollback, retry once, and metadata mismatch preservation; Node tests reject malformed Handoff result fields and recover on the next call.

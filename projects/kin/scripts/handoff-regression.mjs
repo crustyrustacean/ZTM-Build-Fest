@@ -50,6 +50,41 @@ export async function handoffRegressions() {
   await idle();
   check((await count()) === before + 4 && app.state.handoffs.at(-1).text === "Original handoff", "retry original exactly once");
   check(capture.input.value === "Newer handoff draft", "older retry preserves newer text");
+  for (const mode of ["quota", "abort"]) {
+    const eventCount = await count();
+    const counter = (await app.store.ensureContext()).next_logical_time;
+    IDBObjectStore.prototype.add = function (...args) {
+      if (this.name !== "events") return originalAdd.apply(this, args);
+      if (mode === "quota") throw new DOMException("Synthetic quota", "QuotaExceededError");
+      const request = originalAdd.apply(this, args);
+      request.addEventListener("success", () => this.transaction.abort());
+      return request;
+    };
+    try { await app.handleAddHandoff({ detail: { text: "Atomic handoff " + mode } }); }
+    finally { IDBObjectStore.prototype.add = originalAdd; }
+    check((await count()) === eventCount && (await app.store.ensureContext()).next_logical_time === counter, "Handoff event/counter rollback");
+    app.retryButton.click(); app.retryButton.click();
+    await idle();
+    check((await count()) === eventCount + 1 && (await app.store.ensureContext()).next_logical_time === counter + 1n, "Handoff event/counter exactly once");
+  }
+  const saved = (await app.store.loadEvents()).find(row => row.kind === "HANDOFF_ADDED");
+  const canonical = [...new Uint8Array(saved.encoded_event)];
+  const writeRow = row => new Promise((resolve,reject) => {
+    const tx = app.store.database.transaction("events","readwrite");
+    tx.objectStore("events").put(row);
+    tx.oncomplete = resolve; tx.onabort = () => reject(tx.error);
+  });
+  await writeRow({ ...saved, actor_id: new Uint8Array(16) });
+  let rejected = false;
+  try { await app.store.loadEvents(); } catch { rejected = true; }
+  check(rejected, "malformed Handoff metadata fails safely");
+  const raw = await new Promise(resolve => {
+    const tx = app.store.database.transaction("events","readonly");
+    const request = tx.objectStore("events").get(saved.local_sequence);
+    request.onsuccess = () => resolve(request.result);
+  });
+  check(JSON.stringify([...new Uint8Array(raw.encoded_event)]) === JSON.stringify(canonical), "canonical Handoff bytes preserved");
+  await writeRow(saved);
   const events = (await app.store.loadEvents()).map(row => row.encoded_event);
   check(JSON.stringify(app.engine.applyEvents(events)) === JSON.stringify(app.state), "mixed deterministic replay");
   check(app.store.database.version === 1, "no IndexedDB migration");
