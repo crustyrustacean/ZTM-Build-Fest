@@ -1,0 +1,74 @@
+# Household Domain
+
+**Status:** domain specification for future implementation. These entities and behaviors are not implemented. Trust and multi-device details are planned for v0.0.5; v0.1.0 uses local placeholders only.
+
+## Scope and relationships
+
+Kin initially models one private household with two adult members. A household is not a device, account, or relationship score. Its durable identity groups household events and membership. Members are people; devices are installations authorized for a member; credentials authenticate a member or authorize a device. These identities must not be conflated.
+
+```text
+Household
+├── Member
+│   ├── Credential(s)
+│   └── Device(s)
+└── Event stream
+    └── derived household state
+```
+
+The event stream records changes; current domain state is a projection of valid events, as specified in [Events](EVENTS.md) and [State](STATE.md).
+
+## Household
+
+A household is one private coordination space with a stable, opaque `household_id`. The ID remains stable when a member replaces a device. It is included in each event so data from different households cannot be silently mixed.
+
+The initial product assumption is two adult members. This is a scope constraint, not a role/permission system. A household is created, active, and eventually may be closed or deleted through an explicit lifecycle; there is no implicit transfer of ownership when a device changes.
+
+In v0.1.0, the household ID is a local placeholder created for the browser installation. It does not represent a remotely registered household and does not establish membership or authentication. Household creation, membership, closure, recovery, and deletion protocols remain future work.
+
+## Member
+
+A member is a person participating in a household, identified by an opaque, stable `member_id`. The member ID is distinct from every device ID and credential ID. Replacing or revoking a device does not create a new person or rewrite prior event authorship.
+
+An event's `actor_id` identifies the member who initiated the action. In v0.1.0 it is a temporary local actor ID, not a verified identity. Membership may later have invited, active, and removed states; authorization and transitions are specified in v0.0.5. Kin does not infer a member's identity, relationship, capacity, or intent from event activity.
+
+## Device
+
+A device is one browser/application installation with an opaque, stable `device_id`, associated with an owning member when identity is introduced. A device is not a member and should not be treated as a household member when replaced.
+
+Conceptual authorization states are unregistered, trusted, and revoked. Only an authorized device may participate in future sync. Revocation blocks future authorization/sync but cannot erase plaintext or keys already copied to a device. v0.1.0 has only a local installation placeholder; trusted-device enrollment and revocation are not implemented.
+
+## Credential
+
+A credential is an authenticator associated with a member, such as a future passkey. It proves control of an authentication credential; it is not the member, household, device, or household encryption key. A credential may be used on or to authorize a device according to the identity protocol planned for v0.0.5.
+
+## Item
+
+An Item is a lightweight household need or reminder. It has a stable opaque `item_id`, user-entered text, an event-derived creation state, and a completion state. Its lifecycle is specified in [Lifecycles](LIFECYCLES.md).
+
+Items are not project-management tasks. The initial model deliberately avoids priority, labels, project hierarchy, assignment requirements, and complex metadata. Adding, completing, reopening, and archiving are separate immutable events; an earlier event is not edited to change the item.
+
+v0.1.0 includes only adding and completing an item. Reopening and archival are future behavior, tentatively v0.2.0. Archive is a state transition/tombstone, not physical deletion of the historical event.
+
+## Handoff
+
+A Handoff is a short context transfer one household member wants another to know. Its conceptual lifecycle is created, unacknowledged, acknowledged, and archived. Acknowledgement means receipt, not agreement, approval, or evaluation. Handoffs are planned for v0.3.0 and are not implemented.
+
+## TalkItem
+
+A TalkItem captures “This matters, but right now may not be the right moment.” It can be open, resolved, reopened, and eventually archived. It is a coordination reminder, not therapy, diagnosis, mediation, or a verdict. Kin must not add blame scores, sentiment scores, winner/loser logic, or automated interpretation. Talk is planned for v0.4.0 and is not implemented.
+
+## Pulse
+
+A Pulse is lightweight, time-bounded context about current capacity, for example “Good,” “Okay,” “Drained,” “Rough day,” or “Need quiet.” It is not a mental-health diagnosis, relationship score, historical performance metric, or permanent characterization of a person. A Pulse has an explicit expiry or is cleared; time-dependent display is derived using an explicit evaluation time, not hidden wall-clock reads during replay. Pulse is planned for v0.5.0 and is not implemented.
+
+## Routine
+
+A Routine represents a recurring household need, with a recurrence definition and occurrences. It is intended to support lightweight household rhythms, not become a general calendar. Routine behavior and recurrence rules are future domain work planned for v0.7.0.
+
+## Agreement
+
+An Agreement, if introduced, represents an explicit understanding deliberately entered or revised by household members. Kin must not infer an agreement from messages, behavior, or completion history. Agreements require clear authorship, revision, and archival semantics and are not currently assigned a release milestone.
+
+## Event
+
+An Event is an immutable, identified fact describing a domain change. Each event belongs to one household, has an actor and originating device identity, a timestamp, event kind/version, and validated payload. The canonical naming, identity, ordering, replay, and error rules are in [Events](EVENTS.md). No entity in this document implies an implemented feature.
