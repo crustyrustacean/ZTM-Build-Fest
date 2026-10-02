@@ -1,12 +1,13 @@
 # Accessibility Contract
 
-**Status:** baseline v0.1.0 accessibility requirements are implemented in the native UI. This contract remains the regression checklist for future changes.
+**Status:** v0.1.x accessibility requirements are implemented in the native UI and remain the regression checklist for future changes.
 
 ## Baseline requirements
 
 - Use semantic HTML first and native form controls wherever possible.
 - Give every input and button a programmatic name and visible label where appropriate.
 - Preserve complete keyboard operation and a logical focus order.
+- Restore focus to the compose input after add/completion transactions that disable or replace the originating control.
 - Provide a clear, visible focus indicator that is not obscured.
 - Use meaningful heading hierarchy and landmarks.
 - Announce asynchronous loading, save/completion success, and errors through an appropriately scoped status region without moving focus unexpectedly.
@@ -27,8 +28,9 @@ Kin should remain usable one-handed on a phone and during interruptions:
 - Keep primary controls stable and easy to reach.
 - Provide accessible names for icon-only controls; prefer a visible text label for unfamiliar actions.
 - Preserve draft text and communicate failures if an interaction is interrupted where practical.
+- Restore a typed draft after same-tab reload when session storage is available; clear it only after a successful append.
 - Avoid dense administration, tiny hit targets, and layouts that require precise gestures.
 
 ## v0.1.0 acceptance
 
-The add and complete flows must work with keyboard alone, expose visible focus, announce relevant result/error state, survive zoom/narrow layouts, and remain understandable without color. Mobile usability and accessibility checks are mandatory before release; they cannot be deferred as polish.
+The add and complete flows work with keyboard alone, restore focus after asynchronous updates, announce relevant result/error state, expose a busy state, and remain understandable without color. Reflow has been checked at 320px, 360px, and 640px CSS widths; full assistive-technology and cross-browser validation remain open. Mobile usability and accessibility checks are release requirements, not optional polish.

@@ -2,6 +2,21 @@
 
 This file records completed Kin releases. The `v0.0.x` releases are planning and documentation milestones; they do not represent implemented application features. The first implementation milestone remains `v0.1.0`.
 
+## [0.1.2]
+
+### Improved
+
+- Preserved in-progress compose drafts across same-tab reloads with best-effort `sessionStorage`; successful persistence clears the draft.
+- Restored keyboard focus after asynchronous add and completion actions and exposed initialization/save progress with `aria-busy`.
+- Kept retryable startup feedback for WASM and IndexedDB failures without discarding stored household events.
+
+### Validation
+
+- Verified draft restore/clear, WASM failure and retry with focus restoration, add/complete focus continuity, status updates, reduced-motion preference, and 320px/360px/640px reflow in the browser.
+- Confirmed a blocked `sessionStorage` does not prevent startup or saving; draft retention degrades without affecting the event store.
+- Confirmed primary controls are at least 48px high. Testing used Windows 10 x64 with the integrated VS Code browser (Code 1.139.1, Electron 43.6.0, Chromium 150.0.7871.250).
+- Screen-reader and non-Chromium browser testing remain unverified.
+
 ## [0.1.1]
 
 ### Fixed

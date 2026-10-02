@@ -41,6 +41,8 @@ Manually exercise or use a lightweight browser-native harness to verify:
 - Repeated actions and replay do not duplicate/corrupt state.
 - User-entered text renders safely as text.
 - Storage/ABI failures reach an understandable error state without claiming success.
+- A compose draft survives a same-tab reload and clears only after successful persistence; the draft is not written to the event store.
+- Focus returns to a usable control after add and completion, and `aria-busy` clears after success or failure.
 - No household-content, backend, analytics, or third-party network requests occur; serving local static assets from the application origin is expected.
 - Browser console has no uncaught errors.
 - Keyboard interaction, focus visibility, status announcements, and a narrow mobile viewport work.

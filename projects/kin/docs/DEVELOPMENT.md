@@ -44,6 +44,7 @@ Windows developers should be able to use PowerShell and standard Rust tooling. m
 - A modern browser with the platform APIs in [IMPLEMENTATION](IMPLEMENTATION.md)
 - A lightweight static-file server bound to localhost during development
 - Optional system Python for serving static files (`py -m http.server` on Windows or `python3 -m http.server` on macOS/Linux); this is not an application dependency
+- Optional Node.js for the built-in bridge regression tests; no npm packages are required
 
 No npm dependency tree or framework runtime is planned. If static serving later requires a helper, prefer a minimal cross-platform option with a clear security/update story.
 

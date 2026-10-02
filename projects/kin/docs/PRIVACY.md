@@ -2,6 +2,8 @@
 
 **Status:** v0.1.0 processes the item event stream locally in the browser and persists it in IndexedDB. There is no account system, encryption, or sync service. Local browser storage is not a security boundary against device compromise, shared browser profiles, or malicious extensions.
 
+The in-progress compose draft may be held in tab-scoped `sessionStorage` to survive a reload. It is not part of the event log, is not shared with another tab, and is cleared after successful save or explicit clear. Browser site-data controls remove both the event store and any draft.
+
 Household information can be highly personal. Future implementation must minimize exposure and communicate clearly what is stored and shared.
 
 ## Intended principles

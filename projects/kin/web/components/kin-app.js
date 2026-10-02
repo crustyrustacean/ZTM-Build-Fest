@@ -47,6 +47,8 @@ class KinApp extends HTMLElement {
     const main = document.createElement("main");
     main.id = "main";
     main.tabIndex = -1;
+    main.setAttribute("aria-busy", "true");
+    this.main = main;
     this.today = document.createElement("kin-today");
     this.compose = document.createElement("kin-compose");
     main.append(this.today, this.compose);
@@ -90,6 +92,7 @@ class KinApp extends HTMLElement {
   }
 
   async loadApplication() {
+    const retrying = !this.retryButton.hidden;
     this.setBusy(true);
     this.clearAlert();
     this.setStatus("Starting Kin…");
@@ -111,6 +114,9 @@ class KinApp extends HTMLElement {
       this.setStatus("");
     } finally {
       this.setBusy(false);
+      if (retrying && this.store) {
+        this.compose.focusInput();
+      }
     }
   }
 
@@ -121,6 +127,7 @@ class KinApp extends HTMLElement {
     this.setBusy(true);
     this.clearAlert();
     this.setStatus("Saving…");
+    let restoreComposeFocus = false;
     try {
       this.state = await this.store.append(
         { type: "add", text: event.detail.text },
@@ -129,11 +136,16 @@ class KinApp extends HTMLElement {
       this.renderState();
       this.compose.clear();
       this.setStatus("Added.");
+      restoreComposeFocus = true;
     } catch (error) {
       this.showAlert(error.userMessage ?? SAVE_ERROR);
       this.setStatus("");
+      restoreComposeFocus = true;
     } finally {
       this.setBusy(false);
+      if (restoreComposeFocus) {
+        this.compose.focusInput();
+      }
     }
   }
 
@@ -144,6 +156,7 @@ class KinApp extends HTMLElement {
     this.setBusy(true);
     this.clearAlert();
     this.setStatus("Saving…");
+    let restoreComposeFocus = false;
     try {
       this.state = await this.store.append(
         { type: "complete", itemId: event.detail.itemId },
@@ -151,11 +164,16 @@ class KinApp extends HTMLElement {
       );
       this.renderState();
       this.setStatus("Marked complete.");
+      restoreComposeFocus = true;
     } catch (error) {
       this.showAlert(error.userMessage ?? SAVE_ERROR);
       this.setStatus("");
+      restoreComposeFocus = true;
     } finally {
       this.setBusy(false);
+      if (restoreComposeFocus) {
+        this.compose.focusInput();
+      }
     }
   }
 
@@ -165,6 +183,7 @@ class KinApp extends HTMLElement {
 
   setBusy(isBusy) {
     this.busy = isBusy;
+    this.main.setAttribute("aria-busy", String(isBusy));
     this.compose.disabled = isBusy || !this.store;
     this.today.disabled = isBusy || !this.store;
   }

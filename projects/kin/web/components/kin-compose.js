@@ -1,4 +1,5 @@
 const MAX_ITEM_TEXT_BYTES = 4096;
+const DRAFT_STORAGE_KEY = "kin.compose.draft";
 const textEncoder = new TextEncoder();
 
 class KinCompose extends HTMLElement {
@@ -34,6 +35,8 @@ class KinCompose extends HTMLElement {
     this.message.id = "compose-message";
     this.message.className = "compose-message";
     this.message.setAttribute("aria-live", "polite");
+    this.restoreDraft();
+    this.input.addEventListener("input", () => this.saveDraft());
     this.form.append(this.label, this.input, this.button, this.message);
     this.replaceChildren(this.form);
     this.form.addEventListener("submit", (event) => this.submit(event));
@@ -48,6 +51,35 @@ class KinCompose extends HTMLElement {
   clear() {
     this.input.value = "";
     this.message.textContent = "";
+    try {
+      sessionStorage.removeItem(DRAFT_STORAGE_KEY);
+    } catch {
+      // Draft retention is best-effort when browser storage is unavailable.
+    }
+  }
+
+  focusInput() {
+    this.input.focus();
+  }
+
+  restoreDraft() {
+    try {
+      this.input.value = sessionStorage.getItem(DRAFT_STORAGE_KEY) ?? "";
+    } catch {
+      this.input.value = "";
+    }
+  }
+
+  saveDraft() {
+    try {
+      if (this.input.value) {
+        sessionStorage.setItem(DRAFT_STORAGE_KEY, this.input.value);
+      } else {
+        sessionStorage.removeItem(DRAFT_STORAGE_KEY);
+      }
+    } catch {
+      // Draft retention is best-effort when browser storage is unavailable.
+    }
   }
 
   submit(event) {

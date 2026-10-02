@@ -1,6 +1,6 @@
 # Roadmap
 
-This roadmap is a planning baseline, not a promise of delivery dates. Releases may change as the product is tested. Kin's current release is `v0.1.1` Core Correctness, a correctness patch to the local Household Heartbeat prototype. The `v0.0.1`–`v0.0.12` planning and documentation history remains preserved; later product increments remain future work.
+This roadmap is a planning baseline, not a promise of delivery dates. Releases may change as the product is tested. Kin's current release is `v0.1.2` Resilience & Accessibility, strengthening the local Household Heartbeat prototype. The `v0.0.1`–`v0.0.12` planning and documentation history remains preserved; later product increments remain future work.
 
 ## Planning releases
 
@@ -65,6 +65,10 @@ The detailed boundary and acceptance scope are in [V0.1.0.md](V0.1.0.md); releas
 ### `v0.1.1` — Core Correctness
 
 Hardened Unicode roundtripping, local storage startup cleanup, and stored-event metadata validation. Regression checks cover malformed input, invalid-event non-append behavior, corrupted-row preservation, concurrent tabs, and rapid repeated submission. No new product capability was added.
+
+### `v0.1.2` — Resilience & Accessibility
+
+Preserves an in-progress compose draft across same-tab reloads using best-effort `sessionStorage`, restores keyboard focus after asynchronous add/complete operations, exposes `aria-busy`, and improves feedback when WASM or local storage is unavailable. Reflow and touch targets were checked at narrow widths. No new product capability was added.
 
 ## Product increments
 
