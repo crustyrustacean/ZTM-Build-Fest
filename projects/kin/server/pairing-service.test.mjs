@@ -13,6 +13,7 @@ const setup = () => {
 test("pairing requires claim and explicit approval, then becomes single use", () => {
   const { service, adult } = setup();
   const invitation = service.createPairing(adult.sessionToken);
+  assert.equal(invitation.state, "Pending");
   const claim = service.claimPairing({ code: invitation.code.toLowerCase().replace("-", " "), credential: credential("b"), deviceLabel: "B phone" });
   assert.equal(claim.state, "Claimed");
   const confirmed = service.approvePairing(adult.sessionToken, invitation.pairingId, claim.version);

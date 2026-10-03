@@ -1,6 +1,6 @@
 # Roadmap
 
-Current release: `v0.8.3 — Household Pairing Pre-Feedback Stabilization`. The v0.8.x line implements and hardens two-adult household pairing, passkeys, explicit approval, sessions, trusted devices, and membership controls while preserving local protocol v1–v7 behavior. The line stops here for product feedback before encrypted sync work.
+Current release: `v0.8.4 — Pairing Creation Response Correctness`. This maintenance patch restores the initiating-adult flow by returning the initial Pending state. The v0.8.x line remains at its product-feedback gate before encrypted sync work.
 
 ## Planning releases
 

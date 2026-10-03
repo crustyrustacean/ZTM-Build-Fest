@@ -2,7 +2,7 @@
 
 > A private, lightweight household coordination app for the little things families need to know, remember, hand off, or discuss.
 
-**Current status: `v0.8.3` — Household Pairing Pre-Feedback Stabilization.** Kin supports a polished manual-code and invitation-link flow for exactly two adults, backed by passkeys, explicit approval, replay-safe activation, inspectable/revocable trusted devices, and explicit membership controls. The `/pair` route hides household content until authorization. Existing single-user coordination and local event bytes remain compatible.
+**Current status: `v0.8.4` — Pairing Creation Response Correctness.** Kin supports a polished manual-code and invitation-link flow for exactly two adults, backed by passkeys, explicit approval, replay-safe activation, inspectable/revocable trusted devices, and explicit membership controls. Pairing creation now returns its initial `Pending` state explicitly, with defensive UI handling for malformed status responses.
 
 ## The problem
 
@@ -68,6 +68,7 @@ The intended technical direction is Rust compiled to WebAssembly, native Web Com
 - `v0.8.1` — Pairing Hardening and Failure Recovery (`kin-v0.8.1`)
 - `v0.8.2` — Trusted Devices, Authorization, and Security UX (`kin-v0.8.2`)
 - `v0.8.3` — Household Pairing Pre-Feedback Stabilization (`kin-v0.8.3`)
+- `v0.8.4` — Pairing Creation Response Correctness (`kin-v0.8.4`)
 - See the [changelog](CHANGELOG.md) for the completed release history.
 
 ## Install, build, and run

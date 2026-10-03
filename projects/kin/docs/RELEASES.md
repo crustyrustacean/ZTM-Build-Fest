@@ -1,6 +1,6 @@
 # Release Process
 
-**Status:** v0.8.3 Household Pairing Pre-Feedback Stabilization. The four-release v0.8.x incubation line is complete locally; no push or kin-main merge is authorized.
+**Status:** v0.8.4 Pairing Creation Response Correctness. The v0.8.x incubation line and its first feedback correction are complete locally; no push or kin-main merge is authorized.
 
 ## Release sequence
 

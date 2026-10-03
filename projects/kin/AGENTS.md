@@ -100,7 +100,7 @@ If an unrelated parent-repository file was modified accidentally, revert that ch
 
 # Current Development Stage
 
-Kin uses semantic versions. Current release: `v0.8.3` — Household Pairing Pre-Feedback Stabilization. The four-release v0.8.x incubation line is complete and awaiting product-experience feedback. Do not begin v0.9.x without explicit approval. No automatic kin-main merge or push.
+Kin uses semantic versions. Current release: `v0.8.4` — Pairing Creation Response Correctness. This patch restores the initiating-adult flow by including the initial `Pending` state in the creation response. The v0.8.x line remains at its feedback gate. Do not begin v0.9.x without explicit approval. No automatic kin-main merge or push.
 
 The pre-implementation releases are:
 
@@ -1088,6 +1088,7 @@ kin-v0.8.0
 kin-v0.8.1
 kin-v0.8.2
 kin-v0.8.3
+kin-v0.8.4
 kin-v1.0.0
 ```
 

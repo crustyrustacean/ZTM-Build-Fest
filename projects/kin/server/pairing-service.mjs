@@ -107,7 +107,7 @@ export class PairingService {
     this.pairings.set(pairing.id, pairing);
     this.codeIndex.set(verifier, pairing.id);
     this.audit("pairing_created", { householdId: household.id, pairingId: pairing.id });
-    return { pairingId: pairing.id, code, expiresAt: pairing.expiresAt, version: pairing.version };
+    return { pairingId: pairing.id, code, state: pairing.state, expiresAt: pairing.expiresAt, version: pairing.version };
   }
 
   state(pairing) {

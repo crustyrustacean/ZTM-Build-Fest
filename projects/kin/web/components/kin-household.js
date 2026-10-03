@@ -75,7 +75,7 @@ class KinHousehold extends HTMLElement {
       this.button("Log out", () => this.logout(), "secondary");
       return;
     }
-    const state = document.createElement("p"); state.className = "pairing-state"; state.setAttribute("role", "status"); state.textContent = this.pairing.state === "Pending" ? "Waiting for the other adult to claim this code." : this.pairing.state === "Claimed" ? `${this.pairing.deviceLabel || "The other device"} is awaiting your approval.` : `Pairing ${this.pairing.state.toLowerCase()}.`; this.append(state);
+    const state = document.createElement("p"); state.className = "pairing-state"; state.setAttribute("role", "status"); state.textContent = this.pairing.state === "Pending" ? "Waiting for the other adult to claim this code." : this.pairing.state === "Claimed" ? `${this.pairing.deviceLabel || "The other device"} is awaiting your approval.` : typeof this.pairing.state === "string" ? `Pairing ${this.pairing.state.toLowerCase()}.` : "Kin could not read the pairing status. Revoke this request or reload before continuing."; this.append(state);
     if (["Pending", "Claimed"].includes(this.pairing.state)) {
       if (this.pairing.code) { const code = document.createElement("output"); code.className = "pairing-code"; code.textContent = this.pairing.code; code.setAttribute("aria-label", `Pairing code ${[...this.pairing.code].join(" ")}`); this.append(code); }
       this.countdown = document.createElement("p"); this.countdown.className = "pairing-countdown"; this.append(this.countdown); this.updateCountdown(); this.timer = setInterval(() => this.updateCountdown(), 1000);

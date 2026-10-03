@@ -2,6 +2,10 @@
 
 This file records completed Kin releases. The `v0.0.x` releases are planning and documentation milestones; they do not represent implemented application features. The first implementation milestone remains `v0.1.0`.
 
+## [0.8.4] — Pairing Creation Response Correctness
+
+Return the initial `Pending` state from pairing creation so the initiating-adult UI can render a newly created code without dereferencing an absent state. Add an exact response-contract regression and defensive UI fallback for malformed or incomplete pairing status responses.
+
 ## [0.8.3] — Household Pairing Pre-Feedback Stabilization
 
 Polish the two-adult journey with URL prefill, clipboard/native sharing fallbacks, readable selectable codes, quiet countdowns, semantic status/error regions, keyboard-native controls, forced-color styling, destructive-action explanations, and actionable passkey errors. Hide local household content on `/pair` before authorization, recover safely from stale claim cookies, reconcile security/recovery documentation, and retain the complete v0.7.x regression suite.
