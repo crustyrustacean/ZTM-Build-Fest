@@ -1,26 +1,22 @@
 import { randomBytes } from "node:crypto";
+import { DurableConflictError } from "./durable-store.mjs";
 import { PairingError } from "./pairing-service.mjs";
+import {
+  canonicalEventEnvelope,
+  canonicalJson,
+  isEventEnvelopeValid,
+  isProvisioningPackageValid,
+  isSyncId,
+  MAX_BINDINGS,
+  MAX_HOUSEHOLD_EVENTS,
+  MAX_KEY_EPOCHS,
+  MAX_ROTATION_PACKAGES,
+} from "./sync-contract.mjs";
 
-const ENVELOPE_FIELDS = [
-  "protocolVersion",
-  "envelopeVersion",
-  "eventId",
-  "householdId",
-  "deviceId",
-  "deviceSequence",
-  "logicalTime",
-  "keyEpoch",
-  "nonce",
-  "ciphertext",
-  "signature",
-];
 const MAX_EVENTS_PER_BATCH = 20;
-const MAX_ENVELOPE_BYTES = 8_192;
 const MAX_REQUEST_BYTES = 200_000;
-const MAX_HOUSEHOLD_EVENTS = 100_000;
 const MAX_PROVISIONING_GRANTS = 128;
 const MAX_PROVISIONING_BATCH = 20;
-const MAX_KEY_EPOCHS = 128;
 const MAX_SYNC_RATE_BUCKETS = 4096;
 const SYNC_RATE_WINDOW_MS = 60_000;
 const SYNC_RATE_LIMIT = 256;
@@ -28,9 +24,10 @@ const GRANT_TTL_MS = 10 * 60_000;
 const MAX_CURSOR = 100_000_000;
 
 export class EncryptedSyncService {
-  constructor(pairingService, { now = () => Date.now() } = {}) {
+  constructor(pairingService, { now = () => Date.now(), store } = {}) {
     this.pairingService = pairingService;
     this.now = now;
+    this.store = store;
     this.households = new Map();
     this.rateBuckets = new Map();
   }
@@ -45,8 +42,8 @@ export class EncryptedSyncService {
       pendingEpoch: state.rotationPending ? state.currentEpoch + 1 : null,
       lastRotationProposalId: state.lastRotation?.proposalId ?? null,
       latestCursor: encodeCursor(state.nextSequence - 1),
-      eventCount: state.records.length,
-      acceptance: "process-local",
+      eventCount: state.eventCount,
+      acceptance: this.store ? "durable" : "process-local",
     };
   }
 
@@ -74,6 +71,7 @@ export class EncryptedSyncService {
     const state = this.state(auth.household.id);
     state.enabled = true;
     auth.device.syncProvisionedEpochs ??= [state.currentEpoch];
+    this.persistState(auth.household.id, state);
     return { enabled: true };
   }
 
@@ -112,7 +110,9 @@ export class EncryptedSyncService {
           413,
         );
       const existing =
-        state.byEventId.get(envelope.eventId) ?? seen.get(envelope.eventId);
+        state.byEventId.get(envelope.eventId) ??
+        this.store?.findEvent(auth.household.id, envelope.eventId) ??
+        seen.get(envelope.eventId);
       if (existing) {
         if (existing.canonical !== canonical)
           throw new PairingError(
@@ -129,7 +129,13 @@ export class EncryptedSyncService {
           "This device must synchronize its earlier events first.",
           409,
         );
-      if (state.records.length + staged.length >= MAX_HOUSEHOLD_EVENTS)
+      if (
+        (this.store
+          ? this.store.eventCount(auth.household.id)
+          : state.eventCount) +
+          staged.length >=
+        MAX_HOUSEHOLD_EVENTS
+      )
         throw new PairingError(
           "sync_limit",
           "This household reached its sync limit.",
@@ -145,16 +151,33 @@ export class EncryptedSyncService {
       nextDeviceSequence.set(auth.device.id, envelope.deviceSequence);
     }
 
-    for (const record of staged) {
-      state.records.push(record);
-      state.byEventId.set(record.envelope.eventId, record);
+    if (this.store && staged.length) {
+      try {
+        this.store.commitEvents(
+          auth.household.id,
+          state.nextSequence,
+          auth.device.id,
+          state.deviceSequence.get(auth.device.id) ?? 0,
+          staged,
+        );
+      } catch (error) {
+        if (error instanceof DurableConflictError)
+          this.households.delete(auth.household.id);
+        throw error;
+      }
     }
+    if (!this.store)
+      for (const record of staged) {
+        state.records.push(record);
+        state.byEventId.set(record.envelope.eventId, record);
+      }
     state.nextSequence += staged.length;
     state.deviceSequence = nextDeviceSequence;
+    state.eventCount += staged.length;
     return {
       accepted: envelopes.length,
       latestCursor: encodeCursor(state.nextSequence - 1),
-      durable: false,
+      durable: Boolean(this.store),
     };
   }
 
@@ -173,6 +196,13 @@ export class EncryptedSyncService {
         "sync_cursor_invalid",
         "Kin could not continue from that sync position.",
         400,
+      );
+    if (this.store)
+      return this.store.readEvents(
+        auth.household.id,
+        cursor,
+        limit,
+        auth.device.syncHistoryFromEpoch ?? 1,
       );
     const scanned = state.records
       .filter((record) => record.sequence > cursor)
@@ -223,7 +253,7 @@ export class EncryptedSyncService {
           envelope: structuredClone(envelope),
         });
     }
-    if (state.bindings.size + staged.size > 256)
+    if (state.bindings.size + staged.size > MAX_BINDINGS)
       throw new PairingError(
         "sync_limit",
         "This household reached its sync limit.",
@@ -231,7 +261,8 @@ export class EncryptedSyncService {
       );
     for (const [eventId, binding] of staged)
       state.bindings.set(eventId, binding);
-    return { accepted: envelopes.length, durable: false };
+    this.persistState(auth.household.id, state);
+    return { accepted: envelopes.length, durable: Boolean(this.store) };
   }
 
   pullBindings(sessionToken, cursorValue = "") {
@@ -272,7 +303,7 @@ export class EncryptedSyncService {
     const auth = this.authorize(sessionToken);
     const state = this.state(auth.household.id);
     const stableRequestId = requestId ?? randomBytes(16).toString("hex");
-    if (!/^[a-f0-9]{32}$/.test(stableRequestId))
+    if (!isSyncId(stableRequestId))
       throw new PairingError(
         "provisioning_invalid",
         "That key transfer request is invalid.",
@@ -347,6 +378,7 @@ export class EncryptedSyncService {
     };
     state.grants.set(grant.grantId, grant);
     state.grantRequests.set(requestKey, grant.grantId);
+    this.persistState(auth.household.id, state);
     return {
       ...publicGrant(grant),
       recipientPublicKeys: structuredClone(recipient.syncPublicKeys),
@@ -379,13 +411,17 @@ export class EncryptedSyncService {
       );
     grant.package ??= structuredClone(keyPackage);
     grant.canonicalPackage ??= canonicalPackage;
-    return { accepted: true, grantId, durable: false };
+    this.persistState(auth.household.id, state);
+    return { accepted: true, grantId, durable: Boolean(this.store) };
   }
 
   pendingProvisioning(sessionToken) {
     const auth = this.authorize(sessionToken);
     const state = this.state(auth.household.id);
+    const grantCount = state.grants.size;
     this.pruneGrants(state);
+    if (state.grants.size !== grantCount)
+      this.persistState(auth.household.id, state);
     return [...state.grants.values()]
       .filter(
         (grant) =>
@@ -421,6 +457,7 @@ export class EncryptedSyncService {
     if (!device.syncProvisionedEpochs.includes(grant.keyEpoch))
       device.syncProvisionedEpochs.push(grant.keyEpoch);
     device.syncProvisionedEpochs.sort((left, right) => left - right);
+    this.persistState(auth.household.id, this.state(auth.household.id));
     return { acknowledged: true, grantId };
   }
 
@@ -457,9 +494,9 @@ export class EncryptedSyncService {
     }
     if (
       expectedEpoch !== state.currentEpoch ||
-      !/^[a-f0-9]{32}$/.test(proposalId ?? "") ||
+      !isSyncId(proposalId) ||
       !Array.isArray(packages) ||
-      packages.length > 64
+      packages.length > MAX_ROTATION_PACKAGES
     )
       throw new PairingError(
         "stale_key_epoch",
@@ -523,6 +560,7 @@ export class EncryptedSyncService {
         keyEpoch: nextEpoch,
       });
     }
+    this.persistState(auth.household.id, state);
     return {
       currentEpoch: nextEpoch,
       rotationPending: false,
@@ -541,6 +579,7 @@ export class EncryptedSyncService {
       for (const [request, grantId] of state.grantRequests)
         if (grantId === id) state.grantRequests.delete(request);
     }
+    this.persistState(householdId, state);
   }
 
   onAccessChange(householdId, excludedDeviceIds = []) {
@@ -558,6 +597,7 @@ export class EncryptedSyncService {
           if (requestedGrantId === grantId)
             state.grantRequests.delete(requestKey);
       }
+    this.persistState(householdId, state);
     return state.currentEpoch + 1;
   }
 
@@ -604,24 +644,32 @@ export class EncryptedSyncService {
   }
 
   state(householdId) {
+    this.store?.assertAvailable();
     let state = this.households.get(householdId);
     if (!state) {
-      state = {
-        currentEpoch: 1,
-        enabled: false,
-        rotationPending: false,
-        nextSequence: 1,
-        records: [],
-        byEventId: new Map(),
-        deviceSequence: new Map(),
-        grants: new Map(),
-        bindings: new Map(),
-        lastRotation: null,
-        grantRequests: new Map(),
-      };
+      state = this.store
+        ? this.store.loadSyncState(householdId)
+        : {
+            currentEpoch: 1,
+            enabled: false,
+            rotationPending: false,
+            nextSequence: 1,
+            records: [],
+            eventCount: 0,
+            byEventId: new Map(),
+            deviceSequence: new Map(),
+            grants: new Map(),
+            bindings: new Map(),
+            lastRotation: null,
+            grantRequests: new Map(),
+          };
       this.households.set(householdId, state);
     }
     return state;
+  }
+
+  persistState(householdId, state) {
+    this.store?.saveSyncState(householdId, state, this.pairingService);
   }
 
   pruneGrants(state) {
@@ -643,72 +691,24 @@ function validateEventEnvelope(envelope, auth, currentEpoch) {
       400,
     );
   if (
-    !envelope ||
-    typeof envelope !== "object" ||
-    Object.keys(envelope).length !== ENVELOPE_FIELDS.length ||
-    ENVELOPE_FIELDS.some((field) => !Object.hasOwn(envelope, field)) ||
-    envelope.protocolVersion !== 1 ||
-    envelope.envelopeVersion !== 1 ||
+    !isEventEnvelopeValid(envelope) ||
     envelope.householdId !== auth.household.id ||
     envelope.deviceId !== auth.device.id ||
-    !Number.isSafeInteger(envelope.keyEpoch) ||
     envelope.keyEpoch < (auth.device.syncHistoryFromEpoch ?? 1) ||
-    envelope.keyEpoch > currentEpoch ||
-    !/^[a-f0-9]{32}$/.test(envelope.eventId) ||
-    !Number.isSafeInteger(envelope.deviceSequence) ||
-    envelope.deviceSequence < 1 ||
-    !/^(0|[1-9][0-9]*)$/.test(envelope.logicalTime) ||
-    !/^[A-Za-z0-9_-]{16}$/.test(envelope.nonce) ||
-    typeof envelope.ciphertext !== "string" ||
-    !/^[A-Za-z0-9_-]+$/.test(envelope.ciphertext) ||
-    Buffer.byteLength(envelope.ciphertext) > MAX_ENVELOPE_BYTES ||
-    !/^[A-Za-z0-9_-]{86}$/.test(envelope.signature) ||
-    Buffer.from(envelope.nonce, "base64url").length !== 12 ||
-    Buffer.from(envelope.signature, "base64url").length !== 64 ||
-    Buffer.from(envelope.ciphertext, "base64url").length < 16
+    envelope.keyEpoch > currentEpoch
   )
     throw invalid();
 }
 
 function validateProvisioningPackage(value, expected, now = Date.now()) {
   if (
-    !value ||
-    value.version !== 1 ||
-    value.householdId !== expected.householdId ||
-    value.senderDeviceId !== expected.senderDeviceId ||
-    value.recipientDeviceId !== expected.recipientDeviceId ||
-    value.recipientFingerprint !== expected.recipientFingerprint ||
-    value.keyEpoch !== expected.keyEpoch ||
-    value.grantId !== expected.grantId ||
-    !Number.isSafeInteger(value.expiresAt) ||
-    value.expiresAt !== expected.expiresAt ||
-    value.expiresAt <= now ||
-    typeof value.signature !== "string" ||
-    typeof value.wrappedKey !== "string" ||
-    typeof value.ephemeralPublicKey !== "object" ||
-    Buffer.byteLength(JSON.stringify(value)) > MAX_ENVELOPE_BYTES
+    !isProvisioningPackageValid(value, expected) || value.expiresAt <= now
   )
     throw new PairingError(
       "provisioning_invalid",
       "That key transfer is invalid.",
       400,
     );
-}
-
-function canonicalEventEnvelope(envelope) {
-  return JSON.stringify(
-    ENVELOPE_FIELDS.map((field) => [field, envelope[field]]),
-  );
-}
-
-function canonicalJson(value) {
-  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
-  if (value && typeof value === "object")
-    return `{${Object.keys(value)
-      .sort()
-      .map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`)
-      .join(",")}}`;
-  return JSON.stringify(value);
 }
 
 function publicGrant(grant) {

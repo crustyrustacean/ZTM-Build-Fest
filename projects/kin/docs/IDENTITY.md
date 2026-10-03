@@ -1,6 +1,6 @@
 # Identity and Trusted Devices
 
-**Status:** Implemented through v0.10.3 for the local incubation service. Server member/passkey/device authorization remains distinct from the local encryption unlock. v0.10 protects successor transport private keys and epoch secrets under the local root while retaining public verification history. Identity and relay state remain in-memory; encrypted archive recovery restores local history, not an authenticated server household.
+**Status:** v0.11.5 implementation candidate; awaiting human review. Server member/passkey/device authorization remains distinct from the local encryption unlock. v0.10 protects successor transport private keys and epoch secrets under the local root while retaining public verification history. The candidate persists server identity and device-token verifiers; raw tokens and sessions remain ephemeral. An encrypted local archive restores local history, not an authenticated server household.
 
 ## Separate identities
 
@@ -72,10 +72,9 @@ The first coded release uses local household, actor, and device placeholders onl
 
 ## Forward platform gates
 
-The planned v0.11 line must make the membership, credential, trusted-device,
-revocation and coordination state that currently lives in process memory durable
-across restart, without changing the service into a plaintext household
-authority. The planned v0.13 line must define replacement-device and household
-recovery against current membership, deletion and revocation state. These are
-planning requirements, not implemented behavior; see [ROADMAP](ROADMAP.md) and
-the [v0.11](V0.11.0.md)/[v0.13](V0.13.0.md) contracts.
+The v0.11 implementation candidate persists membership, credential,
+trusted-device, revocation and coordination state across restart without
+changing the service into a plaintext household authority. The v0.13 line must
+define replacement-device and household recovery against current membership,
+deletion and revocation state. It remains planned; see [ROADMAP](ROADMAP.md)
+and the [v0.11](V0.11.0.md)/[v0.13](V0.13.0.md) contracts.

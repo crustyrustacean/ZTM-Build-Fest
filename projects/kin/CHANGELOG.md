@@ -2,6 +2,90 @@
 
 This file records completed Kin releases. The `v0.0.x` releases are planning and documentation milestones; they do not represent implemented application features. The first implementation milestone remains `v0.1.0`.
 
+## Unreleased — v0.11.0–v0.11.5 Durable Service & Deployment candidate
+
+The implementation candidate with durable semantic validation is tagged
+`kin-v0.11.5` for human review. The `kin-v0.11.3` and `kin-v0.11.4` tags are preserved.
+These are review candidates, not published product releases.
+
+### v0.11.0 — Durable Identity & Relay Foundation
+
+Introduces SQLite server schema v1 and durable household identity, membership,
+credential, trusted-device, authorization, sync-coordination and opaque relay
+state. Event success is reported only after the transaction commits. Bounded
+indexed reads and persisted relay/device sequences preserve opaque envelopes,
+idempotency and cursor behavior across restarts.
+
+### v0.11.1 — Transaction & Interruption Correctness
+
+Makes migration transactional and fail-closed on interruption or unsupported
+newer schemas. Adds on-disk rollback/corruption checks, transaction boundaries
+for cross-service mutations and stale-writer compare-and-commit checks.
+
+### v0.11.2 — Operations & Recovery
+
+Adds readiness, graceful shutdown and an exclusive single-process service lock.
+Adds `npm run backup` using SQLite's online backup API and `npm run restore`
+with source validation, exclusive maintenance locking and offline replacement;
+preserves the replaced database and any WAL sidecars.
+
+### v0.11.3 — Privacy & Durable-Service Hardening
+
+Hardens persistent record validation, bounded reads, corruption behavior,
+error/log output, process restart behavior and backup/rollback documentation.
+Tests cover migration interruption, newer-schema rejection, corrupt relay
+data, stale-writer conflicts, backup/restore, lock exclusion and a spawned HTTP
+server restart that reauthenticates and recovers accepted ciphertext and
+sequence state. On Windows x64/Node 22.12 the full Node suite passed 157 tests
+after `npm ci`, including all 83 server tests; the Rust, WASM, browser,
+security-storage, security-UI, virtual-authenticator and version-consistency
+gates also passed. npm reported zero vulnerabilities but warned that the
+`better-sqlite3` install script is not covered by `allowScripts`; the installed
+native binding loaded successfully. Linux/macOS and launch-workflow validation,
+an independent security audit and production certification are not claimed.
+Restoring an old backup can roll back revocation or key epochs.
+
+### v0.11.4 — Pre-Merge Durability & Operations Corrections
+
+Share canonical web-root guards between service startup and admin commands,
+including symlinked missing ancestors, and prevent static routes from escaping
+the web root. Expected stale-writer conflicts now roll back, return HTTP 409
+and permit retry without poisoning the store; fatal storage errors still fail
+closed. Lock errors include the exact path and safe manual recovery guidance.
+
+Correct durable cursor encoding so bounded pulls can resume, reject missing,
+empty and unsupported restore sources before replacement, and isolate the
+passkey regression store from the default service database. Regression coverage
+proves admin exclusion, cleanup, verified backups and preserved database/WAL/SHM
+state. Schema v1, backup format and client/domain versions are unchanged.
+
+Passed 181 Node tests (107 server), 118 Rust tests, formatting, Clippy, release
+WASM, product/security-storage/security-UI/WebAuthn-PRF browser gates, npm audit,
+version checks and PowerShell/POSIX launcher smoke tests. The POSIX launcher
+used Windows Node through WSL; native Linux Node and macOS remain unverified.
+See [the hardening evidence](docs/V0.11.0.md#pr-17-pre-merge-hardening-evidence-2026-10-03).
+
+### v0.11.5 — Durable Semantic Integrity
+
+Durable startup, readiness, backup and restore now share schema, SQLite and
+Kin semantic validation. Cross-check normalized routing/authorization columns
+against grant JSON, device JSON and canonical opaque envelopes; reject
+impossible membership/device limits, credential ownership, sequence and
+epoch/rotation state before readiness. Backup validates both source and copy;
+restore validates read-only before replacement. No automatic repair or whole-
+database tamper resistance is claimed. Expired grants, retained historical
+authority and accepted certificate encodings remain supported. Strict input
+identity checks prevent malformed grants/proposals from committing invalid state.
+
+Passed 281 Node/real-WASM tests (207 server, 100 new regressions), 118 Rust tests
+on both Windows and WSL, formatting, Clippy, release WASM, the product browser
+gate, 313 security-storage assertions, 97 security-UI assertions and 18 virtual
+WebAuthn/PRF assertions. npm ci/audit, version checks and PowerShell/POSIX
+build/launcher smoke gates passed. POSIX used Windows Node through WSL;
+native Linux Node and macOS remain unverified. Server schema v1, sync envelope
+v1, client/domain formats and backup format remain unchanged. See
+[semantic-integrity evidence and measurements](docs/V0.11.0.md#v0115-semantic-integrity-evidence-2026-10-03).
+
 ## [0.10.3] — Bounded Storage/Archive Hardening & Architecture Closure
 
 Page protected reads and bound decryption concurrency, remove redundant migration

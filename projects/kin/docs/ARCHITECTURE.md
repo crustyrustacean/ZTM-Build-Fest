@@ -1,6 +1,6 @@
 # Architecture
 
-**Status:** Current through v0.10.3. Rust owns portable commands, canonical codecs, replay and archive framing/import validation. JavaScript owns root rotation, local encryption/unlock, bounded persistence and browser capabilities. Event DB schema 3 and key DB schema 4 persist encrypted protected values. The same-origin identity/relay service remains in-memory.
+**Status:** v0.11.5 implementation candidate; awaiting human review. Rust owns portable commands, canonical codecs, replay and archive framing/import validation. JavaScript owns root rotation, local encryption/unlock, bounded persistence and browser capabilities. Event DB schema 3 and key DB schema 4 persist encrypted protected values. The same-origin identity/relay service uses SQLite server schema v1 for durable authorization and opaque relay state.
 
 ## v0.10 implementation boundary
 
@@ -167,7 +167,7 @@ Opt-in encrypted sync now extends the local-first event store. The browser encry
 Device A <---- encrypted event sync ----> Service <---- encrypted event sync ----> Device B
 ```
 
-The service is not a household source of truth or plaintext domain processor. It still sees routing/membership metadata, event timing/count/size, cursors, and traffic patterns; it controls availability. Identity and relay records are process-memory only, so acknowledgement is not durable. The implementation and limitations are documented in [SYNC](SYNC.md), [IDENTITY](IDENTITY.md), [CRYPTOGRAPHY](CRYPTOGRAPHY.md), and [THREAT-MODEL](THREAT-MODEL.md).
+The service is not a household source of truth or plaintext domain processor. It still sees and persists routing/membership metadata, event timing/count/size, cursors, and traffic patterns; it controls availability. Relay acknowledgement follows a committed SQLite transaction, but does not prove recipient delivery, backup, or hardware durability. The implementation and limitations are documented in [SYNC](SYNC.md), [IDENTITY](IDENTITY.md), [CRYPTOGRAPHY](CRYPTOGRAPHY.md), and [THREAT-MODEL](THREAT-MODEL.md).
 
 ## Future capability leverage
 
@@ -181,9 +181,9 @@ The v0.1.x core is intended to be extended, not treated as proof that later feat
 | Pulse                 | Actor IDs and timestamps                             | Implemented in v0.5.0                  | Explicit as_of, fixed enum, set/replace/clear; audited through v0.5.3 |
 | Since You Last Looked | Ordered immutable event history                      | Implemented in v0.6.0                  | Stabilization through v0.6.3                                          |
 | Routines              | Event infrastructure and explicit civil context      | Implemented in v0.7.0                  | Correctness/resilience/hardening audits in v0.7.1–v0.7.4              |
-| Pairing               | Household/member/device identity fields              | Implemented through v0.8.8             | Durable identity service and recovery beyond live trusted devices     |
-| Offline sync          | Random event IDs and immutable canonical event bytes | Implemented in v0.9.2                  | Bounded to current relay/storage limits; restart is not durable       |
-| Encrypted sync        | Versioned canonical events and browser Web Crypto    | Implemented through v0.9.3             | Independent audit, durable relay, all-device recovery, broader UX     |
+| Pairing               | Household/member/device identity fields              | Implemented through v0.8.8             | Durable service backup/restore and recovery beyond live trusted devices |
+| Offline sync          | Random event IDs and immutable canonical event bytes | Implemented in v0.9.2                  | Bounded to current relay/storage limits                               |
+| Encrypted sync        | Versioned canonical events and browser Web Crypto    | Implemented through v0.9.3             | Independent audit, all-device recovery, broader UX                    |
 | Export/import         | Versioned event representation and preserved history | Yes                                    | Portable container, validation, and recovery UX                       |
 
 “Yes” means the existing infrastructure can be extended; it does not mean the capability is implemented, secure, or ready to ship without its listed domain and validation work.

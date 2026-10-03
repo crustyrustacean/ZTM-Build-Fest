@@ -1,6 +1,6 @@
 # Roadmap
 
-Current implementation: `v0.10.3 — Bounded Storage/Archive Hardening & Architecture Closure`. This completes the requested implementation line and stops for human review of PR #15. The releases after v0.10 are planning only; v0.11–v0.14 and v1.0 have not been implemented.
+Last published release: `v0.10.3 — Bounded Storage/Archive Hardening & Architecture Closure`. The `v0.11.5` Durable Service & Deployment implementation candidate is complete and tagged `kin-v0.11.5` for human review; it is not a published release. Do not begin v0.12.
 
 ```text
 v0.9.3 — Encrypted Event Sync Stabilization
@@ -18,9 +18,9 @@ v0.14.x — UX/UI Consolidation
 v1.0.0 — Stable Kin Platform
 ```
 
-Kin supports encrypted local storage, recovery/optional PRF unlock, verified migration, Rust commands/codecs, encrypted archives and a static offline shell alongside opt-in encrypted sync. The identity service and relay remain in-memory. Archives recover local history, not server identity. Independent security review and broader browser/authenticator coverage remain outstanding.
+Kin supports encrypted local storage, recovery/optional PRF unlock, verified migration, Rust commands/codecs, encrypted archives and a static offline shell alongside opt-in encrypted sync. The v0.11 candidate adds durable server identity/relay state and service database backup/restore. Archives recover local history, not server identity. Independent security review and broader browser/authenticator coverage remain outstanding.
 
-The next implementation line, after the v0.10 human review gate, is v0.11.x. v0.11–v0.14 below are planned contracts, not implementation claims. The sequence deliberately settles service durability, data lifecycle/deletion and recovery authority before holistic UX/UI work. The [v0.11](V0.11.0.md), [v0.12](V0.12.0.md), [v0.13](V0.13.0.md) and [v0.14](V0.14.0.md) documents define their planning gates.
+The v0.11 candidate follows the v0.10 human review gate and deliberately settles service durability before lifecycle/deletion, recovery authority and holistic UX/UI work. The [v0.11](V0.11.0.md) record contains implementation gates and candidate evidence; [v0.12](V0.12.0.md), [v0.13](V0.13.0.md) and [v0.14](V0.14.0.md) remain planning contracts.
 
 ## Planning releases
 
@@ -230,15 +230,15 @@ The final local architecture/security development line. v0.10.0 implements crypt
 
 Increase the Rust footprint by increasing the amount of Kin that is deterministic, portable, invariant-driven, and independently testable — not by moving browser-native capabilities into Wasm. Web Crypto and networking remain browser/server adapter responsibilities.
 
-### `v0.11.x` — Durable Service & Deployment
+### `v0.11.x` — Durable Service & Deployment (implementation candidate)
 
-Make authorization state, trusted-device/membership records and opaque encrypted
-relay state durable across ordinary service restarts, with explicit schema
-migrations, deployment configuration, backup/restore and operational recovery.
-An acknowledgement means accepted encrypted state was durably committed under a
-documented contract. The service remains an authorization and opaque-relay
-boundary; it must not become a plaintext reducer or household source of truth.
-See [V0.11.0](V0.11.0.md).
+The candidate implements SQLite server schema v1, durable identity/authorization
+and opaque relay state, commit-before-acknowledgement, fail-closed migration and
+corruption handling, an exclusive production-process lock, and verified
+online-backup/offline-restore commands. Automated tests include a spawned HTTP
+process restart and persistence of reauthentication, event identity, cursor and
+device sequence. The last published version remains v0.10.3; the candidate
+awaits human review and release authorization. See [V0.11.0](V0.11.0.md).
 
 ### `v0.12.x` — Data Lifecycle, Retention & Deletion
 

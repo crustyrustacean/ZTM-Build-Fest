@@ -1,16 +1,20 @@
 import assert from "node:assert/strict";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 import { webcrypto } from "node:crypto";
 import { PairingService } from "./pairing-service.mjs";
 import { createKinServer } from "./server.mjs";
 import { EncryptedSyncService } from "./sync-service.mjs";
+import { DurableStore } from "./durable-store.mjs";
 
 globalThis.crypto ??= webcrypto;
 
 const credential = (id) => ({ id, publicKey: `key-${id}`, algorithm: -7 });
 
 async function start(service = new PairingService()) {
-  const app = createKinServer({ service });
+  const app = createKinServer({ service, store: new DurableStore(":memory:") });
   await new Promise((resolve, reject) => {
     app.server.once("error", reject);
     app.server.listen(0, "127.0.0.1", resolve);
@@ -21,7 +25,7 @@ async function start(service = new PairingService()) {
     close: () =>
       new Promise((resolve, reject) =>
         app.server.close((error) => (error ? reject(error) : resolve())),
-      ),
+      ).finally(() => app.store?.close()),
   };
 }
 
@@ -151,7 +155,7 @@ test("HTTP sync operations require an active session and revoked devices cannot 
   }
 });
 
-test("relay restart loses only process-local ciphertext and HTTPS is required outside loopback", async () => {
+test("relay without a durable store is process-local and HTTPS is required outside loopback", async () => {
   const service = new PairingService();
   const adult = service.bootstrap({
     credential: credential("a"),
@@ -169,36 +173,68 @@ test("relay restart loses only process-local ciphertext and HTTPS is required ou
     () => createKinServer({ host: "0.0.0.0", origin: "https://kin.example" }),
     /must bind to loopback/,
   );
-  assert.doesNotThrow(() =>
-    createKinServer({ host: "127.0.0.1", origin: "https://kin.example" }),
-  );
+  const app = createKinServer({
+    host: "127.0.0.1",
+    origin: "https://kin.example",
+    store: new DurableStore(":memory:"),
+  });
+  app.store.close();
 });
 
-test("full service restart loses identity/session and relay state explicitly", async () => {
-  const originalService = new PairingService();
-  const adult = originalService.bootstrap({
-    credential: credential("restart-adult"),
-    deviceLabel: "Restart device",
-  });
-  const first = await start(originalService);
-  const firstStatus = await fetch(`${first.url}/api/sync/status`, {
-    headers: { Cookie: `kin_session=${adult.sessionToken}` },
-  });
-  assert.equal(firstStatus.status, 200);
-  await first.close();
-
-  const restarted = await start(new PairingService());
+test("durable identity and relay survive store restart while sessions expire", () => {
+  const directory = mkdtempSync(join(tmpdir(), "kin-durable-restart-"));
+  const databasePath = join(directory, "kin.sqlite");
+  let store = new DurableStore(databasePath);
   try {
-    const identity = await fetch(`${restarted.url}/api/status`, {
-      headers: { Cookie: `kin_session=${adult.sessionToken}` },
+    const service = new PairingService({ store });
+    const adult = service.bootstrap({
+      credential: credential("restart-adult"),
+      deviceLabel: "Restart device",
     });
-    assert.equal((await identity.json()).identity, null);
-    const sync = await fetch(`${restarted.url}/api/sync/status`, {
-      headers: { Cookie: `kin_session=${adult.sessionToken}` },
-    });
-    assert.equal(sync.status, 401);
-    assert.equal(restarted.syncService.households.size, 0);
+    const sync = new EncryptedSyncService(service, { store });
+    const envelope = eventEnvelope(adult);
+    assert.equal(sync.push(adult.sessionToken, [envelope]).durable, true);
+    store.close();
+
+    store = new DurableStore(databasePath);
+    const restartedService = new PairingService({ store });
+    const restartedSync = new EncryptedSyncService(restartedService, { store });
+    assert.throws(
+      () => restartedService.authorize(adult.sessionToken),
+      (error) => error.code === "authentication_required",
+    );
+    const renewed = restartedService.reauthenticate(
+      adult.deviceToken,
+      "restart-adult",
+    );
+    assert.equal(
+      restartedSync.status(renewed.sessionToken).acceptance,
+      "durable",
+    );
+    assert.equal(restartedSync.status(renewed.sessionToken).eventCount, 1);
+    assert.deepEqual(
+      restartedSync.pull(renewed.sessionToken).events[0].envelope,
+      envelope,
+    );
+    assert.equal(restartedSync.push(renewed.sessionToken, [envelope]).durable, true);
+
+    const conflict = { ...envelope, ciphertext: "B".repeat(24) };
+    assert.throws(
+      () => restartedSync.push(renewed.sessionToken, [conflict]),
+      (error) => error.code === "event_duplicate_conflict",
+    );
+    assert.throws(
+      () =>
+        restartedSync.push(renewed.sessionToken, [
+          eventEnvelope(renewed, {
+            eventId: "b".repeat(32),
+            deviceSequence: 3,
+          }),
+        ]),
+      (error) => error.code === "sync_sequence_gap",
+    );
   } finally {
-    await restarted.close();
+    store.close();
+    rmSync(directory, { recursive: true, force: true });
   }
 });
