@@ -1,6 +1,6 @@
 # v0.1.0 Requirement Traceability
 
-**Status:** Current through v0.6.2 Summary Resilience & Accessibility; earlier version sections are historical contracts. See v0.6.0 below.
+**Status:** Current through v0.6.3 Summary Hardening & Polish; earlier version sections are historical contracts. See v0.6.0 below.
 
 | Requirement                                        | Specification authority                                                                 | v0.1.0 validation                                                                  |
 | -------------------------------------------------- | --------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
@@ -114,3 +114,7 @@ No capability was added. Rust tests cover empty/first/middle/latest/missing curs
 ## v0.6.2 Summary Resilience & Accessibility
 
 No capability was added. Browser validation covers quota/abort rollback and retry, refresh failures, pending-write reconnect, missed and delivered cross-tab invalidation, two stale/new cursor orderings, reload/focus refresh, and Pulse timer reprojection with the summary visible. Accessibility assertions cover semantic markup, native keyboard operation, logical focus, polite/assertive feedback, non-color status, 48px target, 320px reflow, forced colors, increased spacing, reduced motion, and 200% page-scale emulation. Platform/assistive-technology claims remain limited to environments exercised.
+
+## v0.6.3 Summary Hardening & Polish
+
+No capability was added. Real-WASM tests validate all truncated v6 summary/result boundaries, malformed counts/kinds/entity/classification/reserved/UTF-8/length fields, trailing bytes, combined entity-plus-summary output, a 10,000-event v6 replay, actual memory growth, and copied-result lifetime. The privacy and polish audit remains limited to the frozen product contract.

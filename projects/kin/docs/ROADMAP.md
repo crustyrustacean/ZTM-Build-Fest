@@ -1,6 +1,6 @@
 # Roadmap
 
-Current release: `v0.6.2 — Summary Resilience & Accessibility`. The authorized catch-up stabilization line is v0.6.0–v0.6.3; stop after v0.6.3 for evaluation.
+Current release: `v0.6.3 — Summary Hardening & Polish`. The authorized catch-up stabilization line is complete; stop for evaluation and do not begin v0.7.0.
 
 ## Planning releases
 
@@ -162,7 +162,7 @@ Completed: audited cursor write failures/abort, refresh recovery, pending-write 
 
 ### `v0.6.3` — Summary Hardening & Polish
 
-Audit protocol bounds, privacy and visual polish without adding capability; stop for user evaluation.
+Completed: audited v6 parser/result boundaries, 10,000-event replay, WASM memory/copy behavior, privacy and restrained UI polish without adding capability. Stop for user evaluation.
 
 ### `v0.7.0` — Routines
 

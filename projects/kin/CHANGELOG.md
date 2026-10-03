@@ -2,6 +2,10 @@
 
 This file records completed Kin releases. The `v0.0.x` releases are planning and documentation milestones; they do not represent implemented application features. The first implementation milestone remains `v0.1.0`.
 
+## [0.6.3] — Summary Hardening & Polish
+
+No new capability. Added malformed v6 summary record/count/classification/UTF-8/length/trailing-byte coverage, every truncated v6 summary-result boundary, and a 10,000-event real-WASM v6 summary replay with memory-growth and copied-result lifetime checks. Completed the summary privacy and UI polish audit. Passed 82 Rust and 31 Node/real-WASM tests, fmt, Clippy, release WASM, version check, PowerShell/WSL build-run HTTP smokes and complete Chrome 154.0.8037.95 browser regressions. Firefox, Safari, macOS, native zoom, NVDA and VoiceOver remain unverified; no screen-reader certification is claimed. Full environment details are in [V0.6.0](docs/V0.6.0.md).
+
 ## [0.6.2] — Summary Resilience & Accessibility
 
 No new capability. Added catch-up cursor quota/abort rollback and retry, repeated snapshot-read failure recovery, pending cursor-write reconnect, missed view-state notification recovery, both stale/new tab write orders, and Pulse timer refresh while the summary is visible. Extended keyboard, focus, semantic status, reflow, forced-colors, text-spacing and reduced-motion checks. Passed 81 Rust and 29 Node/real-WASM tests, fmt, Clippy, release WASM, version check, PowerShell/WSL build-run HTTP smokes, and complete Chrome 154.0.8037.95 browser regressions. Firefox, Safari, macOS, native zoom, NVDA and VoiceOver remain unverified. Full environment details are in [V0.6.0](docs/V0.6.0.md).

@@ -1190,3 +1190,157 @@ test("protocol v6 summarizes after a stable cursor and reports the full snapshot
     ["item-added", "item-completed"],
   );
 });
+
+test("v6 rejects every truncated summary boundary and malformed summary field", async (context) => {
+  const instantiate = WebAssembly.instantiate;
+  let mutate = () => {};
+  let reportedResultLength;
+  let validResultLength = 0;
+  context.mock.method(WebAssembly, "instantiate", async (...args) => {
+    const result = await instantiate(...args);
+    if (result instanceof WebAssembly.Instance) return result;
+    const { instance } = result;
+    const abi = instance.exports;
+    return {
+      instance: {
+        exports: {
+          ...abi,
+          kin_apply_events(pointer, length) {
+            const status = abi.kin_apply_events(pointer, length);
+            if (status === 0) {
+              validResultLength = abi.kin_result_len();
+              mutate(
+                new Uint8Array(
+                  abi.memory.buffer,
+                  abi.kin_result_ptr(),
+                  validResultLength,
+                ),
+              );
+            }
+            return status;
+          },
+          kin_result_len: () => reportedResultLength ?? abi.kin_result_len(),
+        },
+      },
+    };
+  });
+  const engine = await pulseEngine();
+  const records = [legacyRecord(1, 1), legacyRecord(2, 2)];
+  const valid = engine.applyEvents(records, 0);
+  assert.equal(valid.summary.entries.length, 2);
+
+  const firstSummaryOffset = 52 + 52;
+  const secondSummaryOffset = firstSummaryOffset + 28;
+  const mutations = [
+    (bytes) =>
+      new DataView(bytes.buffer, bytes.byteOffset).setUint32(24, 9, true),
+    (bytes) =>
+      new DataView(bytes.buffer, bytes.byteOffset).setUint32(28, 1, true),
+    (bytes) =>
+      new DataView(bytes.buffer, bytes.byteOffset).setUint32(28, 10001, true),
+    (bytes) => (bytes[32] = 2),
+    (bytes) => (bytes[32] = 0),
+    (bytes) => (bytes[33] = 1),
+    (bytes) => (bytes[firstSummaryOffset + 16] = 12),
+    (bytes) => (bytes[firstSummaryOffset + 17] = 2),
+    (bytes) => (bytes[firstSummaryOffset + 18] = 255),
+    (bytes) => (bytes[firstSummaryOffset + 19] = 1),
+    (bytes) => (bytes[firstSummaryOffset + 24] = 255),
+    ...[0, 4097, 0xffffffff].map(
+      (length) => (bytes) =>
+        new DataView(bytes.buffer, bytes.byteOffset).setUint32(
+          firstSummaryOffset + 20,
+          length,
+          true,
+        ),
+    ),
+    (bytes) => {
+      bytes[secondSummaryOffset + 16] = 2;
+      bytes[secondSummaryOffset + 18] = 0;
+    },
+  ];
+  for (const [index, mutation] of mutations.entries()) {
+    mutate = mutation;
+    assert.throws(
+      () => engine.applyEvents(records, 0),
+      (error) => error.code === 6,
+      `malformed v6 summary mutation ${index}`,
+    );
+  }
+  mutate = () => {};
+  assert.deepEqual(engine.applyEvents(records, 0), valid);
+
+  for (
+    reportedResultLength = 0;
+    reportedResultLength < validResultLength;
+    reportedResultLength += 1
+  ) {
+    assert.throws(
+      () => engine.applyEvents(records, 0),
+      (error) => error.code === 6,
+    );
+  }
+  reportedResultLength = validResultLength + 1;
+  assert.throws(
+    () => engine.applyEvents(records, 0),
+    (error) => error.code === 6,
+  );
+  reportedResultLength = undefined;
+  assert.deepEqual(engine.applyEvents(records, 0), valid);
+});
+
+test("v6 10,000-event history permits bounded summary records and copied results", async (context) => {
+  const instantiate = WebAssembly.instantiate;
+  let memory;
+  context.mock.method(WebAssembly, "instantiate", async (...args) => {
+    const result = await instantiate(...args);
+    memory = result.instance.exports.memory;
+    return result;
+  });
+  const engine = await pulseEngine();
+  const initialMemoryBytes = memory.buffer.byteLength;
+  const makeId = (number) => {
+    const value = new Uint8Array(16);
+    new DataView(value.buffer).setUint32(0, number, true);
+    return value;
+  };
+  const records = Array.from({ length: 10_000 }, (_, index) => {
+    const eventNumber = index + 1;
+    return encodeAddedRecord({
+      eventId: makeId(eventNumber),
+      householdId: zeroId,
+      actorId: zeroId,
+      deviceId: zeroId,
+      timestamp: 1_760_000_000_000 + eventNumber,
+      logicalTime: eventNumber,
+      itemId: makeId(eventNumber + 10_000),
+      text: "x",
+    });
+  });
+  const state = engine.applyEvents(records, 1_760_000_020_000);
+  const snapshot = structuredClone(state);
+  const toHex = (bytes) =>
+    [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  assert.ok(
+    memory.buffer.byteLength > initialMemoryBytes,
+    "real WASM memory growth occurred",
+  );
+  assert.equal(state.items.length, 10_000);
+  assert.equal(state.summary.entries.length, 8);
+  assert.equal(state.summary.totalCount, 10_000);
+  assert.equal(state.items.length + state.summary.entries.length, 10_008);
+  assert.equal(state.summary.entries[0].eventId, toHex(makeId(9_993)));
+  assert.equal(state.summary.throughEventId, toHex(makeId(10_000)));
+
+  for (let iteration = 0; iteration < 3; iteration += 1) {
+    const invalid = records[0].slice();
+    new DataView(invalid.buffer).setUint16(2, 99, true);
+    assert.throws(
+      () => engine.applyEvents([invalid], 0),
+      (error) => error.code === 3,
+    );
+    assert.deepEqual(engine.applyEvents([], 0), emptyV6State());
+    assert.deepEqual(engine.applyEvents(records, 1_760_000_020_000), snapshot);
+  }
+  assert.deepEqual(state, snapshot, "host-owned summary survives later calls");
+});

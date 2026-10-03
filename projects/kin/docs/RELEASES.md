@@ -1,6 +1,6 @@
 # Release Process
 
-**Status:** v0.6.0 capability, v0.6.1 correctness, and v0.6.2 resilience/accessibility are complete on `kin-development`. Continue through the authorized v0.6.3 line, then stop for evaluation. Do not create v0.6.4, begin v0.7.0, push, or merge to `kin-main`.
+**Status:** The authorized v0.6.0–v0.6.3 Since You Last Looked line is complete on `kin-development`. Stop for release-line evaluation. Do not create v0.6.4, begin v0.7.0, push, or merge to `kin-main`.
 
 ## Release sequence
 

@@ -488,7 +488,11 @@ export async function catchUpRegressions() {
   );
 
   await app.store.append(
-    { type: "add", text: "Summary remains visible during Pulse expiry", classification: "need" },
+    {
+      type: "add",
+      text: "Summary remains visible during Pulse expiry",
+      classification: "need",
+    },
     app.engine,
   );
   await app.refreshFromEvents();
@@ -513,18 +517,23 @@ export async function catchUpRegressions() {
     JSON.stringify({
       entries: app.state.summary.entries,
       totalCount: app.state.summary.totalCount,
-    }) === JSON.stringify({
+    }) ===
+    JSON.stringify({
       entries: visibleSummary.entries,
       totalCount: visibleSummary.totalCount,
     });
   const pulseTimerEventCount = await count();
   check(
-    pulseExpired && summaryStayedVisible && pulseTimerEventCount === pulseEventCount,
-    `Pulse timer preserves the visible summary without adding history: ${JSON.stringify({
-      pulseExpired,
-      summaryStayedVisible,
-      pulseEventCountUnchanged: pulseTimerEventCount === pulseEventCount,
-    })}`,
+    pulseExpired &&
+      summaryStayedVisible &&
+      pulseTimerEventCount === pulseEventCount,
+    `Pulse timer preserves the visible summary without adding history: ${JSON.stringify(
+      {
+        pulseExpired,
+        summaryStayedVisible,
+        pulseEventCountUnchanged: pulseTimerEventCount === pulseEventCount,
+      },
+    )}`,
   );
   await app.savePulse({ type: "clear-pulse" });
 
@@ -591,28 +600,45 @@ export async function catchUpPeerRegressions(first, second, until) {
   await first.evaluate(`document.querySelector('kin-app').handleAddItem({
     detail: { text: 'Missed cursor notification', classification: 'need' }
   })`);
-  await until(() => second.evaluate(`document.querySelector('kin-app').state.summary.entries.some(
+  await until(() =>
+    second.evaluate(`document.querySelector('kin-app').state.summary.entries.some(
     entry => entry.text === 'Missed cursor notification'
-  )`));
+  )`),
+  );
   await second.evaluate(`(()=>{
     const app=document.querySelector('kin-app');
     app.channel.removeEventListener('message',app.onPeerMessage);
   })()`);
-  await first.evaluate(`document.querySelector('kin-app').catchUp.button.click()`);
-  await until(() => first.evaluate(`document.querySelector('kin-app').state.summary.totalCount===0`));
+  await first.evaluate(
+    `document.querySelector('kin-app').catchUp.button.click()`,
+  );
+  await until(() =>
+    first.evaluate(
+      `document.querySelector('kin-app').state.summary.totalCount===0`,
+    ),
+  );
   assert.equal(
-    await second.evaluate(`document.querySelector('kin-app').state.summary.totalCount`),
+    await second.evaluate(
+      `document.querySelector('kin-app').state.summary.totalCount`,
+    ),
     1,
     "a tab that missed view-state invalidation keeps its old local projection until recovery",
   );
-  await second.evaluate(`document.dispatchEvent(new Event('visibilitychange'))`);
-  await until(() => second.evaluate(`document.querySelector('kin-app').state.summary.totalCount===0`));
+  await second.evaluate(
+    `document.dispatchEvent(new Event('visibilitychange'))`,
+  );
+  await until(() =>
+    second.evaluate(
+      `document.querySelector('kin-app').state.summary.totalCount===0`,
+    ),
+  );
   await second.evaluate(`(()=>{
     const app=document.querySelector('kin-app');
     app.channel.addEventListener('message',app.onPeerMessage);
   })()`);
 
-  const readBoundary = async (client) => client.evaluate(`(async()=>{
+  const readBoundary = async (client) =>
+    client.evaluate(`(async()=>{
     const snapshot=await document.querySelector('kin-app').store.getCatchUpState();
     return {
       eventId:snapshot.through.eventId,
@@ -621,12 +647,17 @@ export async function catchUpPeerRegressions(first, second, until) {
       snapshotThroughLocalSequence:snapshot.through.localSequence,
     };
   })()`);
-  const appendChange = async (client, text) => client.evaluate(`(async()=>{
+  const appendChange = async (client, text) =>
+    client.evaluate(`(async()=>{
     const app=document.querySelector('kin-app');
     await app.store.append({type:'add',text:${JSON.stringify(text)},classification:'need'},app.engine);
   })()`);
-  const markBoundary = async (client, boundary) => client.evaluate(`document.querySelector('kin-app').store.markCaughtUpThrough(${JSON.stringify(boundary)})`);
-  const readCursor = async (client) => client.evaluate(`(async()=>{
+  const markBoundary = async (client, boundary) =>
+    client.evaluate(
+      `document.querySelector('kin-app').store.markCaughtUpThrough(${JSON.stringify(boundary)})`,
+    );
+  const readCursor = async (client) =>
+    client.evaluate(`(async()=>{
     const cursor=(await document.querySelector('kin-app').store.getCatchUpState()).cursor;
     return cursor;
   })()`);
@@ -647,7 +678,9 @@ export async function catchUpPeerRegressions(first, second, until) {
   assert.deepEqual(await readCursor(first), await readCursor(second));
   assert.equal((await readCursor(second)).localSequence, newerA.localSequence);
   await first.evaluate("document.querySelector('kin-app').refreshFromEvents()");
-  await second.evaluate("document.querySelector('kin-app').refreshFromEvents()");
+  await second.evaluate(
+    "document.querySelector('kin-app').refreshFromEvents()",
+  );
   console.log(
     "PASS content-free cross-tab invalidation, missed-notification recovery, and both stale/new cursor write orders",
   );

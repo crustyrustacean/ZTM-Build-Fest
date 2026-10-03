@@ -1,6 +1,6 @@
 # Accessibility Contract
 
-**Status:** Current through v0.6.2 Summary Resilience & Accessibility; earlier version sections are historical contracts. See v0.6.0 below.
+**Status:** Current through v0.6.3 Summary Hardening & Polish; earlier version sections are historical contracts. See v0.6.0 below.
 
 ## Baseline requirements
 

@@ -1,6 +1,6 @@
 # v0.1.0 Testing Contract
 
-**Status:** Current through v0.6.2 Summary Resilience & Accessibility; earlier version sections are historical contracts. See v0.6.0 below.
+**Status:** Current through v0.6.3 Summary Hardening & Polish; earlier version sections are historical contracts. See v0.6.0 below.
 
 ## Rust domain tests
 
@@ -142,3 +142,7 @@ The correctness-only suite covers an empty event stream; cursor at first, middle
 ## v0.6.2 Summary Resilience & Accessibility
 
 The browser suite injects cursor quota failure and transaction abort, verifies event/cursor/logical-counter rollback and retry, preserves the displayed summary through repeated refresh failures, and keeps a pending mark busy through reconnect. It exercises cross-tab convergence after `view-state-changed`, recovery after a missed notification, both stale/new write orders, and Pulse expiry refresh while the summary remains visible. Keyboard/focus, semantic structure, feedback roles, target size, narrow reflow, forced colors, text spacing, reduced motion, and page-scale zoom remain part of the complete browser gate.
+
+## v0.6.3 Summary Hardening & Polish
+
+Run every truncated v6 result boundary and malformed summary count, kind, entity/classification combination, reserved byte, UTF-8 sequence, extreme length and trailing-byte check. Verify combined 10,000-entity plus summary bounds, a 10,000-event v6 summary-source replay, real WASM memory growth, and copied-result lifetime. Retain every previous Node, Rust, browser, storage, privacy, and accessibility regression.

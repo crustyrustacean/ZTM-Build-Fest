@@ -3,7 +3,10 @@ use crate::event::{
     ActorId, DeviceId, EventEnvelope, EventId, EventKind, HandoffId, HouseholdId,
     ItemClassification, ItemId, PulseValue, TalkId,
 };
-use crate::state::{summarize, SummaryEntityKind, SummaryKind, MAX_SUMMARY_ENTRIES};
+use crate::protocol::encode_state_v6;
+use crate::state::{
+    summarize, CatchUpSummary, SummaryEntityKind, SummaryEntry, SummaryKind, MAX_SUMMARY_ENTRIES,
+};
 
 fn id(value: u8) -> [u8; 16] {
     [value; 16]
@@ -241,4 +244,87 @@ fn conflicting_event_id_reuse_rejects_the_entire_summary() {
         summarize(&[first, conflict], None),
         Err(KinError::InvalidEvent)
     );
+}
+
+#[test]
+fn v6_result_encoder_rejects_invalid_summary_counts_and_record_combinations() {
+    let state = crate::state::rebuild_at(&[], 0).unwrap();
+    let added = SummaryEntry {
+        event_id: EventId(id(1)),
+        kind: SummaryKind::ItemAdded,
+        entity_kind: SummaryEntityKind::Item,
+        text: "Milk".to_owned(),
+        classification: Some(ItemClassification::Need),
+    };
+    let mut wrong_entity = added.clone();
+    wrong_entity.entity_kind = SummaryEntityKind::Talk;
+    let mut missing_classification = added.clone();
+    missing_classification.classification = None;
+    let invalid_completion = SummaryEntry {
+        event_id: EventId(id(2)),
+        kind: SummaryKind::ItemCompleted,
+        entity_kind: SummaryEntityKind::Item,
+        text: "Milk".to_owned(),
+        classification: Some(ItemClassification::Need),
+    };
+    let invalid_summaries = [
+        CatchUpSummary {
+            entries: Vec::new(),
+            total_count: 1,
+            through_event_id: None,
+        },
+        CatchUpSummary {
+            entries: vec![added.clone()],
+            total_count: 0,
+            through_event_id: Some(EventId(id(1))),
+        },
+        CatchUpSummary {
+            entries: vec![added.clone(); MAX_SUMMARY_ENTRIES + 1],
+            total_count: (MAX_SUMMARY_ENTRIES + 1) as u32,
+            through_event_id: Some(EventId(id(1))),
+        },
+        CatchUpSummary {
+            entries: Vec::new(),
+            total_count: 10_001,
+            through_event_id: Some(EventId(id(1))),
+        },
+        CatchUpSummary {
+            entries: vec![wrong_entity],
+            total_count: 1,
+            through_event_id: Some(EventId(id(1))),
+        },
+        CatchUpSummary {
+            entries: vec![missing_classification],
+            total_count: 1,
+            through_event_id: Some(EventId(id(1))),
+        },
+        CatchUpSummary {
+            entries: vec![invalid_completion],
+            total_count: 1,
+            through_event_id: Some(EventId(id(2))),
+        },
+        CatchUpSummary {
+            entries: vec![SummaryEntry {
+                text: String::new(),
+                ..added.clone()
+            }],
+            total_count: 1,
+            through_event_id: Some(EventId(id(1))),
+        },
+        CatchUpSummary {
+            entries: vec![SummaryEntry {
+                text: "x".repeat(4097),
+                ..added
+            }],
+            total_count: 1,
+            through_event_id: Some(EventId(id(1))),
+        },
+    ];
+
+    for summary in invalid_summaries {
+        assert_eq!(
+            encode_state_v6(&state, &summary),
+            Err(KinError::MalformedProtocol)
+        );
+    }
 }

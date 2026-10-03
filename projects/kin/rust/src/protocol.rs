@@ -776,6 +776,12 @@ mod tests {
     #[test]
     fn v6_cursor_header_requires_exact_flags_and_reserved_bytes() {
         let request = request_with(&[], PROTOCOL_V6, 0);
+        let mut trailing_request = request.clone();
+        trailing_request.push(0);
+        assert_eq!(
+            decode_request_with_summary(&trailing_request),
+            Err(KinError::MalformedProtocol)
+        );
         for length in 0..V6_REQUEST_HEADER_BYTES {
             assert_eq!(
                 decode_request_with_summary(&request[..length]),

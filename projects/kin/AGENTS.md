@@ -100,7 +100,7 @@ If an unrelated parent-repository file was modified accidentally, revert that ch
 
 # Current Development Stage
 
-Kin uses semantic versions. Current release: `v0.6.2` — Summary Resilience & Accessibility. The v0.6.0 capability is implemented; the authorized stabilization line is v0.6.0–v0.6.3 on `kin-development`. Follow frozen `docs/V0.6.0.md`. Stop after v0.6.3; do not create v0.6.4 or begin v0.7.0. No automatic kin-main merge or push.
+Kin uses semantic versions. Current release: `v0.6.3` — Summary Hardening & Polish. The v0.6.0 capability and v0.6.1–v0.6.3 audits are complete on `kin-development`. Follow frozen `docs/V0.6.0.md`. Stop here; do not create v0.6.4 or begin v0.7.0. No automatic kin-main merge or push.
 
 The pre-implementation releases are:
 
@@ -1076,6 +1076,7 @@ kin-v0.5.3
 kin-v0.6.0
 kin-v0.6.1
 kin-v0.6.2
+kin-v0.6.3
 kin-v1.0.0
 ```
 
