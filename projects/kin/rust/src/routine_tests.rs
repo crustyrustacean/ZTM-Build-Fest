@@ -418,3 +418,150 @@ fn maximum_routine_replay_and_projection_are_bounded_and_deterministic() {
         Err(KinError::SizeLimit)
     );
 }
+
+#[test]
+fn v071_mixed_history_preserves_legacy_entity_and_summary_bytes() {
+    let make = |sequence, kind, payload: &[u8]| {
+        let mut row = record(sequence, 17, 0, 0, b"");
+        row.truncate(88);
+        row[2..4].copy_from_slice(&u16::to_le_bytes(kind));
+        row[84..88].copy_from_slice(&(payload.len() as u32).to_le_bytes());
+        row.extend_from_slice(payload);
+        row
+    };
+    let mut text_payload = vec![0x11; 16];
+    text_payload.extend_from_slice(&1u32.to_le_bytes());
+    text_payload.push(b'x');
+    let mut pulse_payload = vec![0; 8];
+    pulse_payload.extend_from_slice(&2000i64.to_le_bytes());
+    let legacy = [
+        make(1, 1, &text_payload),
+        make(2, 5, &text_payload),
+        make(3, 8, &text_payload),
+        make(4, 12, &pulse_payload),
+    ];
+    let mut v6 = request(&[], 20261002);
+    v6.truncate(40);
+    v6[4] = 6;
+    v6[8] = 4;
+    for row in &legacy {
+        v6.extend_from_slice(row);
+    }
+    let old = decode_request_with_summary(&v6).unwrap();
+    let old_state = rebuild_at(&old.events, 1234).unwrap();
+    let old_summary = summarize_validated(&old.events, None, &old_state).unwrap();
+    let old_bytes = encode_state_v6(&old_state, &old_summary).unwrap();
+    let new_state = project(&legacy, 20261002).unwrap();
+    assert_eq!(new_state, old_state);
+    let new_bytes = encode_state_v7(&new_state, &old_summary).unwrap();
+    assert_eq!(&new_bytes[8..52], &old_bytes[8..52]);
+    assert_eq!(&new_bytes[52..56], &[0; 4]);
+    assert_eq!(&new_bytes[56..], &old_bytes[52..]);
+
+    let mut mixed = legacy.to_vec();
+    // The same opaque entity bytes may identify an Item, Handoff, Talk and Routine.
+    mixed.push(record(5, 14, 0, 20261002, b"Starter"));
+    mixed.push(record(6, 15, 0, 20261002, b""));
+    mixed.push(make(7, 2, &[0x11; 16]));
+    let state = project(&mixed, 20261002).unwrap();
+    assert!(state.routines[0].completed);
+    assert_eq!(state.items[0].status, crate::state::ItemStatus::Completed);
+    assert_eq!(state.handoffs, old_state.handoffs);
+    assert_eq!(state.talks, old_state.talks);
+    assert_eq!(state.pulses, old_state.pulses);
+    let tomorrow = project(&mixed, 20261003).unwrap();
+    assert_eq!(tomorrow.items, state.items);
+    assert_eq!(tomorrow.pulses, state.pulses);
+    assert!(!tomorrow.routines[0].completed);
+}
+
+#[test]
+fn v071_routine_cursor_boundaries_deduplication_and_missing_cursor() {
+    let mut rows = vec![record(1, 14, 0, 20261002, b"Starter")];
+    rows.push(record(2, 15, 0, 20261002, b""));
+    rows.push(record(3, 16, 0, 20261002, b""));
+    rows.push(record(4, 17, 0, 0, b""));
+    rows.push(rows[1].clone());
+    let req = decode_request_with_summary(&request(&rows, 20261003)).unwrap();
+    let state = project(&rows, 20261003).unwrap();
+    for (position, remaining) in [(0, 3), (1, 2), (2, 1), (3, 0)] {
+        let summary =
+            summarize_validated(&req.events, Some(req.events[position].event_id), &state).unwrap();
+        assert_eq!(summary.total_count, remaining);
+        assert_eq!(summary.through_event_id, Some(req.events[4].event_id));
+        assert!(summary
+            .entries
+            .iter()
+            .all(|entry| entry.text == "Starter" && entry.classification.is_none()));
+    }
+    assert_eq!(
+        summarize_validated(&req.events, Some(crate::event::EventId([255; 16])), &state),
+        Err(KinError::InvalidEvent)
+    );
+}
+
+#[test]
+fn v071_all_cursor_flags_and_timestamp_extremes_fail_deterministically() {
+    for flag in 2..=255 {
+        let mut req = request(&[], 20261002);
+        req[20] = flag;
+        assert_eq!(
+            decode_request_with_summary(&req),
+            Err(KinError::MalformedProtocol)
+        );
+    }
+    for offset in 21..40 {
+        let mut req = request(&[], 20261002);
+        req[offset] = 255;
+        assert_eq!(
+            decode_request_with_summary(&req),
+            Err(KinError::MalformedProtocol)
+        );
+    }
+    for value in [
+        i64::MIN,
+        -8_640_000_000_000_001,
+        8_640_000_000_000_001,
+        i64::MAX,
+    ] {
+        let mut req = request(&[], 20261002);
+        req[12..20].copy_from_slice(&value.to_le_bytes());
+        assert_eq!(
+            decode_request_with_summary(&req),
+            Err(KinError::MalformedProtocol)
+        );
+        for kind in 14..=17 {
+            let mut row = record(1, kind, 0, 20261002, b"x");
+            row[68..76].copy_from_slice(&value.to_le_bytes());
+            assert_eq!(project(&[row], 20261002), Err(KinError::MalformedProtocol));
+        }
+    }
+    for value in [-8_640_000_000_000_000i64, 8_640_000_000_000_000] {
+        let mut req = request(&[], 10101);
+        req[12..20].copy_from_slice(&value.to_le_bytes());
+        assert!(decode_request_with_summary(&req).is_ok());
+    }
+}
+
+#[test]
+fn v071_concurrent_intents_follow_logical_order_never_wall_clock_order() {
+    for cadence in [0, 1] {
+        let key = if cadence == 0 { 20261002 } else { 20260928 };
+        for (first, second, completed) in [(15, 16, false), (16, 15, true)] {
+            let mut rows = vec![
+                record(1, 14, cadence, 20261002, b"x"),
+                record(2, first, 0, key, b""),
+                record(3, second, 0, key, b""),
+            ];
+            rows[1][68..76].copy_from_slice(&5000i64.to_le_bytes());
+            rows[2][68..76].copy_from_slice(&0i64.to_le_bytes());
+            assert_eq!(
+                project(&rows, 20261002).unwrap().routines[0].completed,
+                completed
+            );
+            let original = project(&rows, 20261002).unwrap();
+            rows.push(rows[1].clone());
+            assert_eq!(project(&rows, 20261002).unwrap(), original);
+        }
+    }
+}
