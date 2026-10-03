@@ -1,6 +1,6 @@
 # Roadmap
 
-Current release: `v0.7.2 — Routine Resilience & Accessibility`. Daily/Weekly capability is implemented; this release audits lifecycle recovery and accessibility without adding feature scope.
+Current release: `v0.7.3 — Routine Hardening & Polish`. Daily/Weekly capability is implemented; this release audits ABI, replay limits, privacy and documentation without adding feature scope.
 
 ## Planning releases
 
