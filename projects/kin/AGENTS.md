@@ -100,7 +100,7 @@ If an unrelated parent-repository file was modified accidentally, revert that ch
 
 # Current Development Stage
 
-Kin uses semantic versions. Current release: `v0.8.4` — Pairing Creation Response Correctness. This patch restores the initiating-adult flow by including the initial `Pending` state in the creation response. The v0.8.x line remains at its feedback gate. Do not begin v0.9.x without explicit approval. No automatic kin-main merge or push.
+Kin uses semantic versions. Current release: `v0.8.5` — Auth Panel Text Contrast. This patch makes authentication-panel text readable against its light background without changing authentication behavior. The v0.8.x line remains at its feedback gate. Do not begin v0.9.x without explicit approval. No automatic kin-main merge.
 
 The pre-implementation releases are:
 
@@ -1089,6 +1089,7 @@ kin-v0.8.1
 kin-v0.8.2
 kin-v0.8.3
 kin-v0.8.4
+kin-v0.8.5
 kin-v1.0.0
 ```
 

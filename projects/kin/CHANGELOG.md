@@ -2,6 +2,10 @@
 
 This file records completed Kin releases. The `v0.0.x` releases are planning and documentation milestones; they do not represent implemented application features. The first implementation milestone remains `v0.1.0`.
 
+## [0.8.5] — Auth Panel Text Contrast
+
+Set the household authentication panel's text to the app's dark ink color so headings, form labels, explanatory text, and status messages remain readable against its light background. Button-specific and alert colors are unchanged. No authentication behavior or product capability changed.
+
 ## [0.8.4] — Pairing Creation Response Correctness
 
 Return the initial `Pending` state from pairing creation so the initiating-adult UI can render a newly created code without dereferencing an absent state. Add an exact response-contract regression and defensive UI fallback for malformed or incomplete pairing status responses.

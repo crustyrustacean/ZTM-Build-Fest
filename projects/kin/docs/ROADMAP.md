@@ -1,6 +1,6 @@
 # Roadmap
 
-Current release: `v0.8.4 — Pairing Creation Response Correctness`. This maintenance patch restores the initiating-adult flow by returning the initial Pending state. The v0.8.x line remains at its product-feedback gate before encrypted sync work.
+Current release: `v0.8.5 — Auth Panel Text Contrast`. This maintenance patch makes authentication-panel text readable against its light background without changing authentication behavior. The v0.8.x line remains at its product-feedback gate before encrypted sync work.
 
 ## Planning releases
 
