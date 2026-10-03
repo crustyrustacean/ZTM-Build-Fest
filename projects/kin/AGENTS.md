@@ -100,7 +100,7 @@ If an unrelated parent-repository file was modified accidentally, revert that ch
 
 # Current Development Stage
 
-Kin uses semantic versions. Current release: `v0.7.4` — Routine Stale-Action Correctness. v0.7.0 through v0.7.4 are tagged and validated; v0.7.4 covers same-period stale-action correctness, two-tab regressions, manual Wasm ABI allocation-ownership hardening, and pairing-planning documentation cleanup. Protocol layouts and persisted event bytes remain unchanged. The annotated `kin-v0.7.4` tag points to the validated release commit and is pushed to the fork, not upstream. Follow frozen `docs/V0.7.0.md`; do not expand capability in stabilization patches. Stop after .4 for evaluation. No automatic kin-main merge or push.
+Kin uses semantic versions. Current release: `v0.8.0` — Household Pairing Foundation. It introduces the two-adult household identity and pairing protocol while preserving local event protocols v1–v7 and IndexedDB schema 1. The v0.8.x line must continue through correctness, security/accessibility, and polish milestones before user evaluation. No automatic kin-main merge or push.
 
 The pre-implementation releases are:
 
@@ -1084,6 +1084,10 @@ kin-v0.7.1
 kin-v0.7.2
 kin-v0.7.3
 kin-v0.7.4
+kin-v0.8.0
+kin-v0.8.1
+kin-v0.8.2
+kin-v0.8.3
 kin-v1.0.0
 ```
 

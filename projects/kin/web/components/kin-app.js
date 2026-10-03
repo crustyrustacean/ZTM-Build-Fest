@@ -9,6 +9,7 @@ import "./kin-handoff-list.js";
 import "./kin-talk-list.js";
 import "./kin-pulse.js";
 import "./kin-catch-up.js";
+import "./kin-household.js";
 
 const START_ERROR =
   "Kin could not start its household engine or local storage. Your saved information was not intentionally deleted.";
@@ -123,6 +124,9 @@ class KinApp extends HTMLElement {
     tagline.textContent = "A little more in step.";
     brand.append(title, tagline);
     header.append(brand);
+
+    this.household = document.createElement("kin-household");
+    header.append(this.household);
 
     const main = document.createElement("main");
     main.id = "main";

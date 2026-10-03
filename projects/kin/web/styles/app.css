@@ -17,6 +17,30 @@
   --focus: #a54632;
 }
 
+.household-panel {
+  display: block;
+  max-width: 38rem;
+  margin: 1rem auto;
+  padding: 1rem;
+  border: 2px solid var(--border, #8a795f);
+  border-radius: 0.75rem;
+  background: var(--surface, #fffdf7);
+}
+
+.household-panel h2 { margin-top: 0; }
+.household-panel form, .household-panel label { display: grid; gap: 0.4rem; }
+.household-panel form { gap: 0.85rem; }
+.household-panel input { min-height: 3rem; padding: 0.6rem; font: inherit; }
+.household-panel button { min-height: 3rem; margin: 0.25rem; padding: 0.6rem 0.9rem; }
+.pairing-code { display: block; margin: 1rem 0; font: 700 clamp(1.5rem, 8vw, 2.5rem)/1.2 ui-monospace, monospace; letter-spacing: 0.12em; user-select: all; }
+.pairing-actions { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.household-panel .danger { border-color: #8d2525; color: #701b1b; }
+.household-message[role="alert"] { color: #701b1b; font-weight: 650; }
+.device-list { padding-left: 1.25rem; }
+.device-list li { margin-block: 0.75rem; }
+
+@media (forced-colors: active) { .household-panel { border-color: CanvasText; } }
+
 * {
   box-sizing: border-box;
 }

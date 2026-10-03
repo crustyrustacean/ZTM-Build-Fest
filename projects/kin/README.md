@@ -2,7 +2,7 @@
 
 > A private, lightweight household coordination app for the little things families need to know, remember, hand off, or discuss.
 
-**Current status: `v0.7.4` — Routine Stale-Action Correctness.** Kin supports Daily and Monday-start Weekly household routines: create, complete the current occurrence, reopen and archive. Rust derives occurrences from saved events and explicit browser-local civil context through protocol v7. The IndexedDB preflight rejects stale same-period completion/reopen actions against the latest Rust projection, with two-tab regression coverage. v0.7.4 also hardens the manual Wasm ABI so `kin_apply_events` accepts only the exact tracked allocation returned by `kin_alloc`, with expanded ownership regressions; protocol layouts and persisted event bytes remain unchanged. Pairing remains planning-only. Midnight/focus refresh never creates an event. IndexedDB stays schema 1; protocols v1–v6 and source event bytes remain supported. No framework, analytics, AI or remote service is present.
+**Current status: `v0.8.0` — Household Pairing Foundation.** Kin can establish a two-adult household through a short-lived, single-use pairing code, passkey-backed identities, and explicit approval by the existing adult. Pairing, membership, credentials, sessions, and trusted devices are separate server-side concepts. Existing local coordination remains available and its protocol v1–v7 bytes and IndexedDB schema 1 are unchanged; encrypted event sync is not included.
 
 ## The problem
 
@@ -64,11 +64,12 @@ The intended technical direction is Rust compiled to WebAssembly, native Web Com
 - `v0.7.2` — Routine Resilience & Accessibility (`kin-v0.7.2`)
 - `v0.7.3` — Routine Hardening & Polish (`kin-v0.7.3`)
 - `v0.7.4` — Routine Stale-Action Correctness (`kin-v0.7.4`)
+- `v0.8.0` — Household Pairing Foundation (`kin-v0.8.0`)
 - See the [changelog](CHANGELOG.md) for the completed release history.
 
 ## Install, build, and run
 
-Requirements: Rust/Cargo with the `wasm32-unknown-unknown` target, Python 3, and a modern browser with WebAssembly, ES modules, Custom Elements, and IndexedDB.
+Requirements: Rust/Cargo with the `wasm32-unknown-unknown` target, Node.js 22 or later, and a modern browser with WebAssembly, WebAuthn/passkeys, ES modules, Custom Elements, and IndexedDB.
 
 From the repository root in PowerShell:
 
@@ -79,11 +80,11 @@ rustup target add wasm32-unknown-unknown
 
 The script builds the WASM module and serves the web app at `http://localhost:8000`. On macOS/Linux, run `sh projects/kin/run.sh` from the repository root.
 
-Kin stores household events in the current browser profile's IndexedDB and may keep independent in-progress Item, Handoff, Talk and Routine drafts in tab-scoped `sessionStorage`. It does not provide accounts, backup, encryption, pairing, or cross-device sync; browser storage is not a security boundary against device compromise or extensions. Use synthetic household text while evaluating this prototype.
+Kin stores household events in the current browser profile's IndexedDB and may keep independent drafts in tab-scoped `sessionStorage`. The local Node service holds identity and pairing state in memory for this incubation line; restarting it ends sessions and loses the identity registry. Household content is not uploaded and cross-device event sync, backup, content encryption, and last-device recovery are not provided. Browser storage is not a security boundary against device compromise or extensions. Use synthetic household text while evaluating this prototype.
 
 ## AI usage
 
-AI-assisted development tools are used for brainstorming, product planning, architecture exploration, documentation, implementation support, debugging, and testing. Kin has no AI runtime, analytics, backend, or third-party runtime dependency; household events are processed locally and are not transmitted by the application.
+AI-assisted development tools are used for brainstorming, product planning, architecture exploration, documentation, implementation support, debugging, and testing. Kin has no AI runtime, analytics, or third-party runtime dependency; household events are processed locally and are not transmitted by the pairing service.
 
 ## License
 

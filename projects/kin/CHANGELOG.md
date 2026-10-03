@@ -2,6 +2,10 @@
 
 This file records completed Kin releases. The `v0.0.x` releases are planning and documentation milestones; they do not represent implemented application features. The first implementation milestone remains `v0.1.0`.
 
+## [0.8.0] — Household Pairing Foundation
+
+Add the first two-adult household identity model, passkey registration and approval, a ten-minute single-use human-readable pairing code, `/pair` manual entry and invitation links, explicit Pending/Claimed/Confirmed/Expired/Revoked states, server-side attempt/rate limits, atomic membership confirmation, trusted-device inspection/revocation, privacy-safe audit events, and lifecycle tests. The same-origin service stores only a keyed code verifier and never logs codes. Existing local event protocol v1–v7 and IndexedDB schema 1 remain unchanged.
+
 ## [0.7.4] — Routine Stale-Action Correctness
 
 Reject routine completion unless the latest occurrence is open, and reject reopen unless it is completed, even when the submitted period key remains current. Preserve existence, archive and period-key preflight checks and the existing stale-state error code. Add two-tab persistence regressions for stale completion and reopen. Harden the manual Wasm ABI so `kin_apply_events` accepts only the exact tracked allocation returned by `kin_alloc`, with expanded ownership regressions. Refresh pairing-planning status through the v0.8.0 checkpoint and update current release metadata. Protocol layouts, persisted event bytes and product capability remain unchanged.
