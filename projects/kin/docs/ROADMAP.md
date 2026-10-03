@@ -1,6 +1,6 @@
 # Roadmap
 
-Current release: `v0.7.4 — Routine Stale-Action Correctness`. Daily/Weekly capability is implemented; this patch rejects stale same-period occurrence actions, adds two-tab regressions, hardens manual Wasm ABI allocation ownership, and updates pairing-planning documentation without adding feature scope. Protocol layouts and persisted event bytes remain unchanged.
+Current release: `v0.8.8 — Active-Member Slot Correctness`. Household capacity now counts active memberships rather than retained historical member records. After an adult leaves or is removed, the remaining adult may pair a replacement while the inactive historical membership remains retained. Pairing creation and final approval both enforce the two-active-adult limit. The v0.8.x line remains at its product-feedback gate before encrypted sync work.
 
 ## Planning releases
 
@@ -186,7 +186,7 @@ Reject stale same-period completion/reopen commands before persistence, add mult
 
 ### `v0.8.0` — Household Pairing
 
-Begin multi-user household identity. Explore one household with two adult members, QR pairing, a short-lived pairing code, passkeys, and trusted devices. The planning contract is [V0.8.0](V0.8.0.md); authorization and recovery must be defined before shipping pairing.
+Completed through v0.8.8: one household with exactly two active adult-member slots, manual pairing codes/invitation URLs, passkeys, member-bound approval and activation, trusted-device controls and session invalidation, reauthentication, protected membership removal, replacement after removal or leave with historical membership retention, terminal-claim cleanup, and bounded authentication flows. QR is deferred. Household content sync remains unimplemented. The implementation record is [V0.8.0](V0.8.0.md).
 
 ### `v0.9.0` — Encrypted Sync
 
@@ -198,4 +198,4 @@ Focus on polish, reliability, accessibility, mobile UX, privacy documentation, o
 
 ## Scope discipline
 
-Each roadmap item is future work unless explicitly marked as completed. Authentication, passkeys, encryption, remote services, pairing, synchronization remain unimplemented and out of scope for v0.7.x. Releases through `v0.0.12` were documentation-only; v0.1.0 is the first coded release. Handoff is implemented in v0.3.0; Talk in v0.4.0; Pulse in v0.5.0; Since You Last Looked in v0.6.0.
+Each roadmap item is future work unless explicitly marked as completed. Authentication, passkeys, pairing, and trusted-device authorization are implemented through v0.8.8; encryption and synchronization remain unimplemented. Releases through `v0.0.12` were documentation-only; v0.1.0 is the first coded release. Handoff is implemented in v0.3.0; Talk in v0.4.0; Pulse in v0.5.0; Since You Last Looked in v0.6.0; Routines in v0.7.0.

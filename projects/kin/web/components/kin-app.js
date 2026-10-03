@@ -9,6 +9,7 @@ import "./kin-handoff-list.js";
 import "./kin-talk-list.js";
 import "./kin-pulse.js";
 import "./kin-catch-up.js";
+import "./kin-household.js";
 
 const START_ERROR =
   "Kin could not start its household engine or local storage. Your saved information was not intentionally deleted.";
@@ -124,10 +125,15 @@ class KinApp extends HTMLElement {
     brand.append(title, tagline);
     header.append(brand);
 
+    this.household = document.createElement("kin-household");
+    header.append(this.household);
+
     const main = document.createElement("main");
     main.id = "main";
     main.tabIndex = -1;
     main.setAttribute("aria-busy", "true");
+    // The invitation route exposes only the enrollment surface until authorization.
+    main.hidden = window.location.pathname === "/pair";
     this.main = main;
     this.catchUp = document.createElement("kin-catch-up");
     this.today = document.createElement("kin-today");
@@ -716,6 +722,7 @@ class KinApp extends HTMLElement {
     this.pulse.disabled = isBusy || !this.store;
     this.catchUp.disabled = isBusy || !this.store;
     this.routines.disabled = isBusy || !this.store;
+    this.household.disabled = isBusy || !this.store;
     this.retryButton.disabled = isBusy;
   }
 

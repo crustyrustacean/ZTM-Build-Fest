@@ -1,6 +1,6 @@
 # Identity and Trusted Devices
 
-**Status:** Current through v0.7.4 Routine Stale-Action Correctness; design specification for future releases. No accounts, credentials, device registry, authentication, or trusted-device implementation exists. Pairing, sync, and cryptographic boundaries are specified in [PAIRING](PAIRING.md), [SYNC](SYNC.md), and [CRYPTOGRAPHY](CRYPTOGRAPHY.md).
+**Status:** Current through v0.8.8. Household/member identity, passkey credentials, member-bound approvals, trusted-device-bound sessions and reauthentication, membership removal, active-member capacity, and eager revoked-device session invalidation are implemented by the same-origin in-memory service. Encrypted sync and content-key management remain future work.
 
 ## Separate identities
 
@@ -30,7 +30,7 @@ Events carry household, actor/member, and originating device IDs as specified in
 
 Membership is an explicit relation between a household and a member, not inferred from possession of a device or from event authorship. Conceptual states are invited, active, and removed. Creation, acceptance, and removal must be explicit, attributable events with defined authorization before implementation. Removal blocks future household access but cannot retract data already learned or copied.
 
-The planned first shared household has two adult members. Kin does not infer family relationships, rank members, or assign contribution scores. A member may have multiple devices and credentials; removing one device must not silently remove the member.
+The planned first shared household has exactly two active adult-member slots. Removed members remain historically represented but inactive and do not consume a slot, allowing the remaining adult to pair a replacement. Kin does not infer family relationships, rank members, or assign contribution scores. A member may have multiple devices and credentials; removing one device must not silently remove the member.
 
 ## Passkey direction
 
@@ -48,13 +48,17 @@ Household view
 
 The authenticator's local biometric/PIN operation is handled by the platform; Kin should not collect a biometric or device PIN. Passkeys authenticate a member to the service. They do not automatically encrypt household data, create a household key, identify a particular installation, or provide a general-purpose key-agreement API. Those require separate reviewed key and device protocols.
 
-Passkey enrollment, multiple credentials, recovery, loss, credential revocation, account recovery, and session expiry must be decided before shipping identity. v0.1.0 has no login.
+v0.1.0 had no login. The v0.8.x incubation line supports one passkey per member. Multiple credentials, credential replacement, recovery after losing trusted-device state, and adding a new device for an existing member remain unsupported.
 
 ## Device authorization
 
 A device is trusted only after explicit enrollment by an active member through the pairing flow. The device has its own ID and device key material, separate from the member's credential and household content key. Each accepted event records its originating `device_id` for later sync and audit context; this must not become a covert activity feed.
 
 Conceptual device states are pending, authorized, and revoked. Only authorized devices may submit or receive encrypted household events. Revocation is a server-side authorization change plus a key-rotation decision; it cannot erase content or keys already copied to a device. See [Pairing](PAIRING.md) and [Sync](SYNC.md).
+
+## v0.8.6 existing-member reauthentication
+
+Bootstrap and claim activation set a separate opaque `kin_device` cookie whose hash is bound to the server-side device record. Logout invalidates and clears only the session cookie. Login options are limited to that trusted device's member credentials; after a valid assertion, the service issues a new session and rotates the device token. A missing or revoked device token, removed member, or unrelated credential is rejected. A passkey alone does not silently trust a new browser.
 
 ## v0.1.0 boundary
 

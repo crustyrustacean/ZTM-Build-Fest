@@ -1,6 +1,6 @@
 # Cryptographic Posture
 
-**Status:** Current through v0.7.4 Routine Stale-Action Correctness; security requirements and conceptual key model only. No cryptography is implemented or security-reviewed. Threats and residual risks are in [THREAT-MODEL](THREAT-MODEL.md); identity and pairing boundaries are in [IDENTITY](IDENTITY.md) and [PAIRING](PAIRING.md).
+**Status:** Current through v0.8.8. Pairing uses platform cryptographic randomness with rejection sampling over its code alphabet, HMAC-SHA-256 code verifiers, SHA-256 WebAuthn checks, member-bound approval assertions, and hardened ES256/RS256 passkey verification. Household content encryption, key exchange, rotation, and encrypted sync remain unimplemented and unreviewed.
 
 ## Non-negotiable rule
 
@@ -55,4 +55,4 @@ Browser-side encryption protects against some server/database exposure but not m
 
 ## Claims boundary
 
-Encryption, pairing, passkeys, key storage, rotation, and sync are not implemented. Kin must not claim end-to-end encryption, zero-knowledge service, or verified security until a concrete protocol has been implemented, independently reviewed, and tested against the threat model.
+Pairing and passkey verification are implemented for the local incubation service, but have not received independent security review. Content encryption, key storage/transfer, rotation, and sync are not implemented. Kin must not claim end-to-end encryption, a zero-knowledge service, production hardening, or verified security.

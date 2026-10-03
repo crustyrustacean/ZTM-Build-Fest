@@ -5,4 +5,4 @@ $projectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 Write-Host 'WASM build succeeded.'
 $webRoot = Join-Path $projectRoot 'web'
 Write-Host 'Serving Kin at http://localhost:8000. Press Ctrl+C to stop.'
-py -3 -m http.server -b 127.0.0.1 -d $webRoot 8000
+node (Join-Path $projectRoot 'server/server.mjs')

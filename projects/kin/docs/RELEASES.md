@@ -1,6 +1,6 @@
 # Release Process
 
-**Status:** v0.7.4 Routine Stale-Action Correctness and manual Wasm ABI ownership-hardening release. No capability is added. The fork branch and tag are pushed; no upstream push or kin-main merge is authorized.
+**Status:** v0.8.8 Active-Member Slot Correctness. Capacity is derived from active memberships at invitation creation and final approval while inactive historical membership records remain retained. The v0.8.x line remains at its product-feedback gate; encrypted sync requires separate authorization.
 
 ## Release sequence
 
@@ -77,4 +77,4 @@ Follow [V0.7.0](V0.7.0.md) for capability, correctness, resilience/accessibility
 
 ## v0.8.0 Household Pairing
 
-The v0.7.x line is complete at `kin-v0.7.4`, which points to validated release commit `a8ded079be6fdbedba8738a64a5f0fb753e7fdd6` and is pushed to the fork, not upstream. [V0.8.0](V0.8.0.md) is the current planning checkpoint for identity and pairing; do not tag or claim a v0.8.0 implementation until its authorization, recovery, cryptographic, ABI, storage, and compatibility gates are frozen and implemented.
+The v0.7.x line is complete at `kin-v0.7.4`, which points to validated release commit `a8ded079be6fdbedba8738a64a5f0fb753e7fdd6` and is pushed to the fork, not upstream. The v0.8.x implementation and stabilization record is in [V0.8.0](V0.8.0.md). `kin-v0.8.8` corrects active-member slot accounting without adding pairing scope. Stop after `kin-v0.8.8` for product feedback; encrypted sync remains a separately authorized future capability.

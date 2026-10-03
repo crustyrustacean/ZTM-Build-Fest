@@ -1,6 +1,6 @@
 # Pairing and Device Enrollment
 
-**Status:** Current through the v0.8.0 Household Pairing planning checkpoint; pairing remains conceptual and unimplemented. QR generation, pairing codes, identity, device trust, and key exchange are not implemented. Identity distinctions are in [IDENTITY](IDENTITY.md); key handling is in [CRYPTOGRAPHY](CRYPTOGRAPHY.md).
+**Status:** Current through v0.8.8. Manual pairing codes/invitation URLs, passkey identity and reauthentication, member-bound approval/activation, active-member capacity, trusted-device session invalidation, terminal-claim cleanup, and fresh-auth member removal are implemented. QR, key exchange, encrypted sync, and durable service storage are not implemented.
 
 ## Distinct operations
 
@@ -18,7 +18,7 @@ Create household
 Start invitation session
         |
         v
-Display short-lived QR / pairing code
+Display short-lived pairing code or invitation URL
         |
         v
 Member B scans or enters code
@@ -48,7 +48,9 @@ The pairing invitation must not itself be a durable login credential or contain 
 - Bind confirmation to the exact key-exchange transcript. Both devices should show matching human-readable verification information (such as a short fingerprint/word sequence derived using a standard protocol) before approval. The representation and usability must be security-reviewed; it is not an ad hoc cryptographic primitive.
 - Show the inviter and invitee which household and member/device are being added, and require clear confirmation from both.
 
-The exact expiry, cryptographic exchange, and server state machine remain implementation decisions informed by threat modeling. These requirements are not executable protocol code.
+The v0.8.6 implementation uses a ten-minute Pending invitation and starts a separate fifteen-minute approval window after a successful claim. It validates a code before returning WebAuthn registration options. Cryptographic key exchange, household content encryption, and sync remain future work; see [V0.8.0](V0.8.0.md).
+
+Household capacity is derived from active membership records at both invitation creation and final approval. An inactive historical member does not consume one of the two active-adult slots, but remains stored; a full household cannot create an invitation or approve an in-flight claim.
 
 ## Add a device for an existing member
 
@@ -92,3 +94,5 @@ Revocation should immediately mark the device unauthorized at the service, rejec
 Revocation cannot erase plaintext, screenshots, exports, or encryption keys already copied to a lost/compromised device. To provide forward confidentiality, the household content key must be rotated after revocation and new events encrypted under the new key. Existing history may need controlled re-encryption for remaining devices; the exact policy, recovery, and effects on backups are open decisions. Do not promise retroactive erasure.
 
 Member removal and device revocation are different actions. Removing a member must revoke that member's devices and initiate key rotation, but still cannot reclaim data already downloaded.
+
+In v0.8.6, removing another adult requires a fresh passkey assertion bound to the actor, current trusted device, and target member. A session or confirmation dialog alone is insufficient.

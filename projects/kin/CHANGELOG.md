@@ -2,6 +2,42 @@
 
 This file records completed Kin releases. The `v0.0.x` releases are planning and documentation milestones; they do not represent implemented application features. The first implementation milestone remains `v0.1.0`.
 
+## [0.8.8] — Active-Member Slot Correctness
+
+Count active memberships rather than retained historical member records when enforcing household capacity. After an adult leaves or is removed, the remaining adult can pair a replacement while the inactive historical membership remains stored. Invitation creation and final approval both enforce the two-active-adult limit, and a full-household approval fails before creating any member, device, credential, session, or confirmed pairing state.
+
+## [0.8.7] — Pairing Security and State Hygiene
+
+Bind pairing approval assertions to the authenticated adult's credential, eagerly remove every session for a revoked device, lazily prune expired sessions and terminal pairing capabilities, and normalize malformed WebAuthn/CBOR/COSE input into controlled verification failures. Clarify realistic signature-counter semantics and retain fresh-session behavior without adding product scope.
+
+## [0.8.6] — Pairing Feedback-Gate Corrections
+
+Use rejection sampling for valid, uniformly selected pairing-code characters; validate invitations before WebAuthn; and give claimed requests a separate 15-minute approval window. Add trusted-device-bound passkey reauthentication, action-bound fresh authentication for adult removal, terminal-claim recovery, early invitation-URL cleanup, HTTPS-aware Secure cookies, and bounded/pruned transient security state. No sync or new household scope is added.
+
+## [0.8.5] — Auth Panel Text Contrast
+
+Set the household authentication panel's text to the app's dark ink color so headings, form labels, explanatory text, and status messages remain readable against its light background. Button-specific and alert colors are unchanged. No authentication behavior or product capability changed.
+
+## [0.8.4] — Pairing Creation Response Correctness
+
+Return the initial `Pending` state from pairing creation so the initiating-adult UI can render a newly created code without dereferencing an absent state. Add an exact response-contract regression and defensive UI fallback for malformed or incomplete pairing status responses.
+
+## [0.8.3] — Household Pairing Pre-Feedback Stabilization
+
+Polish the two-adult journey with URL prefill, clipboard/native sharing fallbacks, readable selectable codes, quiet countdowns, semantic status/error regions, keyboard-native controls, forced-color styling, destructive-action explanations, and actionable passkey errors. Hide local household content on `/pair` before authorization, recover safely from stale claim cookies, reconcile security/recovery documentation, and retain the complete v0.7.x regression suite.
+
+## [0.8.2] — Trusted Devices, Authorization, and Security UX
+
+Make device trust inspectable and revocable, add logout with session-only semantics, define leaving and other-adult removal, revoke all target sessions/devices on membership removal, and prohibit the last active adult from leaving without a supported deletion/recovery path. Add an authorization matrix and actionable passkey, expiry, revocation, trust, and recovery messages without exposing household details before approval.
+
+## [0.8.1] — Pairing Hardening and Failure Recovery
+
+Separate membership approval from joining-device activation: after atomic approval, the joining adult must prove continued possession of the enrolled passkey before receiving a session. Lost-passkey, response-loss, duplicate approval, revoke/approve, server-time expiry, simultaneous invitation, replay, logout, and device-revocation paths fail closed or retry idempotently. Logout invalidates a session without conflating it with device trust.
+
+## [0.8.0] — Household Pairing Foundation
+
+Add the first two-adult household identity model, passkey registration and approval, a ten-minute single-use human-readable pairing code, `/pair` manual entry and invitation links, explicit Pending/Claimed/Confirmed/Expired/Revoked states, server-side attempt/rate limits, atomic membership confirmation, trusted-device inspection/revocation, privacy-safe audit events, and lifecycle tests. The same-origin service stores only a keyed code verifier and never logs codes. Existing local event protocol v1–v7 and IndexedDB schema 1 remain unchanged.
+
 ## [0.7.4] — Routine Stale-Action Correctness
 
 Reject routine completion unless the latest occurrence is open, and reject reopen unless it is completed, even when the submitted period key remains current. Preserve existence, archive and period-key preflight checks and the existing stale-state error code. Add two-tab persistence regressions for stale completion and reopen. Harden the manual Wasm ABI so `kin_apply_events` accepts only the exact tracked allocation returned by `kin_alloc`, with expanded ownership regressions. Refresh pairing-planning status through the v0.8.0 checkpoint and update current release metadata. Protocol layouts, persisted event bytes and product capability remain unchanged.
