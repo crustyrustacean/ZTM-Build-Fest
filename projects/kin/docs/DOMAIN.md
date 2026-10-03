@@ -1,6 +1,6 @@
 # Household Domain
 
-**Status:** Current through v0.6.0 Since You Last Looked; earlier version sections are historical contracts. See Pulse and v0.6.0 below.
+**Status:** Current through v0.7.0 Routines; earlier version sections are historical contracts. See v0.7.0 below.
 
 ## Scope and relationships
 
@@ -63,7 +63,7 @@ A Pulse is lightweight, time-bounded context about current capacity, for example
 
 ## Routine
 
-A Routine represents a recurring household need, with a recurrence definition and occurrences. It is intended to support lightweight household rhythms, not become a general calendar. Routine behavior and recurrence rules are future domain work planned for v0.7.0.
+A Routine represents a recurring household need, with a recurrence definition and occurrences. It is intended to support lightweight household rhythms, not become a general calendar. Daily/Weekly recurrence is implemented in v0.7.0; see the frozen release contract below.
 
 ## Agreement
 
@@ -80,3 +80,7 @@ Pulse is the latest capacity per actor: enum Good/Okay/Drained/RoughDay/NeedQuie
 ## v0.6.0 Since You Last Looked
 
 The summary is a derived household projection over existing Item, Handoff and Talk events. It adds no domain entity or event kind. The catch-up cursor belongs to one browser installation's local UI context; it does not represent a member, device identity claim, acknowledgement, or read receipt. Pulse events advance the snapshot boundary but do not create summary entries. See [V0.6.0](V0.6.0.md).
+
+## v0.7.0 Routines
+
+Routines are immutable Daily/Weekly definitions with derived occurrences. Monday starts a week. Complete/reopen applies to the current occurrence; archive ends the definition. Editing means archive and create anew. No reminders, missed counts, assignments or history UI. See [V0.7.0](V0.7.0.md).

@@ -1,4 +1,6 @@
 import {
+  encodeRoutineCreatedRecord,
+  encodeRoutineActionRecord,
   encodeAddedRecord,
   encodePulseSetRecord,
   encodePulseClearedRecord,
@@ -16,6 +18,7 @@ import {
   randomId,
   encodeReopenedRecord,
 } from "../wasm/kin-engine.js";
+import { projectionContext } from "../browser-time.js";
 
 const DATABASE_NAME = "kin";
 const DATABASE_VERSION = 1;
@@ -154,7 +157,7 @@ export class EventStore {
             );
           }
           const eventId = randomId();
-          const asOf = Date.now();
+          const { asOf, civilDate } = projectionContext();
           const timestamp =
             command.type === "set-pulse" ? command.timestamp : asOf;
           const identity = {
@@ -167,7 +170,66 @@ export class EventStore {
           };
           let kind;
           let encodedEvent;
-          if (command.type === "set-pulse") {
+          if (command.type === "create-routine") {
+            kind = "ROUTINE_CREATED";
+            encodedEvent = encodeRoutineCreatedRecord({
+              ...identity,
+              routineId: randomId(),
+              text: command.text,
+              cadence: command.cadence,
+              createdOn: civilDate,
+            });
+          } else if (
+            [
+              "complete-routine-occurrence",
+              "reopen-routine-occurrence",
+              "archive-routine",
+            ].includes(command.type)
+          ) {
+            const action = command.type.split("-")[0];
+            if (action !== "archive") {
+              const current = engine.applyEvents(
+                loadedEvents.map((event) => event.encoded_event),
+                asOf,
+                context.last_looked_event_id === null
+                  ? null
+                  : idToHex(context.last_looked_event_id),
+                civilDate,
+              );
+              const routine = current.routines.find(
+                (record) => record.routineId === command.routineId,
+              );
+              const occurrenceIsCurrent =
+                action === "complete"
+                  ? routine?.occurrenceStatus === "open"
+                  : routine?.occurrenceStatus === "completed";
+              if (
+                !routine ||
+                routine.status === "archived" ||
+                routine.occurrenceKey === null ||
+                routine.occurrenceKey !== command.occurrenceKey ||
+                !occurrenceIsCurrent
+              ) {
+                const error = new EventStoreError(
+                  "That period changed or the occurrence was already updated. Review the current routine.",
+                );
+                error.code = 4;
+                throw error;
+              }
+            }
+            kind =
+              action === "archive"
+                ? "ROUTINE_ARCHIVED"
+                : action === "complete"
+                  ? "ROUTINE_OCCURRENCE_COMPLETED"
+                  : "ROUTINE_OCCURRENCE_REOPENED";
+            encodedEvent = encodeRoutineActionRecord({
+              ...identity,
+              routineId: idFromHex(command.routineId),
+              occurrenceKey: command.occurrenceKey,
+              action,
+            });
+          } else if (command.type === "set-pulse") {
             kind = "PULSE_SET";
             encodedEvent = encodePulseSetRecord({
               ...identity,
@@ -259,6 +321,7 @@ export class EventStore {
             context.last_looked_event_id === null
               ? null
               : idToHex(context.last_looked_event_id),
+            civilDate,
           );
 
           const existingRequest = events.index("event_id").get(eventId);
@@ -280,6 +343,7 @@ export class EventStore {
                 context.last_looked_event_id === null
                   ? null
                   : idToHex(context.last_looked_event_id),
+                civilDate,
               );
               const tail = loadedEvents.at(-1);
               finish({
@@ -696,6 +760,10 @@ function validateEventRow(row) {
     TALK_ARCHIVED: 11,
     PULSE_SET: 12,
     PULSE_CLEARED: 13,
+    ROUTINE_CREATED: 14,
+    ROUTINE_OCCURRENCE_COMPLETED: 15,
+    ROUTINE_OCCURRENCE_REOPENED: 16,
+    ROUTINE_ARCHIVED: 17,
   }[row.kind];
   const supportedVersion =
     (row.kind === "ITEM_ADDED" && [1, 2].includes(row.event_version)) ||

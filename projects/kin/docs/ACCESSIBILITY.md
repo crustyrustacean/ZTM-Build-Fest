@@ -1,6 +1,6 @@
 # Accessibility Contract
 
-**Status:** Current through v0.6.3 Summary Hardening & Polish; earlier version sections are historical contracts. See v0.6.0 below.
+**Status:** Current through v0.7.0 Routines; earlier version sections are historical contracts. See v0.7.0 below.
 
 ## Baseline requirements
 
@@ -75,6 +75,20 @@ Passed 67 Rust and 24 Node/real-WASM tests, fmt, Clippy, release WASM, version c
 
 The catch-up section uses a semantic heading and unordered list, a visible native “Caught up” button, a textual empty state, and no color-only state or per-entry timestamps. Enter/Space operate the button natively; focus moves to the heading if the button disappears after clearing. The global status is polite and cursor-write/refresh errors are assertive. Browser regressions check the 48px target, 320px reflow, forced colors, increased text spacing, reduced motion, focus and 200% page-scale emulation. Screen-reader certification and native desktop zoom are not claimed without direct testing.
 
+## v0.6.1 cursor correctness evidence
+
+The correctness audit covered empty/first/middle/latest cursor cases, exact and conflicting duplicate event IDs, eight/nine-entry caps, and malformed/partial cursor metadata preservation. Browser evidence includes stale-tab monotonicity and preservation of stored metadata on failure. Recorded validation passed 81 Rust tests, 29 Node/real-WASM tests, and the complete Chrome 154.0.8037.95 browser suite; this adds no assistive-technology or other-browser certification. See [V0.6.0](V0.6.0.md) and the [changelog](../CHANGELOG.md).
+
 ## v0.6.2 resilience and accessibility evidence
 
 Catch-up quota and transaction-abort tests preserve the cursor and restore focus to the visible control; repeated refresh failure retains the summary and retry state. A pending mark remains busy through reconnect. Keyboard activation, semantic section/heading/list, polite completion and assertive error feedback, textual empty state, focus restoration, 48px target, 320px reflow, forced colors, increased text spacing, reduced motion and 200% Chromium page-scale emulation are checked. No native desktop zoom or assistive-technology certification is claimed.
+
+## v0.6.3 hardening, polish, and cursor recovery evidence
+
+The hardening/polish audit covered summary copy, omitted count, empty state, placement, mobile wrapping, and focus visibility alongside malformed v6 results, truncation boundaries, 10,000-event replay, memory growth, and copied-result lifetime. Commit `45ca041` fixes a committed cursor followed by a failed snapshot reload: the displayed summary is preserved, peers receive content-free invalidation, and retry reloads canonical state without another cursor write. Two-tab recovery and quota/abort no-broadcast regressions preserve the distinction between refresh failure and failed writes.
+
+Recorded revalidation passed 82 Rust tests, 31 Node/real-WASM tests, and the complete Chrome 154.0.8037.95 runner (12 initial scenarios and 21 PASS groups). Existing 320px reflow, forced colors, increased spacing, reduced motion, and 200% Chromium page-scale emulation passed. Firefox, Safari, macOS, native desktop zoom, NVDA, and VoiceOver remain unverified; page-scale emulation is not native zoom and no screen-reader certification is claimed. See [V0.6.0](V0.6.0.md) and the [changelog](../CHANGELOG.md).
+
+## v0.7.0 Routines
+
+Routine capture uses labeled native text/cadence controls, a semantic list and named native actions. Text says Open/Done today or this week. Focus follows the corresponding row action, or returns to capture after archive; quiet periodic refresh does not announce a fabricated household change. Verify keyboard create/complete/reopen/archive, visible focus, 48px targets, forced colors, 320px reflow, spacing and zoom. Actual assistive-technology gaps remain in [V0.7.0](V0.7.0.md).

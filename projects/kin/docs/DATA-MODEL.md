@@ -1,6 +1,6 @@
 # Data Model
 
-**Status:** Current through v0.6.0 Since You Last Looked; earlier version sections are historical contracts. See Pulse and v0.6.0 below.
+**Status:** Current through v0.7.0 Routines; earlier version sections are historical contracts. See v0.7.0 below.
 
 ## Event-oriented source of truth
 
@@ -63,3 +63,7 @@ PulseState has actor_id, fixed enum value, set_at, expires_at and active/expired
 ## v0.6.0 Since You Last Looked
 
 `last_looked_event_id`, `last_looked_local_sequence`, and `last_looked_at` are installation-local view metadata in `local_context`, not fields on Household, Member, or Event. Rust summary records expose only source event ID, semantic kind, entity kind, text, and optional Item classification; actor and device provenance are not part of the presentation projection. See [V0.6.0](V0.6.0.md).
+
+## v0.7.0 Routines
+
+Routine occurrence identity is `(routine_id, civil period start date)`, not a random occurrence ID. Current state is derived; only definitions and human lifecycle actions persist. Civil dates use validated YYYYMMDD u32, Monday-start weeks. No time-zone preference is persisted in v0.7. See [V0.7.0](V0.7.0.md).

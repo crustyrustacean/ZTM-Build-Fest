@@ -2,11 +2,33 @@
 
 This file records completed Kin releases. The `v0.0.x` releases are planning and documentation milestones; they do not represent implemented application features. The first implementation milestone remains `v0.1.0`.
 
+## [0.7.4] — Routine Stale-Action Correctness
+
+Reject routine completion unless the latest occurrence is open, and reject reopen unless it is completed, even when the submitted period key remains current. Preserve existence, archive and period-key preflight checks and the existing stale-state error code. Add two-tab persistence regressions for stale completion and reopen. Harden the manual Wasm ABI so `kin_apply_events` accepts only the exact tracked allocation returned by `kin_alloc`, with expanded ownership regressions. Refresh pairing-planning status through the v0.8.0 checkpoint and update current release metadata. Protocol layouts, persisted event bytes and product capability remain unchanged.
+
+## [0.7.3] — Routine Hardening & Polish
+
+No capability added. Completed the v0.7.x ABI and parser boundary audit, maximum replay and Wasm memory-growth checks, protocol and allocation ownership review, local-only privacy review, and documentation reconciliation. The full hardening gate passed without changing protocol v7, IndexedDB schema 1, or earlier event bytes. See [V0.7.0](docs/V0.7.0.md).
+
+## [0.7.2] — Routine Resilience & Accessibility
+
+No capability added. Validated suspended-tab, midnight, focus and visibility reprojection; stale-tab convergence; failed-write rollback and retry; keyboard focus restoration; semantic routine controls; narrow reflow, forced colors, text spacing and reduced motion. The full Rust, bridge, launcher and Chrome gates passed. See [V0.7.0](docs/V0.7.0.md).
+
+## [0.7.1] — Routine Correctness
+
+No capability added. Audited mixed legacy/Routine replay, civil-date context validation, duplicate/conflicting IDs, logical ordering over wall-clock timestamps, cursor boundaries, historical compatibility and v7 malformed input. Passed 105 Rust tests plus the existing bridge and browser gates. See [V0.7.0](docs/V0.7.0.md).
+
+## [0.7.0] — Routines
+
+Added Daily and Monday-start Weekly Routines with create, complete/reopen current occurrence and terminal archive. Rust owns civil-date validation, deterministic period identity and replay; protocol v7 carries explicit local civil context without changing exports, old protocol bytes or IndexedDB schema 1. Atomic preflight rejects stale period actions instead of retargeting them. Human Routine actions participate in catch-up; timers/focus/visibility only reproject and create no facts. Native controls preserve drafts, keyboard focus and failed-command recovery. No reminders, calendar, assignments, streaks, framework, dependency or backend.
+
+Release validation and remaining platform gaps are recorded in [V0.7.0](docs/V0.7.0.md). The first calendar/contract checkpoint is `f3065fd`; the release includes the end-to-end capability and its regression coverage.
+
 ## [0.6.3] — Summary Hardening & Polish
 
-Pre-merge hardening fixes committed catch-up cursor recovery after a failed snapshot reload, with immediate content-free peer invalidation and refresh-only retry. Added two-tab recovery coverage and explicit no-broadcast checks for quota/abort failures; corrected the raw copied-result test to use a v6 summary result. Revalidation passed 82 Rust tests, 31 Node/real-WASM tests, the complete Chrome runner (12 initial scenarios and 21 PASS groups), and the established release checks and PowerShell/WSL HTTP smokes. Moved the misplaced v0.6.2 validation paragraph to its proper section.
+Fixed committed catch-up cursor recovery after a failed snapshot reload in commit `45ca041`: immediately send content-free peer invalidation, preserve the displayed summary, and offer a refresh-only retry without another cursor write. Added two-tab recovery coverage and explicit no-broadcast checks for quota/abort failures; corrected the raw copied-result test to use a v6 summary result. Revalidation passed 82 Rust tests, 31 Node/real-WASM tests, the complete Chrome runner (12 initial scenarios and 21 PASS groups), and the established release checks and PowerShell/WSL HTTP smokes. Moved the misplaced v0.6.2 validation paragraph to its proper section.
 
-No new capability. Added malformed v6 summary record/count/classification/UTF-8/length/trailing-byte coverage, every truncated v6 summary-result boundary, and a 10,000-event real-WASM v6 summary replay with memory-growth and copied-result lifetime checks. Completed the summary privacy and UI polish audit. Passed 82 Rust and 31 Node/real-WASM tests, fmt, Clippy, release WASM, version check, PowerShell/WSL build-run HTTP smokes and complete Chrome 154.0.8037.95 browser regressions. Firefox, Safari, macOS, native zoom, NVDA and VoiceOver remain unverified; no screen-reader certification is claimed. Full environment details are in [V0.6.0](docs/V0.6.0.md).
+Hardening and polish added malformed v6 summary record/count/classification/UTF-8/length/trailing-byte coverage, every truncated v6 summary-result boundary, and a 10,000-event real-WASM v6 summary replay with memory-growth and copied-result lifetime checks. Completed the summary privacy and UI polish audit. Passed 82 Rust and 31 Node/real-WASM tests, fmt, Clippy, release WASM, version check, PowerShell/WSL build-run HTTP smokes and complete Chrome 154.0.8037.95 browser regressions. Firefox, Safari, macOS, native zoom, NVDA and VoiceOver remain unverified; no screen-reader certification is claimed. Full environment details are in [V0.6.0](docs/V0.6.0.md).
 
 ## [0.6.2] — Summary Resilience & Accessibility
 

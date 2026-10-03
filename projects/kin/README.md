@@ -2,7 +2,7 @@
 
 > A private, lightweight household coordination app for the little things families need to know, remember, hand off, or discuss.
 
-**Current status: `v0.6.3` — Summary Hardening & Polish.** Kin presents a bounded, event-derived catch-up summary for Items, Handoff and Talk. Catch-up position is explicit, local to this browser installation, and never records who viewed the summary. Rust owns summary selection, ordering, truncation and event boundaries through protocol v6. IndexedDB remains schema 1; canonical event bytes and event codes 1–13 are unchanged, and no view/read event is written. Existing Today/Needs, Handoff, Talk and Pulse capabilities remain local. Actor IDs are placeholders, not verified people. No runtime framework, analytics, AI or remote service is present.
+**Current status: `v0.7.4` — Routine Stale-Action Correctness.** Kin supports Daily and Monday-start Weekly household routines: create, complete the current occurrence, reopen and archive. Rust derives occurrences from saved events and explicit browser-local civil context through protocol v7. The IndexedDB preflight rejects stale same-period completion/reopen actions against the latest Rust projection, with two-tab regression coverage. v0.7.4 also hardens the manual Wasm ABI so `kin_apply_events` accepts only the exact tracked allocation returned by `kin_alloc`, with expanded ownership regressions; protocol layouts and persisted event bytes remain unchanged. Pairing remains planning-only. Midnight/focus refresh never creates an event. IndexedDB stays schema 1; protocols v1–v6 and source event bytes remain supported. No framework, analytics, AI or remote service is present.
 
 ## The problem
 
@@ -12,7 +12,7 @@ Kin aims to make useful household context easier to share and find. It is not a 
 
 ## Intended direction
 
-Kin is intended as a private, lightweight shared household operating layer. Today and Needs views, lightweight classification, capture, completion, reopening, and archival are implemented locally. Handoff capture, acknowledgement, and recent context are implemented locally. Talk captures short topics for later, with Open/Resolved lists, resolve, reopen, and archive. Resolved is workflow state only, not agreement or an objective solution. Pulse adds fixed current capacity, set/replace/clear and explicit expiry through Rust protocol v5. Since You Last Looked shows at most eight recent meaningful household changes with an omitted-change count; Pulse is excluded. The user explicitly marks the displayed snapshot caught up. Values are context only, never scores or diagnoses. Routines remain future work.
+Kin is intended as a private, lightweight shared household operating layer. Today and Needs views, lightweight classification, capture, completion, reopening, and archival are implemented locally. Handoff capture, acknowledgement, and recent context are implemented locally. Talk captures short topics for later, with Open/Resolved lists, resolve, reopen, and archive. Resolved is workflow state only, not agreement or an objective solution. Pulse adds fixed current capacity, set/replace/clear and explicit expiry, introduced in Rust protocol v5. Since You Last Looked shows at most eight recent meaningful household changes with an omitted-change count; Pulse is excluded. The user explicitly marks the displayed snapshot caught up. Values are context only, never scores or diagnoses. Routines support Daily/Weekly coordination without reminders, streaks, assignments or calendar UI.
 
 The intended technical direction is Rust compiled to WebAssembly, native Web Components, vanilla JavaScript, and browser APIs, with a local-first start and no external framework unless a demonstrated requirement justifies one.
 
@@ -59,6 +59,11 @@ The intended technical direction is Rust compiled to WebAssembly, native Web Com
 - `v0.6.1` — Summary Correctness (`kin-v0.6.1`)
 - `v0.6.2` — Summary Resilience & Accessibility (`kin-v0.6.2`)
 - `v0.6.3` — Summary Hardening & Polish (`kin-v0.6.3`)
+- `v0.7.0` — Routines (`kin-v0.7.0`)
+- `v0.7.1` — Routine Correctness (`kin-v0.7.1`)
+- `v0.7.2` — Routine Resilience & Accessibility (`kin-v0.7.2`)
+- `v0.7.3` — Routine Hardening & Polish (`kin-v0.7.3`)
+- `v0.7.4` — Routine Stale-Action Correctness (`kin-v0.7.4`)
 - See the [changelog](CHANGELOG.md) for the completed release history.
 
 ## Install, build, and run
@@ -74,7 +79,7 @@ rustup target add wasm32-unknown-unknown
 
 The script builds the WASM module and serves the web app at `http://localhost:8000`. On macOS/Linux, run `sh projects/kin/run.sh` from the repository root.
 
-Kin stores household events in the current browser profile's IndexedDB and may keep independent in-progress Item, Handoff and Talk drafts in tab-scoped `sessionStorage`. It does not provide accounts, backup, encryption, pairing, or cross-device sync; browser storage is not a security boundary against device compromise or extensions. Use synthetic household text while evaluating this prototype.
+Kin stores household events in the current browser profile's IndexedDB and may keep independent in-progress Item, Handoff, Talk and Routine drafts in tab-scoped `sessionStorage`. It does not provide accounts, backup, encryption, pairing, or cross-device sync; browser storage is not a security boundary against device compromise or extensions. Use synthetic household text while evaluating this prototype.
 
 ## AI usage
 
@@ -96,6 +101,8 @@ Kin is nested in the ZTM Build Fest repository. Its community files and template
 
 ## Project documents
 
+- [Routines release contract and test matrix](docs/V0.7.0.md)
+
 - [Changelog](CHANGELOG.md)
 - [Product vision](docs/PRODUCT.md)
 - [Principles and non-goals](docs/PRINCIPLES.md)
@@ -111,6 +118,7 @@ Kin is nested in the ZTM Build Fest repository. Its community files and template
 - [Synchronization design](docs/SYNC.md)
 - [Cryptographic posture](docs/CRYPTOGRAPHY.md)
 - [Threat model](docs/THREAT-MODEL.md)
+- [v0.8.0 Household Pairing contract](docs/V0.8.0.md)
 - [Implementation layout and responsibilities](docs/IMPLEMENTATION.md)
 - [JavaScript/WASM ABI](docs/ABI.md)
 - [IndexedDB storage contract](docs/STORAGE.md)

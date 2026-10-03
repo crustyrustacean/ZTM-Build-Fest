@@ -3,8 +3,22 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::error::KinError;
 use crate::event::{
     valid_timestamp, ActorId, EventEnvelope, EventId, EventKind, HandoffId, HouseholdId,
-    ItemClassification, ItemId, PulseValue, TalkId,
+    ItemClassification, ItemId, PulseValue, RoutineId, TalkId,
 };
+use crate::recurrence::{Cadence, CivilDate};
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RoutineState {
+    pub routine_id: RoutineId,
+    pub text: String,
+    pub created_by: ActorId,
+    pub created_at: i64,
+    pub created_on: CivilDate,
+    pub cadence: Cadence,
+    pub archived: bool,
+    pub occurrence_key: Option<CivilDate>,
+    pub completed: bool,
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ItemStatus {
@@ -77,6 +91,7 @@ pub struct HouseholdState {
     pub handoffs: Vec<HandoffState>,
     pub talks: Vec<TalkState>,
     pub pulses: Vec<PulseState>,
+    pub routines: Vec<RoutineState>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -93,6 +108,10 @@ pub enum SummaryKind {
     TalkResolved = 9,
     TalkReopened = 10,
     TalkArchived = 11,
+    RoutineCreated = 12,
+    RoutineOccurrenceCompleted = 13,
+    RoutineOccurrenceReopened = 14,
+    RoutineArchived = 15,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -101,6 +120,7 @@ pub enum SummaryEntityKind {
     Item = 1,
     Handoff = 2,
     Talk = 3,
+    Routine = 4,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -132,10 +152,29 @@ pub fn rebuild(events: &[EventEnvelope]) -> Result<HouseholdState, KinError> {
 }
 
 pub fn rebuild_at(events: &[EventEnvelope], as_of: i64) -> Result<HouseholdState, KinError> {
+    rebuild_with_context(events, as_of, None)
+}
+
+pub fn rebuild_on(
+    events: &[EventEnvelope],
+    as_of: i64,
+    civil_date: CivilDate,
+) -> Result<HouseholdState, KinError> {
+    rebuild_with_context(events, as_of, Some(civil_date))
+}
+
+fn rebuild_with_context(
+    events: &[EventEnvelope],
+    as_of: i64,
+    civil_date: Option<CivilDate>,
+) -> Result<HouseholdState, KinError> {
     if !valid_timestamp(as_of) {
         return Err(KinError::MalformedProtocol);
     }
     let mut pulses = BTreeMap::new();
+    let mut routines: Vec<RoutineState> = Vec::new();
+    let mut routine_positions = BTreeMap::new();
+    let mut completed_periods = BTreeSet::new();
     let mut household_id = None;
     let mut items = Vec::new();
     let mut handoffs = Vec::new();
@@ -167,6 +206,69 @@ pub fn rebuild_at(events: &[EventEnvelope], as_of: i64) -> Result<HouseholdState
         }
 
         match &event.kind {
+            EventKind::RoutineCreated {
+                routine_id,
+                text,
+                cadence,
+                created_on,
+            } => {
+                let today = civil_date.ok_or(KinError::UnsupportedVersion)?;
+                if !valid_timestamp(event.timestamp) || text.len() > 4096 || text.is_empty() {
+                    return Err(KinError::MalformedProtocol);
+                }
+                if text.trim().is_empty() || routine_positions.contains_key(routine_id) {
+                    return Err(KinError::InvalidEvent);
+                }
+                routine_positions.insert(*routine_id, routines.len());
+                routines.push(RoutineState {
+                    routine_id: *routine_id,
+                    text: text.clone(),
+                    created_by: event.actor_id,
+                    created_at: event.timestamp,
+                    created_on: *created_on,
+                    cadence: *cadence,
+                    archived: false,
+                    occurrence_key: cadence.current_key(*created_on, today),
+                    completed: false,
+                });
+            }
+            EventKind::RoutineOccurrenceCompleted { routine_id, key }
+            | EventKind::RoutineOccurrenceReopened { routine_id, key } => {
+                civil_date.ok_or(KinError::UnsupportedVersion)?;
+                if !valid_timestamp(event.timestamp) {
+                    return Err(KinError::MalformedProtocol);
+                }
+                let position = routine_positions
+                    .get(routine_id)
+                    .copied()
+                    .ok_or(KinError::InvalidEvent)?;
+                let routine = &routines[position];
+                if routine.archived {
+                    return Err(KinError::InvalidEvent);
+                }
+                routine.cadence.validate_key(routine.created_on, *key)?;
+                if matches!(event.kind, EventKind::RoutineOccurrenceCompleted { .. }) {
+                    completed_periods.insert((*routine_id, *key));
+                } else {
+                    completed_periods.remove(&(*routine_id, *key));
+                }
+            }
+            EventKind::RoutineArchived { routine_id } => {
+                civil_date.ok_or(KinError::UnsupportedVersion)?;
+                if !valid_timestamp(event.timestamp) {
+                    return Err(KinError::MalformedProtocol);
+                }
+                let position = routine_positions
+                    .get(routine_id)
+                    .copied()
+                    .ok_or(KinError::InvalidEvent)?;
+                let routine = &mut routines[position];
+                if routine.archived {
+                    return Err(KinError::InvalidEvent);
+                }
+                routine.archived = true;
+                routine.occurrence_key = None;
+            }
             EventKind::PulseSet { value, expires_at } => {
                 if !valid_timestamp(event.timestamp) || !valid_timestamp(*expires_at) {
                     return Err(KinError::MalformedProtocol);
@@ -311,12 +413,18 @@ pub fn rebuild_at(events: &[EventEnvelope], as_of: i64) -> Result<HouseholdState
         event_bytes.insert(event.event_id, event.canonical_bytes.clone());
     }
 
+    for routine in &mut routines {
+        routine.completed = routine
+            .occurrence_key
+            .is_some_and(|key| completed_periods.contains(&(routine.routine_id, key)));
+    }
     Ok(HouseholdState {
         household_id,
         items,
         handoffs,
         talks,
         pulses: pulses.into_values().collect(),
+        routines,
     })
 }
 
@@ -358,6 +466,11 @@ pub(crate) fn summarize_validated(
         .map(|talk| (talk.talk_id, talk.text.as_str()))
         .collect();
     let mut entries = Vec::new();
+    let routines: BTreeMap<RoutineId, &str> = state
+        .routines
+        .iter()
+        .map(|routine| (routine.routine_id, routine.text.as_str()))
+        .collect();
     let mut total_count = 0u32;
 
     for event in &events[start..] {
@@ -365,6 +478,40 @@ pub(crate) fn summarize_validated(
             continue;
         }
         let summary = match &event.kind {
+            EventKind::RoutineCreated { text, .. } => Some((
+                SummaryKind::RoutineCreated,
+                SummaryEntityKind::Routine,
+                text.as_str(),
+                None,
+            )),
+            EventKind::RoutineOccurrenceCompleted { routine_id, .. } => {
+                routines.get(routine_id).map(|text| {
+                    (
+                        SummaryKind::RoutineOccurrenceCompleted,
+                        SummaryEntityKind::Routine,
+                        *text,
+                        None,
+                    )
+                })
+            }
+            EventKind::RoutineOccurrenceReopened { routine_id, .. } => {
+                routines.get(routine_id).map(|text| {
+                    (
+                        SummaryKind::RoutineOccurrenceReopened,
+                        SummaryEntityKind::Routine,
+                        *text,
+                        None,
+                    )
+                })
+            }
+            EventKind::RoutineArchived { routine_id } => routines.get(routine_id).map(|text| {
+                (
+                    SummaryKind::RoutineArchived,
+                    SummaryEntityKind::Routine,
+                    *text,
+                    None,
+                )
+            }),
             EventKind::ItemAdded {
                 item_id: _,
                 text,
@@ -489,6 +636,12 @@ mod tests {
         let event_id = EventId(id(event_number));
         let mut canonical_bytes = vec![event_number, logical_time as u8];
         match &kind {
+            EventKind::RoutineCreated { .. }
+            | EventKind::RoutineOccurrenceCompleted { .. }
+            | EventKind::RoutineOccurrenceReopened { .. }
+            | EventKind::RoutineArchived { .. } => {
+                panic!("Routine tests use independent wire fixtures")
+            }
             EventKind::PulseSet { value, expires_at } => {
                 canonical_bytes.push(*value as u8);
                 canonical_bytes.extend_from_slice(&expires_at.to_le_bytes());

@@ -1,3 +1,5 @@
+import { projectionContext } from "../browser-time.js";
+import "./kin-routines.js";
 import { loadKinEngine } from "../wasm/kin-engine.js";
 import { EventStore } from "../storage/event-store.js";
 import "./kin-compose.js";
@@ -18,7 +20,7 @@ class KinApp extends HTMLElement {
     super();
     this.engine = null;
     this.store = null;
-    this.state = { items: [], handoffs: [], talks: [], pulses: [] };
+    this.state = { items: [], handoffs: [], talks: [], pulses: [], routines: [] };
     this.busy = false;
     this.starting = null;
     this.initialized = false;
@@ -46,6 +48,7 @@ class KinApp extends HTMLElement {
       this.saveTalk({ type: "reopen-talk", talkId: event.detail.talkId });
     this.onArchiveTalk = (event) =>
       this.saveTalk({ type: "archive-talk", talkId: event.detail.talkId });
+    this.onRoutineIntent = event => this.saveRoutine({ ...event.detail, type: event.type.slice(4) });
     this.pulseTimer = null;
     this.catchUpCursor = null;
     this.snapshotBoundary = null;
@@ -94,6 +97,9 @@ class KinApp extends HTMLElement {
     this.addEventListener("kin:set-pulse", this.onSetPulse);
     this.addEventListener("kin:clear-pulse", this.onClearPulse);
     this.addEventListener("kin:caught-up", this.onCaughtUp);
+    for (const action of ["create-routine", "complete-routine-occurrence", "reopen-routine-occurrence", "archive-routine"]) {
+      this.addEventListener(`kin:${action}`, this.onRoutineIntent);
+    }
     document.addEventListener("visibilitychange", this.onTimeWake);
     window.addEventListener("focus", this.onWindowFocus);
     this.openPeerChannel();
@@ -129,6 +135,7 @@ class KinApp extends HTMLElement {
     this.handoffs = document.createElement("kin-handoff-list");
     this.talks = document.createElement("kin-talk-list");
     this.pulse = document.createElement("kin-pulse");
+    this.routines = document.createElement("kin-routines");
     main.append(
       this.catchUp,
       this.today,
@@ -136,6 +143,7 @@ class KinApp extends HTMLElement {
       this.handoffs,
       this.talks,
       this.pulse,
+      this.routines,
     );
 
     const feedback = document.createElement("div");
@@ -177,6 +185,9 @@ class KinApp extends HTMLElement {
     this.removeEventListener("kin:set-pulse", this.onSetPulse);
     this.removeEventListener("kin:clear-pulse", this.onClearPulse);
     this.removeEventListener("kin:caught-up", this.onCaughtUp);
+    for (const action of ["create-routine", "complete-routine-occurrence", "reopen-routine-occurrence", "archive-routine"]) {
+      this.removeEventListener(`kin:${action}`, this.onRoutineIntent);
+    }
     document.removeEventListener("visibilitychange", this.onTimeWake);
     window.removeEventListener("focus", this.onWindowFocus);
     clearTimeout(this.pulseTimer);
@@ -362,17 +373,47 @@ class KinApp extends HTMLElement {
     }
   }
 
+  async saveRoutine(command) {
+    if (this.busy || !this.store || !this.engine) return;
+    const submitted = Object.freeze({ ...command });
+    const focus = this.routines.captureFocus();
+    let committed = false;
+    this.setBusy(true);
+    this.clearAlert();
+    this.setStatus("Saving…");
+    try {
+      await this.appendCommand(submitted);
+      committed = true;
+      this.broadcastEventChange();
+      this.renderState();
+      if (submitted.type === "create-routine") this.routines.clearIfMatches(submitted);
+      this.setStatus(submitted.type === "create-routine" ? "Routine added." : submitted.type === "archive-routine" ? "Routine archived." : submitted.type === "complete-routine-occurrence" ? "Occurrence completed." : "Occurrence reopened.");
+    } catch (error) {
+      if (error.code === 4 && submitted.routineId) this.pendingRefresh = true;
+      this.showAlert(committed ? "Your routine was saved. Try again to refresh the view." : error.userMessage ?? SAVE_ERROR,
+        committed ? this.retryRefresh : () => this.saveRoutine(submitted), committed || !submitted.routineId ? null : submitted);
+      this.setStatus("");
+    } finally {
+      this.setBusy(false);
+      if (submitted.type === "create-routine" || submitted.type === "archive-routine") this.routines.focusInput();
+      else this.routines.restoreFocus(focus);
+      this.flushPeerRefresh();
+    }
+  }
+
   schedulePulseRefresh() {
     clearTimeout(this.pulseTimer);
-    if (!this.isConnected || !this.state.pulses.length) return;
+    if (!this.isConnected || (!this.state.pulses.length && !this.state.routines?.some(r => r.status === "active"))) return;
     // Timers only request canonical replay. Rust alone decides expiry.
     const now = Date.now();
     const active = this.state.pulses.filter(
       (pulse) => pulse.status === "active",
     );
+    const midnight = new Date(now);
+    midnight.setHours(24, 0, 0, 0);
     const delay = Math.max(
       1,
-      Math.min(60_000, ...active.map((pulse) => pulse.expiresAt - now)),
+      Math.min(60_000, midnight.getTime() - now, ...active.map((pulse) => pulse.expiresAt - now)),
     );
     this.pulseTimer = setTimeout(this.onTimeWake, delay);
   }
@@ -453,10 +494,12 @@ class KinApp extends HTMLElement {
   }
 
   applyCatchUpSnapshot(snapshot) {
+    const { asOf, civilDate } = projectionContext();
     const state = this.engine.applyEvents(
       snapshot.events.map((event) => event.encoded_event),
-      Date.now(),
+      asOf,
       snapshot.cursor.eventId,
+      civilDate,
     );
     const throughEventId = state.summary.throughEventId;
     if (throughEventId !== (snapshot.through?.eventId ?? null)) {
@@ -574,6 +617,7 @@ class KinApp extends HTMLElement {
     const restoreHandoffFocus = this.handoffs.lists.contains(
       document.activeElement,
     );
+    const routineFocus = this.routines.captureFocus();
     const restoreTalkFocus = this.talks.lists.contains(document.activeElement);
     this.clearAlert();
     this.setStatus("Updating from another tab…");
@@ -581,7 +625,7 @@ class KinApp extends HTMLElement {
       const snapshot = await this.store.getCatchUpState();
       this.applyCatchUpSnapshot(snapshot);
       this.renderState();
-      this.setStatus("Household context updated.");
+      this.setStatus("");
       if (previousRetry) {
         const handoff = previousRetryIntent?.handoffId
           ? this.state.handoffs.find(
@@ -593,7 +637,8 @@ class KinApp extends HTMLElement {
               (record) => record.talkId === previousRetryIntent.talkId,
             )
           : null;
-        const item = previousRetryIntent?.talkId
+        const routine = previousRetryIntent?.routineId ? this.state.routines.find(record => record.routineId === previousRetryIntent.routineId) : null;
+        const item = previousRetryIntent?.routineId ? routine : previousRetryIntent?.talkId
           ? talk
           : previousRetryIntent?.handoffId
             ? handoff
@@ -603,9 +648,9 @@ class KinApp extends HTMLElement {
                     stateItem.itemId === previousRetryIntent.itemId,
                 )
               : null;
-        if (previousRetryIntent && (!item || item.status === "archived")) {
+        if (previousRetryIntent && (!item || item.status === "archived" || (previousRetryIntent.occurrenceKey !== undefined && item.occurrenceKey !== previousRetryIntent.occurrenceKey))) {
           this.setStatus(
-            previousRetryIntent.talkId
+            previousRetryIntent.routineId ? "That period changed. Review the current routine." : previousRetryIntent.talkId
               ? "That topic changed. Review its current state."
               : previousRetryIntent.handoffId
                 ? "That handoff changed. Review its current state."
@@ -631,6 +676,7 @@ class KinApp extends HTMLElement {
       else if (focusedControl && this.pulse.contains(focusedControl))
         this.pulse.focusInput();
       if (restoreHandoffFocus) this.handoffs.focusInput();
+      this.routines.restoreFocus(routineFocus);
       if (restoreTalkFocus) this.talks.focusInput();
       if (restoreComposeFocus) {
         this.compose.focusInput();
@@ -656,6 +702,7 @@ class KinApp extends HTMLElement {
     this.pulse.pulse = this.state.pulses.find(
       (pulse) => pulse.actorId === this.store?.actorId,
     );
+    this.routines.routines = this.state.routines ?? [];
     this.schedulePulseRefresh();
   }
 
@@ -668,6 +715,7 @@ class KinApp extends HTMLElement {
     this.talks.disabled = isBusy || !this.store;
     this.pulse.disabled = isBusy || !this.store;
     this.catchUp.disabled = isBusy || !this.store;
+    this.routines.disabled = isBusy || !this.store;
     this.retryButton.disabled = isBusy;
   }
 

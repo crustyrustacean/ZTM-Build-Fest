@@ -1,6 +1,6 @@
 # Household Events
 
-**Status:** Current through v0.6.0 Since You Last Looked; earlier version sections are historical contracts. See Pulse and v0.6.0 below.
+**Status:** Current through v0.7.0 Routines; earlier version sections are historical contracts. See v0.7.0 below.
 
 ## Canonical record
 
@@ -53,7 +53,9 @@ Use uppercase entity/action-past-tense names consistently. The milestone column 
 | `PULSE_SET`            | v0.5.0            | Set time-bounded capacity context, including expiry.         |
 | `PULSE_CLEARED`        | v0.5.0            | Clear current Pulse context.                                 |
 | `ROUTINE_CREATED`      | v0.7.0            | Define a recurring household need.                           |
-| `ROUTINE_COMPLETED`    | v0.7.0            | Complete a routine occurrence.                               |
+| `ROUTINE_OCCURRENCE_COMPLETED` | v0.7.0 | Complete a routine occurrence. |
+| `ROUTINE_OCCURRENCE_REOPENED` | v0.7.0 | Reopen a routine occurrence. |
+| `ROUTINE_ARCHIVED` | v0.7.0 | Archive a routine definition. |
 | `HOUSEHOLD_CREATED`    | v0.8.0            | Establish a household identity when pairing is introduced.   |
 | `MEMBER_INVITED`       | v0.8.0            | Record a member invitation.                                  |
 | `MEMBER_JOINED`        | v0.8.0            | Record accepted household membership.                        |
@@ -114,3 +116,7 @@ Schema-1 codes 12 PULSE_SET (value:u8, reserved[7]=0, expires_at:i64; 16 bytes) 
 ## v0.6.0 Since You Last Looked
 
 No domain event kinds are added. Codes 1–13 and their persisted bytes remain unchanged. Summary entries are derived in Rust protocol v6 from existing Item, Handoff, and Talk events; Pulse remains excluded from entries while still contributing to the exact through-event boundary. Viewing or marking the local summary never appends a household event. See [V0.6.0](V0.6.0.md).
+
+## v0.7.0 Routines
+
+Schema-1 codes 14 ROUTINE_CREATED, 15 ROUTINE_OCCURRENCE_COMPLETED, 16 ROUTINE_OCCURRENCE_REOPENED, 17 ROUTINE_ARCHIVED. Creation persists text/cadence/creation civil date; occurrence actions persist a deterministic date key. No reset or automatically created occurrence event. Archive is terminal. The earlier conceptual ROUTINE_COMPLETED name never had a persisted wire code and is replaced by occurrence-specific naming. See [V0.7.0](V0.7.0.md).

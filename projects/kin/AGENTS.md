@@ -100,7 +100,7 @@ If an unrelated parent-repository file was modified accidentally, revert that ch
 
 # Current Development Stage
 
-Kin uses semantic versions. Current release: `v0.6.3` — Summary Hardening & Polish. The v0.6.0 capability and v0.6.1–v0.6.3 audits are complete on `kin-development`. Follow frozen `docs/V0.6.0.md`. Stop here; do not create v0.6.4 or begin v0.7.0. No automatic kin-main merge or push.
+Kin uses semantic versions. Current release: `v0.7.4` — Routine Stale-Action Correctness. v0.7.0 through v0.7.4 are tagged and validated; v0.7.4 covers same-period stale-action correctness, two-tab regressions, manual Wasm ABI allocation-ownership hardening, and pairing-planning documentation cleanup. Protocol layouts and persisted event bytes remain unchanged. The annotated `kin-v0.7.4` tag points to the validated release commit and is pushed to the fork, not upstream. Follow frozen `docs/V0.7.0.md`; do not expand capability in stabilization patches. Stop after .4 for evaluation. No automatic kin-main merge or push.
 
 The pre-implementation releases are:
 
@@ -615,7 +615,9 @@ PULSE_SET
 PULSE_CLEARED
 
 ROUTINE_CREATED
-ROUTINE_COMPLETED
+ROUTINE_OCCURRENCE_COMPLETED
+ROUTINE_OCCURRENCE_REOPENED
+ROUTINE_ARCHIVED
 
 AGREEMENT_CREATED
 AGREEMENT_REVISED
@@ -1077,6 +1079,11 @@ kin-v0.6.0
 kin-v0.6.1
 kin-v0.6.2
 kin-v0.6.3
+kin-v0.7.0
+kin-v0.7.1
+kin-v0.7.2
+kin-v0.7.3
+kin-v0.7.4
 kin-v1.0.0
 ```
 

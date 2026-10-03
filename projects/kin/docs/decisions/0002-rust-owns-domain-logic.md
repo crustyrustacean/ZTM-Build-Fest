@@ -1,6 +1,6 @@
 # ADR 0002 — Rust Owns Domain Logic
 
-Status: Accepted
+Status: Current through v0.7.4 Routine Stale-Action Correctness; Accepted
 
 ## Context
 

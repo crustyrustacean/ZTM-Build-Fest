@@ -90,6 +90,10 @@ class KinCatchUp extends HTMLElement {
 
 function entryCopy(entry) {
   switch (entry.kind) {
+    case "routine-created": return `${entry.text} added to Routines`;
+    case "routine-occurrence-completed": return `${entry.text} occurrence completed`;
+    case "routine-occurrence-reopened": return `${entry.text} occurrence reopened`;
+    case "routine-archived": return `${entry.text} archived`;
     case "item-added":
       return `${entry.text} added to ${entry.classification === "today" ? "Today" : "Needs"}`;
     case "item-completed":

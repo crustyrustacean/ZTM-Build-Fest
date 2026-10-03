@@ -339,7 +339,7 @@ export async function talkRegressions() {
   edit("Newer talk draft");
   const events = (await app.store.loadEvents()).map((row) => row.encoded_event);
   check(
-    JSON.stringify(app.engine.applyEvents(events, 0)) ===
+    JSON.stringify(app.engine.applyEvents(events, 0, null, 20261002)) ===
       JSON.stringify(app.state),
     "mixed deterministic replay",
   );

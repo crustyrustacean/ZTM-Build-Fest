@@ -1,6 +1,6 @@
 # Threat Model
 
-**Status:** initial design model for future identity and sync. No accounts, network service, encryption, pairing, or device authorization are implemented. This document guides design; it is not a security audit or guarantee.
+**Status:** Current through v0.7.4 Routine Stale-Action Correctness; initial design model for future identity and sync. No accounts, network service, encryption, pairing, or device authorization are implemented. This document guides design; it is not a security audit or guarantee.
 
 ## Assets and boundaries
 

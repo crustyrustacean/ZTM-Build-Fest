@@ -1,6 +1,6 @@
 # Release Process
 
-**Status:** The authorized v0.6.0–v0.6.3 Since You Last Looked line is complete on `kin-development`. Stop for release-line evaluation. Do not create v0.6.4, begin v0.7.0, push, or merge to `kin-main`.
+**Status:** v0.7.4 Routine Stale-Action Correctness and manual Wasm ABI ownership-hardening release. No capability is added. The fork branch and tag are pushed; no upstream push or kin-main merge is authorized.
 
 ## Release sequence
 
@@ -70,3 +70,11 @@ Dedicated validated commits and annotated kin-v0.5.0 through kin-v0.5.3 tags. St
 ## v0.6.x Since You Last Looked
 
 Create dedicated validated commits and annotated `kin-v0.6.0` through `kin-v0.6.3` tags. Preserve protocol v1–v5, schema-1 event bytes, and IndexedDB schema 1. Do not push or merge automatically. Stop after v0.6.3 and hand control back for release-line evaluation. See [V0.6.0](V0.6.0.md).
+
+## v0.7.x Routines
+
+Follow [V0.7.0](V0.7.0.md) for capability, correctness, resilience/accessibility and hardening gates. Release protocol v7 and new schema-1 kinds 14–17 without altering older contracts. Keep IndexedDB schema 1. Each completed milestone gets its own validated commit and annotated tag.
+
+## v0.8.0 Household Pairing
+
+The v0.7.x line is complete at `kin-v0.7.4`, which points to validated release commit `a8ded079be6fdbedba8738a64a5f0fb753e7fdd6` and is pushed to the fork, not upstream. [V0.8.0](V0.8.0.md) is the current planning checkpoint for identity and pairing; do not tag or claim a v0.8.0 implementation until its authorization, recovery, cryptographic, ABI, storage, and compatibility gates are frozen and implemented.

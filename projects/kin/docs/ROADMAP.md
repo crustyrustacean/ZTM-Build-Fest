@@ -1,6 +1,6 @@
 # Roadmap
 
-Current release: `v0.6.3 — Summary Hardening & Polish`. The authorized catch-up stabilization line is complete; stop for evaluation and do not begin v0.7.0.
+Current release: `v0.7.4 — Routine Stale-Action Correctness`. Daily/Weekly capability is implemented; this patch rejects stale same-period occurrence actions, adds two-tab regressions, hardens manual Wasm ABI allocation ownership, and updates pairing-planning documentation without adding feature scope. Protocol layouts and persisted event bytes remain unchanged.
 
 ## Planning releases
 
@@ -166,11 +166,27 @@ Completed: audited v6 parser/result boundaries, 10,000-event replay, WASM memory
 
 ### `v0.7.0` — Routines
 
-Add recurring household needs and lightweight routines, with recurrence logic in Rust. Avoid turning Kin into a traditional calendar.
+Implemented: Daily and Monday-start Weekly Routines with deterministic civil-date occurrence keys, current-period complete/reopen, terminal archive, catch-up summary integration and browser lifecycle reprojection. See [V0.7.0](V0.7.0.md).
+
+### `v0.7.1` — Routine Correctness
+
+Audit recurrence boundaries, replay, malformed protocol, duplicates/conflicts and historical compatibility. No new capability.
+
+### `v0.7.2` — Routine Resilience & Accessibility
+
+Audit suspended/stale tabs, midnight/focus/visibility, failed writes/retries, keyboard/focus and accessibility modes. No new capability.
+
+### `v0.7.3` — Routine Hardening & Polish
+
+Audit ABI/allocation/maximum replay, privacy and documentation consistency; restrained UX polish only. Stop for evaluation.
+
+### `v0.7.4` — Routine Stale-Action Correctness
+
+Reject stale same-period completion/reopen commands before persistence, add multi-client regression coverage, harden manual Wasm ABI allocation ownership, and refresh pairing-document status for the v0.8.0 planning checkpoint. No product capability, protocol-layout or persistent-storage change.
 
 ### `v0.8.0` — Household Pairing
 
-Begin multi-user household identity. Explore one household with two adult members, QR pairing, a short-lived pairing code, passkeys, and trusted devices. Define authorization and recovery before shipping pairing.
+Begin multi-user household identity. Explore one household with two adult members, QR pairing, a short-lived pairing code, passkeys, and trusted devices. The planning contract is [V0.8.0](V0.8.0.md); authorization and recovery must be defined before shipping pairing.
 
 ### `v0.9.0` — Encrypted Sync
 
@@ -182,4 +198,4 @@ Focus on polish, reliability, accessibility, mobile UX, privacy documentation, o
 
 ## Scope discipline
 
-Each roadmap item is future work unless explicitly marked as completed. Authentication, passkeys, encryption, remote services, pairing, synchronization and Routines remain unimplemented and out of scope for v0.6.x. Releases through `v0.0.12` were documentation-only; v0.1.0 is the first coded release. Handoff is implemented in v0.3.0; Talk in v0.4.0; Pulse in v0.5.0; Since You Last Looked in v0.6.0.
+Each roadmap item is future work unless explicitly marked as completed. Authentication, passkeys, encryption, remote services, pairing, synchronization remain unimplemented and out of scope for v0.7.x. Releases through `v0.0.12` were documentation-only; v0.1.0 is the first coded release. Handoff is implemented in v0.3.0; Talk in v0.4.0; Pulse in v0.5.0; Since You Last Looked in v0.6.0.

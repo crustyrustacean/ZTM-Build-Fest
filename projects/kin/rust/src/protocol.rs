@@ -1,8 +1,9 @@
 use crate::error::KinError;
 use crate::event::{
     valid_timestamp, ActorId, DeviceId, EventEnvelope, EventId, EventKind, HandoffId, HouseholdId,
-    ItemClassification, ItemId, PulseValue, TalkId,
+    ItemClassification, ItemId, PulseValue, RoutineId, TalkId,
 };
+use crate::recurrence::{Cadence, CivilDate};
 use crate::state::{
     CatchUpSummary, HandoffStatus, HouseholdState, ItemStatus, PulseStatus, SummaryEntityKind,
     SummaryKind, TalkStatus, MAX_SUMMARY_ENTRIES,
@@ -14,7 +15,8 @@ pub const PROTOCOL_V3: u16 = 3;
 pub const PROTOCOL_V4: u16 = 4;
 pub const PROTOCOL_V5: u16 = 5;
 pub const PROTOCOL_V6: u16 = 6;
-pub const PROTOCOL_VERSION: u16 = PROTOCOL_V6;
+pub const PROTOCOL_V7: u16 = 7;
+pub const PROTOCOL_VERSION: u16 = PROTOCOL_V7;
 pub const ERROR_PROTOCOL_VERSION: u16 = PROTOCOL_V1;
 pub const MAX_EVENT_COUNT: usize = 10_000;
 pub const MAX_PROTOCOL_BYTES: usize = 64 * 1024 * 1024;
@@ -38,6 +40,7 @@ pub struct DecodedRequest {
     pub events: Vec<EventEnvelope>,
     pub as_of: Option<i64>,
     pub summary_cursor: Option<EventId>,
+    pub civil_date: Option<CivilDate>,
 }
 
 pub fn decode_request_with_summary(bytes: &[u8]) -> Result<DecodedRequest, KinError> {
@@ -51,7 +54,13 @@ pub fn decode_request_with_summary(bytes: &[u8]) -> Result<DecodedRequest, KinEr
     let version = read_u16(bytes, 4)?;
     if !matches!(
         version,
-        PROTOCOL_V1 | PROTOCOL_V2 | PROTOCOL_V3 | PROTOCOL_V4 | PROTOCOL_V5 | PROTOCOL_V6
+        PROTOCOL_V1
+            | PROTOCOL_V2
+            | PROTOCOL_V3
+            | PROTOCOL_V4
+            | PROTOCOL_V5
+            | PROTOCOL_V6
+            | PROTOCOL_V7
     ) {
         return Err(KinError::UnsupportedVersion);
     }
@@ -72,7 +81,7 @@ pub fn decode_request_with_summary(bytes: &[u8]) -> Result<DecodedRequest, KinEr
     } else {
         None
     };
-    let summary_cursor = if version == PROTOCOL_V6 {
+    let summary_cursor = if version >= PROTOCOL_V6 {
         let cursor_present = *bytes.get(20).ok_or(KinError::MalformedProtocol)?;
         if !bytes
             .get(21..24)
@@ -90,11 +99,17 @@ pub fn decode_request_with_summary(bytes: &[u8]) -> Result<DecodedRequest, KinEr
     } else {
         None
     };
+    let civil_date = if version == PROTOCOL_V7 {
+        Some(CivilDate::from_encoded(read_u32(bytes, 40)?)?)
+    } else {
+        None
+    };
     let mut events = Vec::new();
     events
         .try_reserve_exact(event_count)
         .map_err(|_| KinError::SizeLimit)?;
     let mut offset = match version {
+        PROTOCOL_V7 => 44,
         PROTOCOL_V6 => V6_REQUEST_HEADER_BYTES,
         PROTOCOL_V5 => 20,
         _ => REQUEST_HEADER_BYTES,
@@ -124,10 +139,21 @@ pub fn decode_request_with_summary(bytes: &[u8]) -> Result<DecodedRequest, KinEr
         events,
         as_of,
         summary_cursor,
+        civil_date,
     })
 }
 
 pub fn encode_state(state: &HouseholdState, protocol_version: u16) -> Result<Vec<u8>, KinError> {
+    if !state.routines.is_empty() {
+        return Err(KinError::UnsupportedVersion);
+    }
+    encode_legacy_entities(state, protocol_version)
+}
+
+fn encode_legacy_entities(
+    state: &HouseholdState,
+    protocol_version: u16,
+) -> Result<Vec<u8>, KinError> {
     if !matches!(
         protocol_version,
         PROTOCOL_V1 | PROTOCOL_V2 | PROTOCOL_V3 | PROTOCOL_V4 | PROTOCOL_V5
@@ -149,6 +175,7 @@ pub fn encode_state(state: &HouseholdState, protocol_version: u16) -> Result<Vec
         .saturating_add(state.handoffs.len())
         .saturating_add(state.talks.len())
         .saturating_add(state.pulses.len())
+        .saturating_add(state.routines.len())
         > MAX_EVENT_COUNT
     {
         return Err(KinError::SizeLimit);
@@ -295,7 +322,71 @@ pub fn encode_state_v6(
     state: &HouseholdState,
     summary: &CatchUpSummary,
 ) -> Result<Vec<u8>, KinError> {
-    let previous = encode_state(state, PROTOCOL_V5)?;
+    encode_state_with_summary(state, summary, PROTOCOL_V6)
+}
+
+pub fn encode_state_v7(
+    state: &HouseholdState,
+    summary: &CatchUpSummary,
+) -> Result<Vec<u8>, KinError> {
+    encode_state_with_summary(state, summary, PROTOCOL_V7)
+}
+
+fn encode_state_with_summary(
+    state: &HouseholdState,
+    summary: &CatchUpSummary,
+    version: u16,
+) -> Result<Vec<u8>, KinError> {
+    if version == PROTOCOL_V6
+        && (!state.routines.is_empty() || summary.entries.iter().any(|entry| entry.kind as u8 > 11))
+    {
+        return Err(KinError::UnsupportedVersion);
+    }
+    let previous = encode_legacy_entities(state, PROTOCOL_V5)?;
+    let mut routine_bytes = Vec::new();
+    for routine in &state.routines {
+        if routine.text.is_empty()
+            || routine.text.len() > MAX_ITEM_TEXT_BYTES
+            || !valid_timestamp(routine.created_at)
+            || (routine.archived && routine.occurrence_key.is_some())
+            || (routine.completed && routine.occurrence_key.is_none())
+        {
+            return Err(KinError::MalformedProtocol);
+        }
+        if let Some(key) = routine.occurrence_key {
+            routine.cadence.validate_key(routine.created_on, key)?;
+        }
+        let length = routine_bytes
+            .len()
+            .checked_add(56 + routine.text.len())
+            .ok_or(KinError::SizeLimit)?;
+        if length > MAX_PROTOCOL_BYTES {
+            return Err(KinError::SizeLimit);
+        }
+        routine_bytes
+            .try_reserve(56 + routine.text.len())
+            .map_err(|_| KinError::SizeLimit)?;
+        routine_bytes.extend_from_slice(&routine.routine_id.0);
+        routine_bytes.extend_from_slice(&routine.created_by.0);
+        routine_bytes.extend_from_slice(&routine.created_at.to_le_bytes());
+        push_u32(&mut routine_bytes, routine.created_on.encoded());
+        push_u32(
+            &mut routine_bytes,
+            routine.occurrence_key.map_or(0, CivilDate::encoded),
+        );
+        routine_bytes.push(routine.cadence as u8);
+        routine_bytes.push(u8::from(routine.archived));
+        routine_bytes.push(if routine.occurrence_key.is_none() {
+            0
+        } else if routine.completed {
+            2
+        } else {
+            1
+        });
+        routine_bytes.push(0);
+        push_u32(&mut routine_bytes, routine.text.len() as u32);
+        routine_bytes.extend_from_slice(routine.text.as_bytes());
+    }
     let summary_count = summary.entries.len();
     if summary_count > MAX_SUMMARY_ENTRIES
         || summary_count > summary.total_count as usize
@@ -319,6 +410,10 @@ pub fn encode_state_v6(
             | SummaryKind::TalkResolved
             | SummaryKind::TalkReopened
             | SummaryKind::TalkArchived => SummaryEntityKind::Talk,
+            SummaryKind::RoutineCreated
+            | SummaryKind::RoutineOccurrenceCompleted
+            | SummaryKind::RoutineOccurrenceReopened
+            | SummaryKind::RoutineArchived => SummaryEntityKind::Routine,
         };
         if entry.entity_kind != expected_entity
             || (entry.kind == SummaryKind::ItemAdded) != entry.classification.is_some()
@@ -336,6 +431,13 @@ pub fn encode_state_v6(
     let entity_bytes = previous.len().checked_sub(24).ok_or(KinError::Internal)?;
     let result_length = V6_RESULT_HEADER_BYTES
         .checked_add(entity_bytes)
+        .and_then(|length| {
+            length.checked_add(if version == PROTOCOL_V7 {
+                4 + routine_bytes.len()
+            } else {
+                0
+            })
+        })
         .and_then(|length| length.checked_add(summary_bytes))
         .ok_or(KinError::SizeLimit)?;
     if result_length > MAX_PROTOCOL_BYTES {
@@ -347,7 +449,7 @@ pub fn encode_state_v6(
         .try_reserve_exact(result_length)
         .map_err(|_| KinError::SizeLimit)?;
     result.extend_from_slice(b"KINS");
-    push_u16(&mut result, PROTOCOL_V6);
+    push_u16(&mut result, version);
     push_u16(&mut result, 0);
     result.extend_from_slice(&previous[8..24]);
     push_u32(&mut result, summary_count as u32);
@@ -364,7 +466,11 @@ pub fn encode_state_v6(
             result.extend_from_slice(&[0; 16]);
         }
     }
+    if version == PROTOCOL_V7 {
+        push_u32(&mut result, state.routines.len() as u32);
+    }
     result.extend_from_slice(&previous[24..]);
+    result.extend_from_slice(&routine_bytes);
 
     for entry in &summary.entries {
         result.extend_from_slice(&entry.event_id.0);
@@ -401,6 +507,44 @@ fn decode_event(record: &[u8], protocol_version: u16) -> Result<EventEnvelope, K
 
     let payload = &record[EVENT_HEADER_BYTES..];
     let kind = match (event_version, event_kind) {
+        (1, 14) if protocol_version >= PROTOCOL_V7 => {
+            if payload.len() < 28
+                || payload[17..20] != [0; 3]
+                || !valid_timestamp(read_i64(record, 68)?)
+            {
+                return Err(KinError::MalformedProtocol);
+            }
+            let length = read_u32(payload, 24)? as usize;
+            if !(1..=MAX_ITEM_TEXT_BYTES).contains(&length) || payload.len() != 28 + length {
+                return Err(KinError::MalformedProtocol);
+            }
+            EventKind::RoutineCreated {
+                routine_id: RoutineId(read_id(payload, 0)?),
+                cadence: Cadence::try_from(payload[16])?,
+                created_on: CivilDate::from_encoded(read_u32(payload, 20)?)?,
+                text: std::str::from_utf8(&payload[28..])
+                    .map_err(|_| KinError::MalformedProtocol)?
+                    .to_owned(),
+            }
+        }
+        (1, 15..=17) if protocol_version >= PROTOCOL_V7 => {
+            if payload.len() != if event_kind == 17 { 16 } else { 20 }
+                || !valid_timestamp(read_i64(record, 68)?)
+            {
+                return Err(KinError::MalformedProtocol);
+            }
+            let routine_id = RoutineId(read_id(payload, 0)?);
+            if event_kind == 17 {
+                EventKind::RoutineArchived { routine_id }
+            } else {
+                let key = CivilDate::from_encoded(read_u32(payload, 16)?)?;
+                if event_kind == 15 {
+                    EventKind::RoutineOccurrenceCompleted { routine_id, key }
+                } else {
+                    EventKind::RoutineOccurrenceReopened { routine_id, key }
+                }
+            }
+        }
         (1, 12) if protocol_version >= PROTOCOL_V5 => {
             if payload.len() != 16 || payload[1..8] != [0; 7] {
                 return Err(KinError::MalformedProtocol);
@@ -933,7 +1077,7 @@ mod tests {
 
     #[test]
     fn truncated_request_header_is_rejected_at_every_short_length() {
-        let header = request_with(&[], PROTOCOL_VERSION, 0);
+        let header = request_with(&[], PROTOCOL_V6, 0);
         for length in 0..REQUEST_HEADER_BYTES {
             assert_eq!(
                 decode_request(&header[..length]),
@@ -945,7 +1089,7 @@ mod tests {
 
     #[test]
     fn nonzero_request_reserved_field_is_rejected() {
-        let mut request = request_with(&[], PROTOCOL_VERSION, 0);
+        let mut request = request_with(&[], PROTOCOL_V6, 0);
         request[6] = 1;
         assert_eq!(decode_request(&request), Err(KinError::MalformedProtocol));
     }
@@ -954,7 +1098,7 @@ mod tests {
     fn truncated_event_header_is_rejected_at_every_short_length() {
         let record = added_record(b"Milk");
         for record_length in 0..EVENT_HEADER_BYTES {
-            let request = request_with(&record[..record_length], PROTOCOL_VERSION, 1);
+            let request = request_with(&record[..record_length], PROTOCOL_V6, 1);
             assert_eq!(
                 decode_request(&request),
                 Err(KinError::MalformedProtocol),
@@ -967,7 +1111,7 @@ mod tests {
     fn truncated_event_payload_is_rejected_at_every_short_length() {
         let record = added_record(b"Milk");
         for record_length in EVENT_HEADER_BYTES..record.len() {
-            let request = request_with(&record[..record_length], PROTOCOL_VERSION, 1);
+            let request = request_with(&record[..record_length], PROTOCOL_V6, 1);
             assert_eq!(
                 decode_request(&request),
                 Err(KinError::MalformedProtocol),
@@ -980,7 +1124,7 @@ mod tests {
     fn declared_payload_larger_than_available_bytes_is_rejected() {
         let mut record = added_record(b"Milk");
         record[84..88].copy_from_slice(&u32::MAX.to_le_bytes());
-        let request = request_with(&record, PROTOCOL_VERSION, 1);
+        let request = request_with(&record, PROTOCOL_V6, 1);
         assert_eq!(decode_request(&request), Err(KinError::MalformedProtocol));
     }
 
@@ -988,7 +1132,7 @@ mod tests {
     fn unsupported_event_schema_is_rejected() {
         let mut record = added_record(b"Buy milk");
         record[..2].copy_from_slice(&3u16.to_le_bytes());
-        let request = request_with(&record, PROTOCOL_VERSION, 1);
+        let request = request_with(&record, PROTOCOL_V6, 1);
         assert_eq!(decode_request(&request), Err(KinError::UnsupportedVersion));
     }
 
@@ -996,7 +1140,7 @@ mod tests {
     fn unsupported_event_kind_is_rejected() {
         let mut record = added_record(b"Buy milk");
         record[2..4].copy_from_slice(&99u16.to_le_bytes());
-        let request = request_with(&record, PROTOCOL_VERSION, 1);
+        let request = request_with(&record, PROTOCOL_V6, 1);
         assert_eq!(decode_request(&request), Err(KinError::UnsupportedVersion));
     }
 
@@ -1004,7 +1148,7 @@ mod tests {
     fn completion_payload_with_wrong_length_is_rejected() {
         let mut record = added_record(b"Milk");
         record[2..4].copy_from_slice(&2u16.to_le_bytes());
-        let request = request_with(&record, PROTOCOL_VERSION, 1);
+        let request = request_with(&record, PROTOCOL_V6, 1);
         assert_eq!(decode_request(&request), Err(KinError::MalformedProtocol));
     }
 
@@ -1052,7 +1196,7 @@ mod tests {
         let mut record = added_record(b"hi");
         record[EVENT_HEADER_BYTES + 16..EVENT_HEADER_BYTES + 20]
             .copy_from_slice(&5u32.to_le_bytes());
-        let request = request_with(&record, PROTOCOL_VERSION, 1);
+        let request = request_with(&record, PROTOCOL_V6, 1);
         assert_eq!(decode_request(&request), Err(KinError::MalformedProtocol));
     }
 
@@ -1062,7 +1206,7 @@ mod tests {
             let mut record = added_record(text);
             record[EVENT_HEADER_BYTES + 16..EVENT_HEADER_BYTES + 20]
                 .copy_from_slice(&declared_length.to_le_bytes());
-            let request = request_with(&record, PROTOCOL_VERSION, 1);
+            let request = request_with(&record, PROTOCOL_V6, 1);
             assert_eq!(decode_request(&request), Err(KinError::MalformedProtocol));
         }
     }
@@ -1070,27 +1214,27 @@ mod tests {
     #[test]
     fn invalid_utf8_is_rejected() {
         let record = added_record(&[0xff]);
-        let request = request_with(&record, PROTOCOL_VERSION, 1);
+        let request = request_with(&record, PROTOCOL_V6, 1);
         assert_eq!(decode_request(&request), Err(KinError::MalformedProtocol));
     }
 
     #[test]
     fn trailing_request_bytes_are_rejected() {
-        let mut request = request_with(&[], PROTOCOL_VERSION, 0);
+        let mut request = request_with(&[], PROTOCOL_V6, 0);
         request.push(0);
         assert_eq!(decode_request(&request), Err(KinError::MalformedProtocol));
     }
 
     #[test]
     fn event_count_limit_is_enforced_before_record_parsing() {
-        let request = request_with(&[], PROTOCOL_VERSION, (MAX_EVENT_COUNT + 1) as u32);
+        let request = request_with(&[], PROTOCOL_V6, (MAX_EVENT_COUNT + 1) as u32);
         assert_eq!(decode_request(&request), Err(KinError::SizeLimit));
     }
 
     #[test]
     fn maximum_utf8_item_text_is_accepted() {
         let record = added_record(&vec![b'x'; MAX_ITEM_TEXT_BYTES]);
-        let request = request_with(&record, PROTOCOL_VERSION, 1);
+        let request = request_with(&record, PROTOCOL_V6, 1);
         let (_, events, _) = decode_request(&request).unwrap();
         assert!(
             matches!(&events[0].kind, EventKind::ItemAdded { text, .. } if text.len() == MAX_ITEM_TEXT_BYTES)
@@ -1101,7 +1245,7 @@ mod tests {
     fn bom_and_emoji_text_are_preserved() {
         let text = "\u{feff}milk 🥛";
         let record = added_record(text.as_bytes());
-        let request = request_with(&record, PROTOCOL_VERSION, 1);
+        let request = request_with(&record, PROTOCOL_V6, 1);
         let (_, events, _) = decode_request(&request).unwrap();
         assert!(
             matches!(&events[0].kind, EventKind::ItemAdded { text: decoded, .. } if decoded == text)
@@ -1111,7 +1255,7 @@ mod tests {
     #[test]
     fn item_text_above_byte_limit_is_rejected() {
         let record = added_record(&vec![b'x'; MAX_ITEM_TEXT_BYTES + 1]);
-        let request = request_with(&record, PROTOCOL_VERSION, 1);
+        let request = request_with(&record, PROTOCOL_V6, 1);
         assert_eq!(decode_request(&request), Err(KinError::MalformedProtocol));
     }
     fn handoff_record(kind: u16, sequence: u8) -> Vec<u8> {

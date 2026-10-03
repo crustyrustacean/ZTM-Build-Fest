@@ -1,6 +1,6 @@
 # Architecture
 
-**Status:** Current through v0.6.0 Since You Last Looked; earlier version sections are historical contracts. See Pulse and v0.6.0 below.
+**Status:** Current through v0.7.0 Routines; earlier version sections are historical contracts. See v0.7.0 below.
 
 ## System shape
 
@@ -90,7 +90,7 @@ The v0.1.x core is intended to be extended, not treated as proof that later feat
 | Talk                  | Identified events and deterministic replay           | Implemented in v0.4.0                  | Stabilization audited through v0.4.3; see V0.4.0                      |
 | Pulse                 | Actor IDs and timestamps                             | Implemented in v0.5.0                  | Explicit as_of, fixed enum, set/replace/clear; audited through v0.5.3 |
 | Since You Last Looked | Ordered immutable event history                      | Implemented in v0.6.0                  | Stabilization through v0.6.3                                          |
-| Routines              | Event infrastructure and replay                      | Yes                                    | Recurrence model and occurrence semantics                             |
+| Routines              | Event infrastructure and explicit civil context      | Implemented in v0.7.0                  | Correctness/resilience/hardening audits in v0.7.1–v0.7.4              |
 | Pairing               | Household/member/device identity fields              | Yes                                    | Authentication, authorization, pairing, recovery, and device trust    |
 | Offline sync          | Random event IDs and immutable canonical event bytes | Yes                                    | Multi-device transport and conflict/reconciliation policy             |
 | Encrypted sync        | Deterministic, versioned event representation        | Yes                                    | Reviewed cryptographic protocol and key lifecycle                     |
@@ -113,3 +113,7 @@ Pulse adds Rust rebuild_at(events, as_of). Timers request canonical reprojection
 ## v0.6.0 Since You Last Looked
 
 Rust protocol v6 derives structured summary entries and the exact through-event boundary from the ordered canonical stream plus an optional stable event-ID cursor. IndexedDB local_sequence remains browser-only. Browser local_context holds the installation cursor; no summary view or acknowledgement is a household event. See [V0.6.0](V0.6.0.md).
+
+## v0.7.0 Routines
+
+Rust derives Daily/Weekly periods from validated explicit civil dates, alongside as_of for Pulse. JS obtains local year/month/day from one browser clock sample; timers only request replay. Inside occurrence append transactions, JS compares the frozen intent key with Rust’s fresh canonical current key before candidate replay. This is identity checking, not a browser recurrence reducer. See [V0.7.0](V0.7.0.md).

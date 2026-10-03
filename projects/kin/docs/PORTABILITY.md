@@ -1,6 +1,6 @@
 # Portable Household Data
 
-**Status:** export/import design only. No export file, import path, integrity checker, or encryption exists. Format versioning is discussed in [VERSIONING](VERSIONING.md), migration failure behavior in [MIGRATIONS](MIGRATIONS.md), and retention/deletion in [RETENTION](RETENTION.md).
+**Status:** Current through v0.7.4 Routine Stale-Action Correctness; export/import design only. No export file, import path, integrity checker, or encryption exists. Format versioning is discussed in [VERSIONING](VERSIONING.md), migration failure behavior in [MIGRATIONS](MIGRATIONS.md), and retention/deletion in [RETENTION](RETENTION.md).
 
 ## Ownership principle
 

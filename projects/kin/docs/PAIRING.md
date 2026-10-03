@@ -1,6 +1,6 @@
 # Pairing and Device Enrollment
 
-**Status:** conceptual protocol and UX specification. QR generation, pairing codes, identity, device trust, and key exchange are not implemented. Identity distinctions are in [IDENTITY](IDENTITY.md); key handling is in [CRYPTOGRAPHY](CRYPTOGRAPHY.md).
+**Status:** Current through the v0.8.0 Household Pairing planning checkpoint; pairing remains conceptual and unimplemented. QR generation, pairing codes, identity, device trust, and key exchange are not implemented. Identity distinctions are in [IDENTITY](IDENTITY.md); key handling is in [CRYPTOGRAPHY](CRYPTOGRAPHY.md).
 
 ## Distinct operations
 

@@ -1,6 +1,6 @@
 # JavaScript–WASM ABI
 
-**Status:** Current through v0.6.0 Since You Last Looked; earlier version sections are historical contracts. See Pulse and v0.6.0 below.
+**Status:** Current through v0.7.4 Routine Stale-Action Correctness and ABI ownership hardening; earlier version sections are historical contracts.
 
 ## Target and exports
 
@@ -116,13 +116,13 @@ size  field
 N     text bytes
 ```
 
-Items remain serialized in original add-event order, including archived tombstones so the caller can make a filtered view without becoming a reducer. The browser hides archived items from ordinary lists. Protocol v6 is the current browser writer; see the additive v5 and v6 contracts below. `KERR` retains the v1 header/version and stable numeric error codes across all supported request protocol versions.
+Items remain serialized in original add-event order, including archived tombstones so the caller can make a filtered view without becoming a reducer. The browser hides archived items from ordinary lists. Protocol v7 is the current browser writer; see the additive contracts below. `KERR` retains the v1 header/version and stable numeric error codes across all supported request protocol versions.
 
 ## Ownership and lifetime
 
 - `kin_alloc(n)` allocates an input buffer owned by JavaScript. For `n == 0`, it returns `0`. Allocation failure returns `0`; the bridge treats that as failure and does not call apply.
 - JavaScript writes exactly `n` bytes within the current `memory.buffer`, refreshes its view after any operation that may grow memory, and calls `kin_apply_events(ptr, n)`.
-- The input pointer is borrowed only for the duration of `kin_apply_events`. Rust must validate pointer/length bounds before reading and must not retain the pointer after return.
+- `kin_apply_events` accepts only the exact pointer and length of a currently tracked `kin_alloc` input buffer. Rust reads from that owned allocation for the duration of the call and does not retain a caller pointer after return.
 - JavaScript calls `kin_free(ptr, n)` exactly once after apply returns, whether apply succeeds or fails. `(0, 0)` is a no-op; other invalid free ranges fail safely and never free an unrelated allocation.
 - Rust owns result/error buffers. `kin_result_ptr/len` refer to the most recent successful result; `kin_error_ptr/len` refer to the most recent failed call. The inactive pair returns `(0, 0)`.
 - Result/error bytes stay valid until the next `kin_apply_events` call or module teardown. JavaScript must copy them into host-owned memory before another call. The bridge must not retain a view that may become stale if WASM memory grows.
@@ -132,7 +132,7 @@ Items remain serialized in original add-event order, including archived tombston
 
 ## Call behavior
 
-`kin_apply_events` accepts one complete, ordered event batch using protocol version 1, 2, 3, 4, 5, or 6. It validates the entire request and reconstructs from scratch. On success it publishes a complete result in the requested protocol version and returns zero. On failure it publishes an error and no partial result; stored IndexedDB bytes remain untouched. Unknown protocol/event versions fail with a stable unsupported-version code; malformed payload, bounds overflow, and invalid state transitions fail deterministically.
+`kin_apply_events` accepts one complete, ordered event batch using protocol version 1, 2, 3, 4, 5, 6, or 7. It validates the entire request and reconstructs from scratch. On success it publishes a complete result in the requested protocol version and returns zero. On failure it publishes an error and no partial result; stored IndexedDB bytes remain untouched. Unknown protocol/event versions fail with a stable unsupported-version code; malformed payload, bounds overflow, and invalid state transitions fail deterministically.
 
 The function may grow memory while parsing or building output. JavaScript must reacquire `memory.buffer` after the call before copying result/error bytes. Length arithmetic is checked for overflow in both languages. Cap a request and result at 64 MiB, a request at 10,000 events, and individual item text at 4096 UTF-8 bytes for v0.1.0; reject larger input before unbounded allocation. The matching 10,000-event storage limit is specified in [STORAGE](STORAGE.md).
 
@@ -150,7 +150,7 @@ Protocols v1/v2 reject Handoff events and cannot serialize Handoff projection, i
 
 ## v0.4.0 Talk
 
-Protocol v4 requests retain the 12-byte KINE header and 88-byte envelope, version 4. KINS header: magic[4], version:u16=4, reserved:u16=0, item_count:u32, handoff_count:u32, talk_count:u32 (20 bytes). All v2 Item records precede v3 Handoff records and Talk records. Talk: talk_id[16], created_by[16], created_at:i64, status:u8 (0 open, 1 resolved, 2 archived), reserved[3]=0, text_length:u32, text[N]. Combined count is at most 10,000; 64 MiB limits, little-endian integers, strict UTF-8, exact lengths and KERR v1 remain unchanged. Protocols 1–3 reject Talk events/state, including tombstones, with unsupported category 3. Browser writes v5. See [V0.4.0](V0.4.0.md).
+Protocol v4 requests retain the 12-byte KINE header and 88-byte envelope, version 4. KINS header: magic[4], version:u16=4, reserved:u16=0, item_count:u32, handoff_count:u32, talk_count:u32 (20 bytes). All v2 Item records precede v3 Handoff records and Talk records. Talk: talk_id[16], created_by[16], created_at:i64, status:u8 (0 open, 1 resolved, 2 archived), reserved[3]=0, text_length:u32, text[N]. Combined count is at most 10,000; 64 MiB limits, little-endian integers, strict UTF-8, exact lengths and KERR v1 remain unchanged. Protocols 1–3 reject Talk events/state, including tombstones, with unsupported category 3. The current browser writes v7; see the v0.7.0 contract below. See [V0.4.0](V0.4.0.md).
 
 ## v0.5.0 Pulse
 
@@ -161,3 +161,7 @@ Protocol v5 KINE: magic[4], version:u16=5, reserved:u16=0, event_count:u32, as_o
 Protocol v6 is additive; v1–v5 request/result layouts and supported behavior remain unchanged. The v6 request is exactly 40 bytes: `KINE`, version 6, reserved zero, event_count:u32, explicit `as_of:i64`, cursor_present:u8, reserved[3]=0, cursor_event_id[16]. An absent cursor requires all-zero ID bytes. A present cursor must exactly match an event in the ordered stream or the request fails with invalid-event status 4.
 
 The v6 result header is exactly 52 bytes: `KINS`, version 6, reserved zero, Item/Handoff/Talk/Pulse counts, summary_count, summary_total_count, through-present:u8, reserved[3]=0, and summary_through_event_id[16] (all zero when absent). It is followed by unchanged v2 Item, v3 Handoff, v4 Talk and v5 Pulse records, then at most eight summary records. Each summary record is event_id[16], kind:u8 (1–11), entity_kind:u8, classification:u8 (0 Today, 1 Needs, 255 absent), reserved:u8=0, text_length:u32, and strict UTF-8 text. Pulse entries are excluded, but the through ID is the exact last event in the input stream, including Pulse. Full offsets, bounds, validation and ownership are in [V0.6.0](V0.6.0.md).
+
+## v0.7.0 Routines
+
+Protocol v7 adds an explicit civil date: 44-byte KINE header and 56-byte KINS header, unchanged exports/ownership, schema-1 Routine kinds 14–17, 56-byte Routine result records and summary kinds 12–15. Current browser calls `applyEvents(records, asOf, cursorEventId, civilDate)` with required explicit context. v1–v6 retain exact layouts/behavior; KERR stays v1. See [V0.7.0](V0.7.0.md) for authoritative offsets, validation and bounds.
