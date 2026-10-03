@@ -10,6 +10,8 @@ import { fileURLToPath } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
 import { keyMigrationRegression } from "./security-key-regression.mjs";
 import { rotationStorageRegression } from "./rotation-storage-regression.mjs";
+import { rootRotationRegression, rootRotationRestartFixture } from "./root-rotation-regression.mjs";
+import { rootKeyRotationRegression } from "./root-key-rotation-regression.mjs";
 
 export async function securityStorageRegressions(client, { adapterOnly = false } = {}) {
   const result = await client.evaluate(`(${browserChecks.toString()})(${JSON.stringify({ adapterOnly })})`);
@@ -106,6 +108,12 @@ async function browserChecks({ adapterOnly }) {
   completion = done(transaction);
   transaction.objectStore("events").put(raw.events[0]);
   await completion;
+
+  vault.checkSecurityEpoch = () => new Promise((resolve, reject) => setTimeout(() => reject(Error("delayed stale epoch")), 25));
+  transaction = protectedDb.transaction("context", "readwrite");
+  completion = done(transaction);
+  await reject(() => completion, "an empty protected transaction waits for and rejects a delayed stale security epoch");
+  delete vault.checkSecurityEpoch;
 
   transaction = protectedDb.transaction("events", "readwrite");
   completion = done(transaction);
@@ -261,7 +269,7 @@ async function storagePerformance({ maximumPayload = false } = {}) {
   const engine = await loadKinEngine();
   const initializationMs = performance.now() - started;
   const results = [];
-  for (const [count, large] of [[100, false], [10000, false], ...(maximumPayload ? [[10000, true]] : [])]) {
+  for (const [count, large] of [[1000, false], [10000, false], ...(maximumPayload ? [[10000, true]] : [])]) {
     await new Promise((resolve, reject) => { const request = indexedDB.deleteDatabase("kin"); request.onsuccess = resolve; request.onerror = () => reject(request.error); });
     const legacy = await EventStore.openLegacyForMigration();
     const context = await legacy.ensureContext();
@@ -289,19 +297,34 @@ async function storagePerformance({ maximumPayload = false } = {}) {
     const unlockStart = performance.now();
     const unlocked = await LocalVault.unlock(await EventStore.securityStatus(), recoverySecret);
     const store = await EventStore.open({ vault: unlocked, engine });
-    const snapshot = await store.getCatchUpState();
+    let snapshot = await store.getCatchUpState();
     const unlockDecryptMs = performance.now() - unlockStart;
     const replayStart = performance.now();
     const { asOf, civilDate } = projectionContext();
     engine.applyEvents(snapshot.events.map((row) => row.encoded_event), asOf, null, civilDate);
     const replayMs = performance.now() - replayStart;
     const measurement = { events: count, textBytes: text.length, canonicalBytes: rows.reduce((total, row) => total + row.encoded_event.byteLength, 0), migrationMs, unlockDecryptMs, replayMs };
-    if (large) {
+    snapshot = null;
+    const raw = await new Promise((resolve, reject) => { const request = indexedDB.open("kin"); request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error); });
+    try {
+      measurement.encryptedRecordBytes = await new Promise((resolve, reject) => {
+        const transaction = raw.transaction(Array.from(raw.objectStoreNames), "readonly");
+        const encoder = new TextEncoder();
+        let bytes = 0;
+        for (const name of raw.objectStoreNames) {
+          const request = transaction.objectStore(name).openCursor();
+          request.onsuccess = () => { const cursor = request.result; if (cursor) { bytes += encoder.encode(JSON.stringify(cursor.value)).byteLength; cursor.continue(); } };
+        }
+        transaction.oncomplete = () => resolve(bytes); transaction.onabort = () => reject(transaction.error);
+      });
+    } finally { raw.close(); }
+    measurement.originUsageBytes = (await navigator.storage.estimate()).usage;
+    {
       const exportStart = performance.now();
       const archive = await exportHouseholdArchive({ store, engine, vault: unlocked });
       measurement.archiveBytes = archive.byteLength;
       measurement.archiveExportMs = performance.now() - exportStart;
-      if (archive.byteLength > 64 * 1024 * 1024) throw Error("Maximum archive exceeded its supported 64 MiB framing bound.");
+      if (archive.byteLength > 64 * 1024 * 1024) throw Error("Archive exceeded its supported 64 MiB framing bound.");
       store.close(); unlocked.lock();
       await new Promise((resolve, reject) => { const request = indexedDB.deleteDatabase("kin"); request.onsuccess = resolve; request.onerror = () => reject(request.error); });
       const target = await LocalVault.create();
@@ -313,13 +336,47 @@ async function storagePerformance({ maximumPayload = false } = {}) {
       measurement.archiveRestoreMs = performance.now() - restoreStart;
       const restored = await restoredStore.loadEvents();
       if (restored.length !== rows.length || restored.some((row, i) => row.encoded_event.length !== rows[i].encoded_event.length || row.encoded_event.some((byte, j) => byte !== rows[i].encoded_event[j])))
-        throw Error("Maximum archive did not restore the exact complete canonical history.");
+        throw Error("Archive did not restore the exact complete canonical history.");
       measurement.archiveRoundTripExact = true;
       restoredStore.close(); target.vault.lock();
-    } else { store.close(); unlocked.lock(); }
+    }
     results.push(measurement);
   }
-  return { initializationMs, results };
+  return { initializationMs, results, scope: "Real browser crypto/IDB and release WASM; source fixture rows retained for exact roundtrip comparison; encryptedRecordBytes is UTF-8 serialized records, originUsageBytes is browser-estimated storage rather than physical database file size." };
+}
+
+function monitorRendererMemory(profile) {
+  if (process.platform !== "win32") return { stop: async () => ({ peakRendererWorkingSetBytes: null, memoryScope: "Renderer working-set sampling unavailable on this host." }) };
+  // Only the isolated test profile and its descendant renderers are measured.
+  // Sampled working set includes native/WASM allocations; it is not JS heap size.
+  const script = `
+$ErrorActionPreference = 'Stop'
+while ($true) {
+  $kinProcesses = @(Get-CimInstance Win32_Process -Filter "Name = 'msedge.exe' OR Name = 'chrome.exe'")
+  $kinIds = [System.Collections.Generic.HashSet[int]]::new()
+  foreach ($kinProcess in $kinProcesses) { if ($kinProcess.CommandLine -like "*$env:KIN_TEST_PROFILE*") { [void]$kinIds.Add([int]$kinProcess.ProcessId) } }
+  do { $kinChanged = $false; foreach ($kinProcess in $kinProcesses) { if ($kinIds.Contains([int]$kinProcess.ParentProcessId) -and $kinIds.Add([int]$kinProcess.ProcessId)) { $kinChanged = $true } } } while ($kinChanged)
+  [long]$kinWorkingSet = 0
+  foreach ($kinProcess in $kinProcesses) { if ($kinIds.Contains([int]$kinProcess.ProcessId) -and $kinProcess.CommandLine -like '*--type=renderer*') { $kinWorkingSet += [long]$kinProcess.WorkingSetSize } }
+  [Console]::WriteLine($kinWorkingSet)
+  Start-Sleep -Milliseconds 500
+}`;
+  const monitor = spawn("powershell.exe", ["-NoProfile", "-Command", script], { windowsHide: true, stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, KIN_TEST_PROFILE: profile } });
+  let pending = "", peak = 0, samples = 0, failure = "";
+  monitor.stdout.on("data", (data) => {
+    pending += data.toString();
+    const lines = pending.split(/\r?\n/u); pending = lines.pop();
+    for (const line of lines) { const bytes = Number(line); if (bytes > 0) { peak = Math.max(peak, bytes); samples += 1; } }
+  });
+  monitor.stderr.on("data", (data) => { failure += data.toString(); });
+  monitor.on("error", (error) => { failure = error.message; });
+  return { stop: async () => {
+    monitor.kill();
+    if (monitor.exitCode === null) await Promise.race([once(monitor, "exit"), delay(2_000)]).catch(() => {});
+    return { peakRendererWorkingSetBytes: peak || null, rendererMemorySamples: samples,
+      memoryScope: "Peak sampled sum of isolated-profile renderer working sets during all benchmark cases; sampled about every 500ms plus process-query time, includes retained source fixture rows. Not a mobile measurement.",
+      ...(failure ? { memorySamplingError: failure.trim() } : {}) };
+  } };
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
@@ -352,10 +409,35 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     const send = (method, params) => new Promise((resolve, reject) => { const next = ++id; pending.set(next, { resolve, reject }); socket.send(JSON.stringify({ id: next, method, params })); });
     const client = { evaluate: async (expression) => { const result = await send("Runtime.evaluate", { expression, awaitPromise: true, returnByValue: true }); assert.equal(result.exceptionDetails, undefined, JSON.stringify(result.exceptionDetails)); return result.result.value; } };
     for (let attempt = 0; attempt < 100; attempt += 1) { if (await client.evaluate("location.origin === " + JSON.stringify(origin))) break; await delay(20); }
-    await securityStorageRegressions(client, { adapterOnly: process.argv.includes("--adapter-only") });
-    if (!process.argv.includes("--adapter-only")) console.log(await client.evaluate(`(${keyMigrationRegression.toString()})()`));
-    if (!process.argv.includes("--adapter-only")) console.log(await client.evaluate(`(${rotationStorageRegression.toString()})()`));
-    if (process.argv.includes("--performance")) console.log("PERFORMANCE " + JSON.stringify(await client.evaluate(`(${storagePerformance.toString()})(${JSON.stringify({ maximumPayload: process.argv.includes("--maximum-payload") })})`)));
+    if (!process.argv.includes("--performance-only")) {
+      await securityStorageRegressions(client, { adapterOnly: process.argv.includes("--adapter-only") });
+      if (!process.argv.includes("--adapter-only")) console.log(await client.evaluate(`(${keyMigrationRegression.toString()})()`));
+      if (!process.argv.includes("--adapter-only")) console.log(await client.evaluate(`(${rotationStorageRegression.toString()})()`));
+      if (!process.argv.includes("--adapter-only")) console.log(await client.evaluate(`(${rootRotationRegression.toString()})()`));
+      if (!process.argv.includes("--adapter-only")) console.log(await client.evaluate(`(${rootKeyRotationRegression.toString()})()`));
+      if (!process.argv.includes("--adapter-only")) {
+        let restartChecks = 0;
+        for (const phase of ["events-staged", "events-committed"]) {
+          const resume = await client.evaluate(`(${rootRotationRestartFixture.toString()})(${JSON.stringify({ phase })})`);
+          const prior = await client.evaluate("performance.timeOrigin");
+          await client.evaluate("location.reload(); true");
+          let reloaded = false;
+          for (let attempt = 0; attempt < 100 && !reloaded; attempt++) {
+            await delay(20);
+            reloaded = await client.evaluate(`performance.timeOrigin !== ${prior} && document.readyState === 'complete'`);
+          }
+          assert.ok(reloaded, "Isolated page did not reload at root-rotation restart boundary");
+          restartChecks += (await client.evaluate(`(${rootRotationRestartFixture.toString()})(${JSON.stringify({ resume })})`)).checks;
+        }
+        console.log(`PASS ${restartChecks} actual page-reload root rotation recovery assertions`);
+      }
+    }
+    if (process.argv.includes("--performance") || process.argv.includes("--performance-only")) {
+      const monitor = monitorRendererMemory(profile);
+      let measurement;
+      try { measurement = await client.evaluate(`(${storagePerformance.toString()})(${JSON.stringify({ maximumPayload: process.argv.includes("--maximum-payload") })})`); }
+      finally { const memory = await monitor.stop(); if (measurement) console.log("PERFORMANCE " + JSON.stringify({ ...measurement, ...memory })); }
+    }
   } finally {
     if (socket) {
       const closed = new Promise((resolve) => socket.addEventListener("close", resolve, { once: true }));

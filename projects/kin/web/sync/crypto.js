@@ -111,6 +111,19 @@ export async function restoreHouseholdEpochKey({ sealed, deviceKeys }) {
   }
 }
 
+// Rotation verifies the recoverable epoch secret, including its public routing
+// metadata and fingerprint, without replacing the household's transport key.
+export async function verifyStoredHouseholdEpoch({ record, deviceKeys }) {
+  if (record?.sealed?.householdId !== record.householdId || record?.sealed?.keyEpoch !== record.keyEpoch)
+    throw new SyncCryptoError("stored_key_mismatch", "The epoch metadata does not match its sealed key.");
+  const rawKey = await openSealedKey({ sealed: record.sealed, deviceKeys });
+  try {
+    if (rawKey.length !== 32 || await fingerprintKey(rawKey) !== record.fingerprint)
+      throw new SyncCryptoError("stored_key_mismatch", "The epoch fingerprint does not match its sealed key.");
+    return await crypto.subtle.importKey("raw", rawKey, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
+  } finally { rawKey.fill(0); }
+}
+
 export async function wrapEpochKey({
   rawKey,
   householdId,

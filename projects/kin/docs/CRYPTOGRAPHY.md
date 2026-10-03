@@ -39,7 +39,7 @@ ciphertext event payload
 sync relay stores and forwards ciphertext plus limited metadata
 ```
 
-Keys come from the platform CSPRNG and reach sync devices through authenticated, recipient-bound provisioning. Sync epoch rotation and local root wrapping are separate protocols, documented below. Local-root compromise recovery would require re-encrypting the corpus and replacing recovery/credential wrappers; v0.10.0 has no in-place local root rotation operation.
+Keys come from the platform CSPRNG and reach sync devices through authenticated, recipient-bound provisioning. Sync epoch rotation and local root wrapping are separate protocols. v0.10.2 implements local-root replacement by re-encrypting the corpus and replacing recovery/credential wrappers, as specified below.
 
 ## Passkeys are not encryption keys
 
@@ -113,5 +113,29 @@ agreement keys are removed and migration verification completes.
 Key generation and authenticated encryption use platform Web Crypto. The implementation has no custom cipher, MAC, nonce counter, or password-derived content key.
 
 ## Claims boundary
+
+### v0.10.2 local root lifecycle
+
+[Root rotation contract v1](ROOT-ROTATION.md) establishes an independent random
+256-bit root, monotonically advances rootVersion, and verifies a new random
+256-bit recovery secret before publication. Confirmation is required in the UI;
+the secret is never persisted or transmitted. Old recovery and PRF wrappers do
+not survive commit. Passkey unlock must be added again with a verified ceremony.
+Transport private keys and sync epoch keys are preserved exactly and only their
+local outer protection changes.
+
+Manifest format 2 and local-envelope v2 bind `root-version`, its decimal value,
+store and record identity in both HKDF info and AES-GCM AAD. Purpose labels remain
+the existing explicit local-storage/local-wrapper v1 strings; AAD's envelope
+version advances to 2. Root 1 retains the exact published manifest/envelope v1
+encoding. KARC framing and archive crypto remain v1; authenticated archive
+metadata includes the source manifest/root version.
+
+During staging, the candidate root may encrypt the source root for exact restart
+recovery. The reverse bridge never exists. The source bridge and old wrappers are
+removed from authority at event publication, and old key rows/stages are removed
+before normal access resumes. A copied old wrapper plus secret cannot recover the
+new root or decrypt newly protected local records. This cannot recall copied
+plaintext, sync keys, old archives or keys captured from an unlocked browser.
 
 Kin implements authenticated local storage, recovery-wrapped encrypted archives and a relay that stores/forwards opaque envelopes. This is not a zero-knowledge claim. The service sees identifiers, timing, counts, ciphertext sizes, membership, cursors, public keys and network metadata; it controls availability and can withhold history. An authorized compromised browser/runtime can read plaintext and invoke keys. The identity service and relay are memory-only. Archives recover local history, not server identity or trust. Do not claim independent security audit, production hardening, anonymity or protection from an unlocked compromised device.

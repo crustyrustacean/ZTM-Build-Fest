@@ -1,12 +1,14 @@
 # Release Process
 
-**Status:** Current implementation: v0.10.1 Security Lifecycle & Sync Recovery Correctness; release branch and both v0.10 tags pushed to `origin` for PR review into `kin-development`. Stabilization remains on v0.10 until the architecture/security readiness gate, followed by v0.11 UX/UI Consolidation and then v1.0.0. Sync is opt-in and encrypted, but identity/relay state remains process-memory only; accepted relay data is not durable.
+**Status:** Current implementation: v0.10.2 Local Root Rotation & Recovery Lifecycle. The user authorized v0.10.2 and v0.10.3, annotated tags before updating existing PR #15 into `kin-development`, then a stop for human review. No merge is authorized. Identity/relay state remains process-memory only; accepted relay data is not durable.
 
 ## Release sequence
 
 The intended progression is `kin-v0.9.3` → `kin-v0.10.0` (Portable Core + Local
 Data Security) → `kin-v0.10.1` (Security Lifecycle & Sync Recovery Correctness) →
-`kin-v0.11.0` (UX/UI Consolidation) → `kin-v1.0.0` (Stable Kin
+`kin-v0.10.2` (Local Root Rotation & Recovery Lifecycle) →
+`kin-v0.10.3` (Bounded Storage/Archive Hardening & Architecture Closure) →
+human review → `kin-v0.11.0` (UX/UI Consolidation) → `kin-v1.0.0` (Stable Kin
 Platform). v1.0 requires BOTH architecture/security and UX/UI readiness. Use the
 concrete development slices and gates in [V0.10.0](V0.10.0.md); do not manufacture
 patch releases or knowingly defer a necessary correctness fix. Create tags only

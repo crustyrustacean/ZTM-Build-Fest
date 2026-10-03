@@ -40,6 +40,24 @@ setup cannot overwrite a newer lock with its earlier journal snapshot.
 
 ## Migration categories
 
+### v0.10.2 root replacement recovery
+
+Root rotation is encryption re-protection, not canonical event migration. Before
+event publication, original event/key rows remain intact and the journal retains
+one candidate root through its verified recovery wrapper. The candidate encrypts
+the old root for restart; old capabilities never wrap the candidate. Entering the
+new recovery key resumes the same operation after tab closure/reload/process-style
+restart. Every source/stage is compared exactly and full Rust replay repeats even
+when the journal records prior verification.
+
+After the atomic event/manifest switch, `root-cleanup` accepts only the candidate
+recovery path and resumes idempotent key replacement and stage cleanup. Normal
+household/sync access stays blocked until both databases agree. Quota/abort/peer
+lock preserve either the original corpus plus the exact candidate journal or the
+verified candidate corpus plus recoverable staged keys. No database schema bump,
+canonical rewrite or household sync-epoch rotation is involved. The full versioned
+contract is [ROOT-ROTATION](ROOT-ROTATION.md).
+
 - **Storage migration:** change IndexedDB schema, such as database schema 1 to 2 (stores, indexes, local record layout). This is distinct from an event payload change.
 - **Event/protocol migration:** decode a supported event or wire representation version into the current in-memory model. Persisted source event bytes remain immutable unless a separately reviewed, explicit export/restore conversion is required.
 - **Projection migration:** change derived state, a disposable cache, or snapshot format. Rebuild from canonical events whenever possible; do not make a projection a second source of truth.

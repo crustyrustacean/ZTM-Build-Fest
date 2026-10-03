@@ -143,6 +143,7 @@ export function encryptedDatabase(database, vault, definitions, { securityGuard 
       let operationTail = Promise.resolve();
       const requests = new Set();
       let guardPromise;
+      let guardPending = true;
       const wrapper = {
         get error() { return native.error; },
         get __kinFailure() { return native.__kinFailure; },
@@ -212,7 +213,9 @@ export function encryptedDatabase(database, vault, definitions, { securityGuard 
           const request = native.objectStore(securityGuard.store).get(securityGuard.key);
           request.onsuccess = () => {
             const marker = request.result;
-            if (!marker || marker.phase !== "encrypted" || marker.vaultId !== vault.vaultId || (marker.lockEpoch ?? 0) !== securityGuard.epoch) {
+            if (!marker || marker.phase !== "encrypted" || marker.vaultId !== vault.vaultId ||
+                (securityGuard.epoch !== undefined && (marker.lockEpoch ?? 0) !== securityGuard.epoch) ||
+                (securityGuard.rootVersion !== undefined && (marker.rootVersion ?? 1) !== securityGuard.rootVersion)) {
               const error = new Error("Kin was locked in another tab. Unlock before continuing.");
               error.code = "locked";
               vault.lock();
@@ -222,12 +225,17 @@ export function encryptedDatabase(database, vault, definitions, { securityGuard 
           };
           request.onerror = () => reject(request.error);
         });
+        if (securityGuard.checkExternal && vault.checkSecurityEpoch)
+          guardPromise = guardPromise.then(() => vault.checkSecurityEpoch());
       } else if (vault.checkSecurityEpoch) {
         guardPromise = vault.checkSecurityEpoch();
       } else guardPromise = Promise.resolve();
       // A transaction may be created without a user request. Its guard still
       // needs an observed rejection and must abort, never silently complete.
-      guardPromise.catch((error) => wrapper.fail(error));
+      guardPromise.then(() => { guardPending = false; }, (error) => {
+        guardPending = false;
+        wrapper.fail(error);
+      });
       // Pump only native reads. Every crypto continuation owns a pending token;
       // callbacks may schedule more work before releasing their token.
       function keepAlive() {
@@ -239,7 +247,7 @@ export function encryptedDatabase(database, vault, definitions, { securityGuard 
           // Issue native requests from an IDB task, where the transaction is
           // active, rather than from a Web Crypto task (which is inactive).
           for (const operation of nativeQueue.splice(0)) operation();
-          if (pending > 0) keepAlive();
+          if (pending > 0 || guardPending) keepAlive();
         };
       }
       function runNative(createRequest) {

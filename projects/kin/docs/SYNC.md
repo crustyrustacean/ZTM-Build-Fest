@@ -6,6 +6,17 @@
 
 ## v0.10 local security integration
 
+v0.10.2 replaces only the local storage root. Exact device private serialization,
+epoch self-seals, pending transition/provisioning/rotation records, pins, bindings,
+outbox and cursors survive re-protection. Sync epoch/device transport keys are not
+rotated as a side effect. Peer locks dispose old adapters and durable root/epoch
+guards reject stale operations.
+
+**Stable archive decision: Option A, intentionally local-only recovery.** Restore
+does not establish membership, trusted-device enrollment or epoch entitlement.
+Sync reattachment requires a separately authorized future workflow and is not
+partially supported. v0.11 must preserve this boundary in its recovery UX.
+
 Transport envelope/protocol v1 and canonical event protocols v1–v8 remain unchanged.
 Local canonical events/outbox copies, epoch records and device private serializations
 are now protected by the unlocked local vault; transport encryption alone never

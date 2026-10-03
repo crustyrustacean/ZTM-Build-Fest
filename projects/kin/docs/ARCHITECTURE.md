@@ -4,6 +4,11 @@
 
 ## v0.10 implementation boundary
 
+v0.10.2 adds the [local root lifecycle](ROOT-ROTATION.md): a browser-owned durable
+cross-database journal, root-version/lock-epoch CAS, and exact candidate recovery.
+Rust continues to validate/replay the unchanged canonical corpus. Recovery
+archives are intentionally local-only copies; they authorize no sync reattachment.
+
 v0.10 preserves v0.9.3 encrypted relay sync, two-adult passkey pairing,
 recipient-bound key provisioning, deterministic v8 replay, exact-envelope retries
 and revocation/epoch rotation. It additionally encrypts local persistent content

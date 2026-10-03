@@ -1,7 +1,7 @@
 import { LocalVault, getActiveVault, setActiveVault, randomRecoverySecret } from "../security/local-vault.js";
 import { authenticatePrf } from "../security/passkey-unlock.js";
 import { EventStore } from "../storage/event-store.js";
-import { migrateSyncKeys, finalizeSyncKeyMigration } from "../sync/key-store.js";
+import { migrateSyncKeys, finalizeSyncKeyMigration, prepareRootRotationKeys, commitRootRotationKeys } from "../sync/key-store.js";
 import { loadKinEngine } from "../wasm/kin-engine.js";
 import { exportHouseholdArchive, importHouseholdArchive } from "../security/archive.js";
 
@@ -51,10 +51,16 @@ class KinSecurity extends HTMLElement {
     this.alert.setAttribute("role", "alert");
     this.alert.className = "error-message";
     this.append(this.message, this.alert);
+    if (this.phase === "protecting") {
+      this.message.textContent = "Protecting household… Keep this tab open.";
+      this.button("Lock household", () => this.onLockRequested?.());
+      return;
+    }
     if (this.phase === "unlocked") {
       this.text("Household data is encrypted in this browser. Drafts last only while unlocked.");
       this.button("Lock household", () => this.onLockRequested?.());
       this.button("Add passkey unlock", () => this.run(() => this.addPasskey()));
+      this.button("Replace recovery protection", () => this.showReplacement());
       for (const wrapper of this.manifest?.wrappers ?? []) {
         if (wrapper.type !== "prf") continue;
         this.button("Remove passkey unlock", () => this.run(async (operation) => {
@@ -84,10 +90,13 @@ class KinSecurity extends HTMLElement {
       this.button("Create recovery key", () => this.showSetup());
       return;
     }
-    if (this.manifest.phase !== "encrypted")
+    const rotating = ["root-rotating", "root-cleanup"].includes(this.manifest.phase);
+    if (rotating)
+      this.text("Recovery protection is being replaced. Enter the new recovery key you saved to resume safely.");
+    else if (this.manifest.phase !== "encrypted")
       this.text("Security setup is incomplete. Unlock to resume migration. Existing legacy data is not yet fully protected.");
     else this.text("Unlock with an authorized passkey or the household recovery key. Reloading always locks Kin.");
-    for (const wrapper of this.manifest.wrappers ?? []) {
+    for (const wrapper of rotating ? [] : this.manifest.wrappers ?? []) {
       if (wrapper.type === "prf") this.button("Unlock with passkey", () => this.run(() => this.unlockPasskey(wrapper)));
     }
     const form = document.createElement("form");
@@ -145,6 +154,88 @@ class KinSecurity extends HTMLElement {
     confirmation.focus();
   }
 
+  showReplacement() {
+    if (this.busy || this.phase !== "unlocked") return;
+    const secret = randomRecoverySecret();
+    this.render();
+    this.text("Save this new recovery key outside Kin. It replaces your current recovery key for this browser. Add passkey unlock again afterward. Old backups still need their original recovery keys.");
+    const output = document.createElement("code");
+    output.className = "recovery-key";
+    output.textContent = secret;
+    const form = document.createElement("form");
+    const label = document.createElement("label");
+    label.htmlFor = "confirm-replacement";
+    label.textContent = "Re-enter the saved new recovery key";
+    const confirmation = document.createElement("input");
+    confirmation.id = label.htmlFor;
+    confirmation.type = "password";
+    confirmation.autocomplete = "off";
+    confirmation.spellcheck = false;
+    confirmation.required = true;
+    const button = document.createElement("button");
+    button.type = "submit";
+    button.textContent = "Confirm saved key";
+    form.append(label, confirmation, button);
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      if (confirmation.value.trim() !== secret)
+        return this.error(new Error("The recovery keys do not match. Save and re-enter the complete new key."));
+      confirmation.value = "";
+      output.textContent = "";
+      void this.run(() => this.replaceProtection(secret));
+    });
+    this.append(output, form);
+    confirmation.focus();
+  }
+
+  async replaceProtection(secret) {
+    const operation = this.operation;
+    const signal = this.operationAbort.signal;
+    const active = getActiveVault();
+    await EventStore.checkSecurityEpoch(active);
+    this.assertCurrentOperation(operation);
+    // The operation owns these capabilities; clearing the application disposes
+    // its event/sync adapters and projection before rotation fences peer tabs.
+    const source = new LocalVault(active.vaultId, active.root, active.manifest);
+    source.securityEpoch = active.securityEpoch;
+    let candidate, engine;
+    const cancel = () => { source.lock(); candidate?.lock(); };
+    signal.addEventListener("abort", cancel, { once: true });
+    try {
+      ({ vault: candidate } = await LocalVault.createRotation(source, secret));
+      this.assertCurrentOperation(operation);
+      const app = this.closest("kin-app");
+      app.lockHousehold(false, { preserveSecurityOperation: true });
+      this.phase = "protecting";
+      this.render();
+      engine = await loadKinEngine();
+      this.assertCurrentOperation(operation);
+      await EventStore.rotateProtection({ sourceVault: source, candidateVault: candidate, engine,
+        prepareKeys: prepareRootRotationKeys, commitKeys: commitRootRotationKeys,
+        onPhase: async (phase) => {
+          this.assertCurrentOperation(operation);
+          if (phase === "begun") {
+            const status = await EventStore.securityStatus();
+            this.assertCurrentOperation(operation);
+            this.manifest = status;
+            app.channel?.postMessage({ type: "household-locked", lockEpoch: status.lockEpoch });
+          }
+        },
+      });
+      this.assertCurrentOperation(operation);
+      await this.finishUnlock(candidate, operation);
+      this.message.textContent = "Recovery protection updated. Use your new recovery key and add passkey unlock again if needed.";
+    } catch (error) {
+      candidate?.lock();
+      if (operation === this.operation) this.phase = "locked";
+      throw error;
+    } finally {
+      signal.removeEventListener("abort", cancel);
+      source.lock();
+      engine?.dispose();
+    }
+  }
+
   async establishProtection(secret) {
     const operation = this.operation;
     const { vault, manifest } = await LocalVault.create(secret);
@@ -165,7 +256,8 @@ class KinSecurity extends HTMLElement {
     this.assertCurrentOperation(operation);
     const manifest = await EventStore.securityStatus();
     this.assertCurrentOperation(operation);
-    const vault = await LocalVault.unlock(manifest, secret);
+    const unlockManifest = manifest?.phase === "root-rotating" ? manifest.rotation.candidateManifest : manifest;
+    const vault = await LocalVault.unlock(unlockManifest, secret);
     await this.finishUnlock(vault, operation);
   }
 
@@ -192,7 +284,17 @@ class KinSecurity extends HTMLElement {
       const status = await EventStore.securityStatus();
       this.assertCurrentOperation(operation);
       vault.assertUnlocked();
-      if (status.phase !== "encrypted") {
+      if (["root-rotating", "root-cleanup"].includes(status.phase)) {
+        this.message.textContent = "Resuming recovery protection…";
+        const engine = await loadKinEngine();
+        try {
+          this.assertCurrentOperation(operation);
+          await EventStore.resumeRotation({ candidateVault: vault, engine,
+            prepareKeys: prepareRootRotationKeys, commitKeys: commitRootRotationKeys,
+            onPhase: () => this.assertCurrentOperation(operation),
+          });
+        } finally { engine.dispose(); }
+      } else if (status.phase !== "encrypted") {
         this.message.textContent = "Encrypting and verifying saved information. Keep this tab open.";
         const engine = await loadKinEngine();
         try {

@@ -38,9 +38,11 @@ export function parseRecoverySecret(value) {
 
 export class LocalVault {
   constructor(vaultId, root, manifest) {
-    if (!/^[a-f0-9]{32}$/.test(vaultId) || root.byteLength !== 32)
+    if (!/^[a-f0-9]{32}$/.test(vaultId) || root.byteLength !== 32 ||
+        manifest?.vaultId !== vaultId || !validRootFormat(manifest))
       throw new VaultError("The household security metadata is invalid.");
     this.vaultId = vaultId;
+    this.rootVersion = manifest.rootVersion;
     this.root = root.slice();
     this.manifest = structuredClone(manifest);
     this.generation = nextGeneration++;
@@ -50,13 +52,29 @@ export class LocalVault {
 
   static async create(recoverySecret = randomRecoverySecret()) {
     requireCrypto();
-    const vaultId = hex(crypto.getRandomValues(new Uint8Array(16)));
+    return LocalVault.createRoot(recoverySecret, hex(crypto.getRandomValues(new Uint8Array(16))), 1);
+  }
+
+  static async createRotation(sourceVault, recoverySecret = randomRecoverySecret()) {
+    sourceVault.assertUnlocked();
+    if (sourceVault.rootVersion >= Number.MAX_SAFE_INTEGER)
+      throw new VaultError("Kin cannot advance this household's protection further.");
+    const candidate = await LocalVault.createRoot(recoverySecret, sourceVault.vaultId, sourceVault.rootVersion + 1);
+    try {
+      sourceVault.assertUnlocked();
+      return candidate;
+    } catch (error) { candidate.vault.lock(); throw error; }
+  }
+
+  static async createRoot(recoverySecret, vaultId, rootVersion) {
+    requireCrypto();
     const root = crypto.getRandomValues(new Uint8Array(32));
-    const manifest = { formatVersion: 1, vaultId, rootVersion: 1, wrappers: [] };
+    const manifest = { formatVersion: rootVersion === 1 ? 1 : 2, vaultId, rootVersion, wrappers: [] };
     const vault = new LocalVault(vaultId, root, manifest);
     root.fill(0);
-    const secret = parseRecoverySecret(recoverySecret);
+    let secret;
     try {
+      secret = parseRecoverySecret(recoverySecret);
       manifest.wrappers.push(await vault.createWrapper(secret, { type: "recovery" }));
       manifest.verifier = await vault.seal("kin-vault-check-v1", { store: "security", id: "verifier" });
       vault.manifest = structuredClone(manifest);
@@ -68,7 +86,7 @@ export class LocalVault {
       vault.lock();
       throw error;
     } finally {
-      secret.fill(0);
+      secret?.fill(0);
     }
   }
 
@@ -82,7 +100,7 @@ export class LocalVault {
     let vault;
     try {
       if (bytes.byteLength !== 32) throw new Error("secret length");
-      root = await decryptBytes(bytes, wrapper.sealed, manifest.vaultId, "kin/local-wrapper/v1", wrapperContext(wrapper));
+      root = await decryptBytes(bytes, wrapper.sealed, manifest.vaultId, "kin/local-wrapper/v1", wrapperContext(wrapper), manifest.rootVersion);
       if (root.byteLength !== 32) throw new Error("root length");
       vault = new LocalVault(manifest.vaultId, root, manifest);
       if (await vault.open(manifest.verifier, { store: "security", id: "verifier" }) !== "kin-vault-check-v1")
@@ -125,7 +143,7 @@ export class LocalVault {
     const generation = this.generation;
     const plaintext = serializeProtectedValue(value);
     try {
-      const envelope = await encryptBytes(this.root, plaintext, this.vaultId, "kin/local-storage/v1", valueContext(context));
+      const envelope = await encryptBytes(this.root, plaintext, this.vaultId, "kin/local-storage/v1", valueContext(context), this.rootVersion);
       this.assertUnlocked();
       if (generation !== this.generation) throw new VaultError("Kin was locked during the operation.", "locked");
       return envelope;
@@ -139,7 +157,7 @@ export class LocalVault {
     const generation = this.generation;
     let plaintext;
     try {
-      plaintext = await decryptBytes(this.root, envelope, this.vaultId, "kin/local-storage/v1", valueContext(context));
+      plaintext = await decryptBytes(this.root, envelope, this.vaultId, "kin/local-storage/v1", valueContext(context), this.rootVersion);
       this.assertUnlocked();
       if (generation !== this.generation) throw new VaultError("Kin was locked during the operation.", "locked");
       return deserializeProtectedValue(plaintext);
@@ -159,7 +177,7 @@ export class LocalVault {
       throw new VaultError("The passkey wrapper is incomplete.");
     const wrapper = { version: 1, id, type };
     if (type === "prf") Object.assign(wrapper, { credentialId, prfSalt });
-    wrapper.sealed = await encryptBytes(secret, this.root, this.vaultId, "kin/local-wrapper/v1", wrapperContext(wrapper));
+    wrapper.sealed = await encryptBytes(secret, this.root, this.vaultId, "kin/local-wrapper/v1", wrapperContext(wrapper), this.rootVersion);
     this.assertUnlocked();
     return wrapper;
   }
@@ -214,8 +232,13 @@ function requireCrypto() {
     throw new VaultError("This browser does not support secure local storage. Use a secure context and a supported browser.", "unsupported_unlock");
 }
 
+function validRootFormat(manifest) {
+  return (manifest?.formatVersion === 1 && manifest.rootVersion === 1) ||
+    (manifest?.formatVersion === 2 && Number.isSafeInteger(manifest.rootVersion) && manifest.rootVersion >= 2);
+}
+
 function validateManifest(manifest) {
-  if (manifest?.formatVersion !== 1 || manifest.rootVersion !== 1 || !/^[a-f0-9]{32}$/.test(manifest.vaultId) ||
+  if (!validRootFormat(manifest) || !/^[a-f0-9]{32}$/.test(manifest.vaultId) ||
       !Array.isArray(manifest.wrappers) || !manifest.wrappers.length || manifest.wrappers.length > MAX_WRAPPERS)
     throw new VaultError("The household security format is unsupported or corrupt.");
   const ids = new Set();
@@ -249,29 +272,35 @@ async function deriveKey(secret, salt, purpose, vaultId, context) {
   );
 }
 
-async function encryptBytes(secret, bytes, vaultId, purpose, context) {
+async function encryptBytes(secret, bytes, vaultId, purpose, context, rootVersion = 1) {
   if (bytes.byteLength > MAX_VALUE_BYTES) throw new VaultError("The protected record exceeds Kin's supported size.");
   // A fresh 256-bit salt derives a one-use AES key; the root is never an AES key.
   // The independently random 96-bit IV is never intentionally reused under a key.
   const salt = crypto.getRandomValues(new Uint8Array(32));
   const nonce = crypto.getRandomValues(new Uint8Array(12));
-  const key = await deriveKey(secret, salt, purpose, vaultId, context);
+  const version = rootVersion === 1 ? 1 : 2;
+  const authenticatedContext = version === 1 ? context : ["root-version", String(rootVersion), ...context];
+  const key = await deriveKey(secret, salt, purpose, vaultId, authenticatedContext);
   const ciphertext = await crypto.subtle.encrypt(
-    { name: "AES-GCM", iv: nonce, additionalData: fields([purpose, "1", vaultId, ...context]), tagLength: 128 }, key, bytes,
+    { name: "AES-GCM", iv: nonce, additionalData: fields([purpose, String(version), vaultId, ...authenticatedContext]), tagLength: 128 }, key, bytes,
   );
-  return { version: 1, vaultId, salt: toBase64Url(salt), nonce: toBase64Url(nonce), ciphertext: toBase64Url(new Uint8Array(ciphertext)) };
+  return { version, ...(version === 2 ? { rootVersion } : {}), vaultId, salt: toBase64Url(salt), nonce: toBase64Url(nonce), ciphertext: toBase64Url(new Uint8Array(ciphertext)) };
 }
 
-async function decryptBytes(secret, envelope, vaultId, purpose, context) {
-  if (envelope?.version !== 1 || envelope.vaultId !== vaultId) throw new VaultError("The protected record belongs to a different household or format.");
+async function decryptBytes(secret, envelope, vaultId, purpose, context, rootVersion = 1) {
+  const version = rootVersion === 1 ? 1 : 2;
+  if (envelope?.version !== version || envelope.vaultId !== vaultId ||
+      (version === 2 ? envelope.rootVersion !== rootVersion : envelope.rootVersion !== undefined))
+    throw new VaultError("The protected record belongs to a different household or format.");
   const salt = fromBase64Url(envelope.salt);
   const nonce = fromBase64Url(envelope.nonce);
   const ciphertext = fromBase64Url(envelope.ciphertext);
   if (salt.length !== 32 || nonce.length !== 12 || ciphertext.length < 16 || ciphertext.length > MAX_VALUE_BYTES + 16)
     throw new VaultError("The protected record has invalid bounds.");
-  const key = await deriveKey(secret, salt, purpose, vaultId, context);
+  const authenticatedContext = version === 1 ? context : ["root-version", String(rootVersion), ...context];
+  const key = await deriveKey(secret, salt, purpose, vaultId, authenticatedContext);
   return new Uint8Array(await crypto.subtle.decrypt(
-    { name: "AES-GCM", iv: nonce, additionalData: fields([purpose, "1", vaultId, ...context]), tagLength: 128 }, key, ciphertext,
+    { name: "AES-GCM", iv: nonce, additionalData: fields([purpose, String(version), vaultId, ...authenticatedContext]), tagLength: 128 }, key, ciphertext,
   ));
 }
 

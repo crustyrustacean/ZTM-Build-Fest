@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import { householdLifecycleChecks } from "./security-household-regression.mjs";
 import { securityOperationChecks } from "./security-operation-regression.mjs";
+import { rootRotationUiChecks } from "./root-rotation-ui-regression.mjs";
 import { spawn } from "node:child_process";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { createServer } from "node:http";
@@ -20,6 +21,9 @@ export async function securityUiRegressions(client) {
   console.log(`PASS ${operations.checks} overlapping security operation assertions`);
   const lifecycle = await client.evaluate(`(${householdLifecycleChecks.toString()})(${JSON.stringify(result.recovery)})`);
   console.log(`PASS ${lifecycle.checks} household lifecycle cancellation assertions`);
+  const rotation = await client.evaluate(`(${rootRotationUiChecks.toString()})(${JSON.stringify(result.recovery)})`);
+  result.recovery = rotation.recovery;
+  console.log(`PASS ${rotation.checks} root rotation UI assertions`);
   await client.send("Page.enable");
   await client.send("Network.enable");
   await client.evaluate("globalThis.__kinReloadSentinel = true");
@@ -47,7 +51,7 @@ export async function securityUiRegressions(client) {
       `(${offlineReloadChecks.toString()})(${JSON.stringify(result.recovery)})`,
     );
     console.log(
-      `PASS ${result.checks + operations.checks + lifecycle.checks + offline.checks} application lock, recovery, peer-tab and offline assertions`,
+      `PASS ${result.checks + operations.checks + lifecycle.checks + rotation.checks + offline.checks} application lock, recovery, peer-tab and offline assertions`,
     );
     console.log(JSON.stringify({ ...result.timings, ...offline.timings }));
   } finally {

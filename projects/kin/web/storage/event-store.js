@@ -5,6 +5,7 @@ import {
   encryptedDatabase, snapshotStores, protectRows, valuesEqual, unprotectRecord,
 } from "./encrypted-idb.js";
 import { projectionContext } from "../browser-time.js";
+import { rotateEventProtection, resumeEventProtection } from "./root-rotation.js";
 
 const DATABASE_NAME = "kin";
 const DATABASE_VERSION = 3;
@@ -38,6 +39,20 @@ export class EventStoreError extends Error {
 export class EventStore {
   constructor(database) {
     this.database = database;
+  }
+
+  static rotateProtection(options) {
+    return rotateEventProtection(options, {
+      openDatabase: openEventDatabase, definitions: EVENT_STORE_DEFINITIONS,
+      validateRows: validateRotationRows,
+    });
+  }
+
+  static resumeRotation(options) {
+    return resumeEventProtection(options, {
+      openDatabase: openEventDatabase, definitions: EVENT_STORE_DEFINITIONS,
+      validateRows: validateRotationRows,
+    });
   }
 
   static async securityStatus() {
@@ -132,7 +147,12 @@ export class EventStore {
           if (!Number.isSafeInteger(epoch) || epoch < 0 || epoch >= Number.MAX_SAFE_INTEGER) {
             abortWith(transaction, new EventStoreError("Kin could not advance the local lock generation.")); return;
           }
-          store.put({ ...current, lockEpoch: epoch + 1 });
+          const updated = { ...current, lockEpoch: epoch + 1 };
+          if (current.phase === "root-rotating" && current.rotation?.candidateManifest) {
+            updated.rotation = { ...current.rotation,
+              candidateManifest: { ...current.rotation.candidateManifest, lockEpoch: epoch + 1 } };
+          }
+          store.put(updated);
           finish(epoch + 1);
         };
       });
@@ -142,7 +162,8 @@ export class EventStore {
   static async checkSecurityEpoch(vault) {
     vault.assertUnlocked();
     const marker = await EventStore.securityStatus();
-    if (!marker || marker.vaultId !== vault.vaultId || marker.phase !== "encrypted" || (marker.lockEpoch ?? 0) !== vault.securityEpoch) {
+    if (!marker || marker.vaultId !== vault.vaultId || marker.phase !== "encrypted" ||
+        marker.rootVersion !== vault.manifest.rootVersion || (marker.lockEpoch ?? 0) !== vault.securityEpoch) {
       vault.lock();
       const error = new EventStoreError("Kin was locked in another tab. Unlock before continuing.");
       error.code = "locked";
@@ -218,7 +239,7 @@ export class EventStore {
     const database = await openEventDatabase();
     try {
       const manifest = await readSecurity(database);
-      if (manifest?.phase !== "encrypted" || manifest.vaultId !== vault.vaultId)
+      if (manifest?.phase !== "encrypted" || manifest.vaultId !== vault.vaultId || manifest.rootVersion !== vault.manifest.rootVersion)
         throw new EventStoreError("Kin must finish protecting this household before opening it.");
       const epoch = vault.securityEpoch ?? vault.manifest.lockEpoch ?? 0;
       if (!Number.isSafeInteger(epoch) || epoch < 0 || (manifest.lockEpoch ?? 0) !== epoch) {
@@ -228,7 +249,7 @@ export class EventStore {
       vault.securityEpoch = epoch;
       vault.checkSecurityEpoch = () => EventStore.checkSecurityEpoch(vault);
       const store = new EventStore(encryptedDatabase(database, vault, EVENT_STORE_DEFINITIONS, {
-        securityGuard: { store: SECURITY_STORE, key: SECURITY_KEY, epoch },
+        securityGuard: { store: SECURITY_STORE, key: SECURITY_KEY, epoch, rootVersion: manifest.rootVersion },
       }));
       store.engine = engine;
       const context = await store.ensureContext();
@@ -2137,6 +2158,20 @@ async function openEventDatabase() {
     request.onerror = () => { if (!settled) { settled = true; reject(storageError(request.error)); } };
     request.onblocked = () => { if (!settled) { settled = true; reject(new EventStoreError("Close other Kin tabs and retry the storage upgrade. Your saved information was preserved.")); } };
   });
+}
+
+function validateRotationRows(rows, engine) {
+  const events = validateEventRows(rows.events);
+  validateLegacyOutbox(rows.sync_outbox, events);
+  if (rows.local_context.length !== 1) throw invalidCatchUpState();
+  const context = rows.local_context[0];
+  validateContext(context);
+  validateCursorBoundary(context, events);
+  if (events.some((row) => row.logical_time >= context.next_logical_time))
+    throw new EventStoreError("Kin found an invalid event counter. The saved history was preserved.");
+  const { asOf, civilDate } = projectionContext();
+  engine.applyEvents(events.map((row) => row.encoded_event), asOf,
+    context.last_looked_event_id === null ? null : idToHex(context.last_looked_event_id), civilDate, syncIdentityFromContext(context));
 }
 
 function validateArchiveSnapshot(snapshot, engine) {

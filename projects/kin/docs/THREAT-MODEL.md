@@ -39,6 +39,18 @@ credential/recovery secret permanently loses the ciphertext.
 
 ## Assets and boundaries
 
+### v0.10.2 recovery-secret compromise
+
+Explicit recovery replacement generates an independent random root and new
+confirmed secret, re-protects every local event/key store, then retires old
+recovery/PRF wrappers. Old copied wrapper+secret pairs cannot decrypt records
+newly protected under the replacement root. The candidate alone protects the
+transitional source-root bridge, which is removed from authority at publication.
+This cannot erase copied plaintext, prior archives, sync epoch keys or material
+captured in an unlocked runtime. Complete hostile site-data rollback remains
+undetectable without an external monotonic witness. Journal/CAS checks reject
+stale manifests, competing rotations and foreign vault/root journals through Kin.
+
 Assets include household plaintext (items, handoffs, Talk topics, Pulse), event history, household/member/device identifiers, authentication credentials, device authorization state, encryption keys, pairing-session secrets, and member safety/expectations.
 
 Trust boundaries include the browser UI ↔ Rust/WASM engine, local browser storage, authorized device ↔ sync service, service ↔ database/logs, and one pairing device ↔ another. The service should relay ciphertext, while household content and content keys remain on authorized clients. A compromised authorized client is inside the confidentiality boundary and can expose what it can access.
@@ -94,4 +106,4 @@ The relay sees household/member/device/session identifiers; event IDs; per-devic
 
 ## Remaining Limitations
 
-The incubation service stores identity and relay records in memory. Full restart loses household identity, sessions, pairing state, relay envelopes and cursors; surviving local encrypted history cannot alone resume that household's sync. A relay-only reset is detected against local high-water and exact cached envelopes are requeued when identity survives. Encrypted archive restore recovers local data only. There is no transparency witness, pre-join history grant for new adults, server-identity recovery or remote erasure. Missing epoch keys pause sync. Local wrapper removal cannot invalidate a copied wrapper plus its secret, and no in-place local root rotation is implemented. New runtime private keys are imported nonextractable, but that is not hardware-backed storage. A compromised unlocked runtime defeats confidentiality. Independent security review and production operational hardening remain required.
+The incubation service stores identity and relay records in memory. Full restart loses household identity, sessions, pairing state, relay envelopes and cursors; surviving local encrypted history cannot alone resume that household's sync. A relay-only reset is detected against local high-water and exact cached envelopes are requeued when identity survives. Encrypted archive restore recovers local data only. There is no transparency witness, pre-join history grant for new adults, server-identity recovery or remote erasure. Missing epoch keys pause sync. Wrapper removal alone cannot invalidate a copied wrapper plus its secret; explicit root replacement in v0.10.2 protects newly re-encrypted local data, while prior copies remain exposed. New runtime private keys are imported nonextractable, but that is not hardware-backed storage. A compromised unlocked runtime defeats confidentiality. Independent security review and production operational hardening remain required.

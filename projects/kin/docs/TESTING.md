@@ -1,6 +1,6 @@
 # Testing Contracts
 
-**Status:** Current through v0.10.1. Earlier version sections are historical release gates. See [V0.10.0](V0.10.0.md) for milestone and patch counts, environment and measurements.
+**Status:** Current through v0.10.2. Earlier version sections are historical release gates. See [V0.10.0](V0.10.0.md) for milestone and patch counts, environment and measurements.
 
 ## v0.10 security and portability gate
 
@@ -51,6 +51,25 @@ mismatched acknowledgements. The storage runner also exercises pending-rotation
 compare-and-set and the retained rotation barrier in encrypted IndexedDB.
 
 ## Rust domain tests
+
+### v0.10.2 root lifecycle gate
+
+The established storage runner invokes `root-rotation-regression.mjs` and
+`root-key-rotation-regression.mjs`, including durable phase interruptions,
+quota/native abort, peer locks, stale manifest/root/capability rejection,
+foreign journals, exact canonical/context/sync/outbox retention, restored private
+keys/epoch secrets/pins, root 2→3, old copied wrapper isolation, and real document
+reload before/after event publication. Node vault tests exercise candidate
+generation failures, authenticated root versions and independent recovery roots.
+The UI runner invokes `root-rotation-ui-regression.mjs` for re-entry confirmation,
+replacement, cancellation, new-key resume, old-key rejection and offline recovery.
+
+Optional `--performance --maximum-payload` now measures 1,000 representative,
+10,000 short-text and 10,000 maximum-text events: migration, decrypt, Rust replay,
+archive export/restore, exact canonical roundtrips, archive and serialized
+encrypted-record bytes, origin storage estimates, and sampled Windows renderer
+working set where available. Sampling includes retained synthetic fixture memory;
+it is neither a precise database-file size nor a mobile measurement.
 
 Before v0.1.0 is considered complete, cover at least:
 

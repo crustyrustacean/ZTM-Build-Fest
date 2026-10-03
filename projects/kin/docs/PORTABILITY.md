@@ -4,6 +4,13 @@
 
 ## Implemented archive boundary
 
+**Stable architecture decision (v0.10.2/v0.10.3): Option A — intentionally
+local-only restore.** Archives are recovery copies of household history. They
+grant no membership or trusted-device authority. Rejoining a synchronized
+household requires a separately authorized future workflow; no partial sync
+reattachment is supported. v0.11 must design recovery UX around this boundary.
+Root rotation does not change old archives: each retains its original recovery key.
+
 The public metadata carries archive version, recovery-wrapped root metadata and
 encryption parameters. The body is raw AES-GCM ciphertext, avoiding redundant
 base64 expansion of the whole archive. HKDF purpose `kin/archive/v1` separates its

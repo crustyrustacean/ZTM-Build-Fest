@@ -1113,7 +1113,7 @@ class KinApp extends HTMLElement {
     this.main.focus();
   }
 
-  lockHousehold(broadcast = true) {
+  lockHousehold(broadcast = true, { preserveSecurityOperation = false } = {}) {
     if (broadcast) {
       this.lockBarrier = Promise.resolve(this.lockBarrier)
         .then(() => EventStore.lockAll())
@@ -1175,7 +1175,7 @@ class KinApp extends HTMLElement {
       this.household = document.createElement("kin-household");
       this.setBusy(false);
       this.setStatus("Household locked.");
-      this.security.locked();
+      if (!preserveSecurityOperation) this.security.locked();
     }
   }
 }

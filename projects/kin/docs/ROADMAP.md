@@ -1,6 +1,6 @@
 # Roadmap
 
-Current implementation: `v0.10.1 — Security Lifecycle & Sync Recovery Correctness` (release branch and both v0.10 tags pushed for PR review into `kin-development`).
+Current implementation: `v0.10.2 — Local Root Rotation & Recovery Lifecycle`. v0.10.3 will complete bounded storage/archive hardening before the requested human review of PR #15. v0.11 has not begun.
 
 ```text
 v0.9.3 — Encrypted Event Sync Stabilization

@@ -2,6 +2,21 @@
 
 This file records completed Kin releases. The `v0.0.x` releases are planning and documentation milestones; they do not represent implemented application features. The first implementation milestone remains `v0.1.0`.
 
+## [0.10.2] — Local Root Rotation & Recovery Lifecycle
+
+Replace recovery protection with an independent random root and a new, re-entered
+256-bit recovery key. Durable staging verifies every protected record, canonical
+replay and restored sync key before publication. Interrupted replacement resumes
+the same candidate; monotonic root versions and lock epochs reject stale tabs.
+Existing PRF unlock wrappers are retired and must be re-added with authentication.
+Old copied recovery wrappers cannot decrypt newly protected data; rotation cannot
+erase previously copied plaintext, keys or backups.
+
+Event/key database schemas remain 3/4. Rotated roots use manifest/local-envelope
+v2 with authenticated root versions; original v1 remains readable. Canonical
+events, replay protocols, sync-envelope v1 and KARC v1 remain compatible. See
+[the release record](docs/V0.10.0.md) and [rotation contract](docs/ROOT-ROTATION.md).
+
 ## [0.10.1] — Security Lifecycle & Sync Recovery Correctness
 
 - Keep cancelled security operations from changing a newer unlock's status, controls or busy state. Late completion cannot label an unlocked household as locked or remove its lock control.

@@ -1,19 +1,20 @@
 # Persistent Contract Versioning
 
-**Status:** Current through v0.10.1; earlier version sections preserve historical contracts.
+**Status:** Current through v0.10.2; earlier version sections preserve historical contracts.
 
 ## Independent version axes
 
 Kin version numbers describe product releases; they do not version every persistent or transport contract.
 
-| Version axis | v0.10.1 read/write contract | Governs |
+| Version axis | v0.10.2 read/write contract | Governs |
 | --- | --- | --- |
-| Application | `0.10.1` | Correctness patch; `kin-v0.10.1` published at `e65db23` |
+| Application | `0.10.2` | Local root rotation and recovery lifecycle |
 | Canonical event schema | Item add 1/2; other kinds 1 | Immutable event interpretation; original bytes retained |
 | Replay protocol | Reads v1–v8; writes local v7 / synchronized v8 | Request context and projection semantics |
 | Manual WASM ABI | Existing exports plus additive command/metadata/archive/import APIs | Host ownership and calls; new command packet v1 |
 | IndexedDB schema | Event DB 2→3; key DB 3→4 | Journalled upgrade to encrypted records |
-| Local envelope | v1 | Purpose, routing AAD, salt, nonce and ciphertext |
+| Local envelope | v1 for original roots; v2 for rotated roots | v2 authenticates rootVersion in addition to purpose/routing |
+| Security manifest / rotation journal | Manifest v1/root 1; v2/root 2+; journal v1 | Monotonic root replacement, CAS and exact restart |
 | Portable archive | KARC v1; metadata/body version 1 | Bounded encrypted archive and complete import planning |
 | Sync envelope | v1 unchanged | Relay encryption/signature/provisioning contracts |
 | Device-key successor | v1 with monotonic generation, maximum 16 transitions | Signed replacement of legacy transport capabilities |
@@ -25,6 +26,11 @@ The v0.2.0 implementation reads event schema 1 for all supported kinds and schem
 ## Compatibility policy
 
 The table records implemented decoders and migrations, validated in [V0.10.0](V0.10.0.md). v0.10.1 preserves every v0.10.0 persistent format and requires no additional database migration.
+v0.10.2 keeps event/key DB versions 3/4 and stores versioned staging values in
+existing security stores. An unrotated root remains readable by v0.10.0/0.10.1;
+after explicit rotation those clients fail closed on manifest/local-envelope v2.
+KARC v1 framing, crypto and body remain supported, including old root-v1 archives.
+Archives made after rotation carry manifest v2 and require a reader supporting it.
 An additive ABI or storage change does not rewrite canonical history or imply a
 sync-protocol bump. v0.9 clients cannot open the upgraded local databases or unlock
 the protected records. Mixed old/new sync clients preserve relay-envelope format,

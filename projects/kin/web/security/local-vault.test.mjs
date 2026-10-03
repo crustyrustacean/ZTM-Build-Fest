@@ -112,3 +112,91 @@ test("typed-value encoding preserves prototype-shaped keys as inert data", () =>
   assert.equal({}.polluted, undefined);
   assert.deepEqual(output, input);
 });
+
+test("root replacement independently advances protection and retires old recovery and PRF wrappers", async () => {
+  const source = await LocalVault.create();
+  const prf = crypto.getRandomValues(new Uint8Array(32));
+  await source.vault.addCredentialWrapper(prf, { credentialId: "old-credential", prfSalt: "old-salt" });
+  const oldManifest = structuredClone(source.vault.manifest);
+  const candidate = await LocalVault.createRotation(source.vault);
+  assert.equal(candidate.manifest.vaultId, source.manifest.vaultId);
+  assert.equal(candidate.manifest.rootVersion, 2);
+  assert.equal(candidate.manifest.formatVersion, 2);
+  assert.notDeepEqual(candidate.vault.root, source.vault.root);
+  assert.notEqual(candidate.recoverySecret, source.recoverySecret);
+  assert.equal(candidate.manifest.wrappers.length, 1);
+  assert.equal(candidate.manifest.wrappers[0].type, "recovery");
+  const context = { store: "events", id: "new-content" };
+  const protectedValue = await candidate.vault.seal("newly protected history", context);
+  const current = await LocalVault.unlock(candidate.manifest, candidate.recoverySecret);
+  assert.equal(await current.open(protectedValue, context), "newly protected history");
+  const copied = await LocalVault.unlock(oldManifest, source.recoverySecret);
+  await assert.rejects(copied.open(protectedValue, context));
+  await assert.rejects(LocalVault.unlock(candidate.manifest, source.recoverySecret));
+  await assert.rejects(LocalVault.unlock(candidate.manifest, prf, oldManifest.wrappers[1].id));
+  const next = await LocalVault.createRotation(candidate.vault);
+  assert.equal(next.manifest.rootVersion, 3);
+  for (const vault of [source.vault, candidate.vault, copied, current, next.vault]) vault.lock();
+});
+
+test("root version is authenticated in wrappers, verifiers and protected values", async () => {
+  const source = await LocalVault.create();
+  const candidate = await LocalVault.createRotation(source.vault);
+  await assert.rejects(LocalVault.unlock({ ...candidate.manifest, rootVersion: 3 }, candidate.recoverySecret));
+  const context = { store: "events", id: 12 };
+  const row = await candidate.vault.seal("synthetic", context);
+  for (const replacement of [0, 1, 3, -1, 1.5, Number.MAX_SAFE_INTEGER + 1])
+    await assert.rejects(candidate.vault.open({ ...row, rootVersion: replacement }, context));
+  for (const field of ["salt", "nonce", "ciphertext"])
+    await assert.rejects(candidate.vault.open({ ...row, [field]: (row[field][0] === "A" ? "B" : "A") + row[field].slice(1) }, context));
+  await assert.rejects(candidate.vault.open({ ...row, version: 1 }, context));
+  await assert.rejects(candidate.vault.open(row, { store: "sync_outbox", id: 12 }));
+  await assert.rejects(candidate.vault.open(row, { store: "events", id: 13 }));
+  source.vault.lock(); candidate.vault.lock();
+});
+
+test("interrupted candidate generation never mutates the current recovery manifest", async () => {
+  const source = await LocalVault.create();
+  const original = structuredClone(source.vault.manifest);
+  await assert.rejects(LocalVault.createRotation(source.vault, "invalid"));
+  assert.deepEqual(source.vault.manifest, original);
+  const pending = LocalVault.createRotation(source.vault);
+  source.vault.lock();
+  await assert.rejects(pending, { code: "locked" });
+  const restored = await LocalVault.unlock(original, source.recoverySecret);
+  restored.lock();
+});
+
+test("interruption after recovery wrapping disposes the candidate and preserves the source", async () => {
+  const source = await LocalVault.create();
+  const original = LocalVault.prototype.createWrapper;
+  let candidate;
+  LocalVault.prototype.createWrapper = async function (...args) {
+    candidate = this;
+    await original.apply(this, args);
+    throw new Error("synthetic failure after candidate recovery wrapping");
+  };
+  try {
+    await assert.rejects(LocalVault.createRotation(source.vault), /after candidate recovery wrapping/);
+    assert.equal(candidate.locked, true);
+    assert.equal(candidate.root, null);
+    assert.equal(source.vault.locked, false);
+    const old = await LocalVault.unlock(source.manifest, source.recoverySecret);
+    old.lock();
+  } finally { LocalVault.prototype.createWrapper = original; source.vault.lock(); }
+});
+
+test("KARC v1 crypto roundtrips with a rotated root and authenticates metadata", async () => {
+  const source = await LocalVault.create();
+  const candidate = await LocalVault.createRotation(source.vault);
+  // Node's HKDF provider limits info to 1024 bytes; the real browser regression
+  // exercises complete KARC metadata and wrappers with the production adapter.
+  const metadata = serializeProtectedValue({ archiveVersion: 1, rootVersion: candidate.manifest.rootVersion });
+  const value = { events: [new Uint8Array([1, 3, 9])] };
+  const envelope = await candidate.vault.sealArchive(value, metadata);
+  assert.equal(envelope.version, 1);
+  assert.deepEqual(await candidate.vault.openArchive(envelope, metadata), value);
+  await assert.rejects(source.vault.openArchive(envelope, metadata));
+  await assert.rejects(candidate.vault.openArchive(envelope, new Uint8Array()));
+  source.vault.lock(); candidate.vault.lock();
+});

@@ -6,6 +6,23 @@ All four household draft surfaces now retain text only in unlocked inputs. Reloa
 
 ## Database
 
+### v0.10.2 root replacement
+
+Event DB 3 and key DB 4 retain their structures. Their existing `security_state`
+key/value stores hold versioned per-record rotation stages. The authoritative
+event singleton follows `encrypted` → `root-rotating` → `root-cleanup` →
+`encrypted`. Its version-1 journal binds one random rotation ID, vault identity,
+source/target root versions, source/candidate manifests and a candidate-protected
+source-root bridge. Progress checkpoints are durable; resume repeats verification.
+No source store is replaced before all event/key stages pass verification.
+
+The first CAS advances the lock epoch and fences normal event access; the key
+database also fences transactions before its source snapshot. Normal transactions
+compare root version as well as phase/vault/epoch. Wrapper updates retain revision
+CAS. Event replacement and the new manifest commit together; key replacement is
+idempotent and journalled, then final publication enables ordinary access. Locked
+or interrupted work cannot publish stale results. See [ROOT-ROTATION](ROOT-ROTATION.md).
+
 ## v0.10 encrypted storage contract
 
 The [v0.10 contract](V0.10.0.md) defines the complete baseline inventory, minimal
