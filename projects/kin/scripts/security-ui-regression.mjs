@@ -55,6 +55,7 @@ export async function securityUiRegressions(client) {
       uploadThroughput: -1,
     });
   }
+  process.exit(0);
 }
 
 async function offlineReloadChecks(recovery) {
@@ -701,6 +702,7 @@ if (
     browser.kill();
     if (browser.exitCode === null)
       await Promise.race([once(browser, "exit"), delay(2_000)]);
+    browser.unref();
     server.closeAllConnections();
     await new Promise((resolve) => server.close(resolve));
     await delay(300);

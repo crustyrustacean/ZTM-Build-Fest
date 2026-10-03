@@ -332,6 +332,7 @@ if (
     browser.kill();
     if (browser.exitCode === null)
       await Promise.race([once(browser, "exit"), delay(2_000)]);
+    browser.unref();
     server.closeAllConnections();
     await new Promise((resolve) => server.close(resolve));
     await delay(300);
@@ -346,4 +347,5 @@ if (
       console.warn("Temporary Edge profile remained busy; the OS may remove it later.");
     });
   }
+  process.exit(0);
 }
