@@ -1,8 +1,8 @@
 # Local Event Storage
 
-**Status:** Current through v0.9.3. v0.1-v0.7 storage notes below are historical release records. Current database is schema 2, with unchanged canonical event bytes and additive sync stores.
+**Status:** v0.10.0 encrypted local storage. The event database is schema 3, key database schema 4, local envelope v1. Canonical event bytes remain unchanged inside authenticated ciphertext. The v0.9.3 database description and earlier notes below record the migration source.
 
-The compose input keeps a best-effort in-progress text and classification draft in the current tab's `sessionStorage`, retaining the existing text key for legacy drafts. This transient data is not an event or household-state source of truth, is cleared only when the exact submitted draft succeeds or the user clears text, and is unavailable across tabs.
+All four household draft surfaces now retain text only in unlocked inputs. Reload/lock discards drafts, and startup removes historical sessionStorage draft keys before components mount. No household plaintext is written to localStorage, sessionStorage, Cache Storage, cookies, OPFS or debug persistence.
 
 ## Database
 
@@ -22,7 +22,30 @@ without keeping the transaction active. Authentication failure aborts the whole
 operation. Unlocked plaintext is ephemeral. v0.10 removes household draft text
 from sessionStorage; lock clears drafts and projected content in all live tabs.
 
-The remaining schema description records v0.9.3 until implementation replaces it.
+Current protected stores retain only their key-path/index routing fields plus
+`protected_version: 1` and `protected_value`. The latter carries local-envelope
+version, vault ID, 32-byte salt, 12-byte nonce and ciphertext/tag (base64url).
+Everything else in the value is encrypted. The public `security_state` singleton
+holds format/root version, vault ID, recovery/PRF wrappers, verifier, migration
+phase, monotonic `lockEpoch`, and wrapper `configRevision`; no usable secret is stored there. A durable epoch
+check inside each event transaction prevents missed peer notifications from
+allowing stale reads or writes. Key operations and network requests also check the
+epoch. Lock aborts in-flight crypto/transactions and rejects stale adapters.
+
+Wrapper changes compare the caller's `configRevision` with the current singleton
+inside one write transaction. Successful changes increment that revision; removing
+a wrapper also increments `lockEpoch` in the same commit. A stale tab cannot
+overwrite newer wrappers or restore a removed unlock path. A failed candidate is
+discarded in favor of committed metadata, or its capability is locked when the
+configuration has changed. Adding a wrapper leaves event ciphertext unchanged.
+
+The key database stores encrypted private-key serializations and sealed epochs;
+runtime imported private/AES keys are nonextractable and never structured-cloned
+into persistent storage. A cross-database migration journal protects staged keys
+until verified event replacement and final key cleanup succeed. Migration requires
+Web Locks; an unsupported browser fails explicitly without deleting legacy data.
+
+The remaining schema description records the v0.9.3 migration source.
 
 ## v0.9.3 database
 

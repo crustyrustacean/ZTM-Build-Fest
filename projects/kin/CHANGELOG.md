@@ -2,6 +2,14 @@
 
 This file records completed Kin releases. The `v0.0.x` releases are planning and documentation milestones; they do not represent implemented application features. The first implementation milestone remains `v0.1.0`.
 
+## [0.10.0] — Portable Core + Local Data Security
+
+Implemented and validated on the v0.10 development branch; publication/tagging is pending approval. Startup now requires recovery or verified PRF unlock before loading protected history. A random local root encrypts complete event/context/outbox values and private sync material; independent credential wrappers avoid corpus re-encryption. Revision checks and a durable lock epoch prevent stale-tab wrapper resurrection and protected writes after lock. Drafts are memory-only.
+
+Migration preserves legacy data until exact-byte decryption and full Rust replay verify the replacement. Nonextractable legacy transport keys authorize encrypted successor keys through a signed, idempotent transition; original canonical events and relay envelopes retain their identity. Rust now owns all 17 household command encoders, command validation, canonical metadata extraction, bounded archive framing and import planning through the existing dependency-free manual ABI.
+
+Encrypted archives restore into an empty installation with fresh local author identity; restored history stays local and does not recreate device trust. The service worker caches static shell assets only and supports offline recovery unlock. Event DB schema is 3, key DB schema 4, local envelope/archive/successor format 1; canonical protocols v1–v8 and sync envelope v1 remain compatible. See [V0.10.0](docs/V0.10.0.md) for actual validation counts, measurements, limitations and v0.11 handoff. The memory-only identity/relay service, lack of in-place local-root rotation, maximum-history latency and broader platform/security review remain explicit limitations.
+
 ## [0.9.3] — Recovery, Privacy, and Feedback Readiness
 
 Completed the v0.9 recovery, metadata, logging, corruption, storage-bound, and UX audit. Added same-member trusted-device pairing, fingerprint-confirmed approval, exact-envelope retry after relay cursor reset, and explicit process-local acknowledgement semantics. An exact identity-binding retry remains idempotent at the 256-record capacity boundary; conflicting or new bindings remain rejected, and rejected batches do not partially commit. Canonical IndexedDB event bytes remain authoritative. The identity service and relay remain memory-only; there is no all-device recovery, durable remote history, independent security audit, or cross-browser certification. Ready for product feedback only after the complete release gates pass.

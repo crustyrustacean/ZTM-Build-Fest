@@ -1,16 +1,14 @@
 # Threat Model
 
-**Status:** Implemented through v0.9.3 for the local incubation release. Client-side AES-GCM event encryption, ECDSA device signatures, ECDH/HKDF key wrapping, IndexedDB key/outbox storage, v8 deterministic replay, and authenticated opaque relay endpoints are implemented. The identity service and relay remain in-memory; independent security audit, cross-browser certification, durable service storage, and external recovery are not provided. This assessment is not a security certification.
+**Status:** Implemented through v0.10.0 for local incubation. Local authenticated encryption, credential/recovery root wrappers, locked startup, encrypted archives and signed transport-key migration complement encrypted sync. The identity service and relay remain in-memory. Independent security audit, cross-browser certification, durable service storage and server-identity recovery are not provided. This assessment is not a security certification.
 
-## Assets and boundaries
+## v0.10 local-at-rest boundary
 
-## v0.10 local-at-rest boundary (development contract)
-
-Intended protection: an unauthorized person with persisted browser site data but
+Implemented protection after verified migration: an unauthorized person with persisted browser site data but
 without an authorized Kin credential/recovery mechanism cannot trivially recover
 household plaintext while Kin is locked. v0.9.3 does not provide this protection:
 its canonical events, draft text and usable sync CryptoKeys survive logout.
-The [v0.10 contract](V0.10.0.md) gates this claim on complete migration, including
+The [v0.10 record](V0.10.0.md) gates this claim on complete migration, including
 outbox duplicates and legacy provisioning/decryption capabilities.
 
 This does not protect a compromised unlocked browser runtime, privileged malicious
@@ -27,13 +25,25 @@ monotonic witness. Recovery-secret disclosure grants its intended access; loss o
 all authorized secrets means permanent data loss. An incomplete migration remains
 explicitly unprotected legacy data and must never be labelled securely locked.
 
-## Assets and boundaries continued
+Startup loads public security metadata only. Logout/manual lock cancels work,
+clears household DOM/drafts and disposes the engine, store and vault. Broadcast
+notification locks peers immediately; a durable lock epoch rejects stale storage
+and network capabilities even if notification is missed. Wrapper revision checks
+prevent stale updates undoing a removal. Old-version tabs must be closed/reloaded
+for migration; no application can recall plaintext previously copied by them.
+
+Encrypted archive plus its independently held recovery secret can recover a lost
+profile's local history. Restore does not reactivate revoked devices or re-create
+server identity; sync stays disabled on the restored household. Losing every
+credential/recovery secret permanently loses the ciphertext.
+
+## Assets and boundaries
 
 Assets include household plaintext (items, handoffs, Talk topics, Pulse), event history, household/member/device identifiers, authentication credentials, device authorization state, encryption keys, pairing-session secrets, and member safety/expectations.
 
 Trust boundaries include the browser UI ↔ Rust/WASM engine, local browser storage, authorized device ↔ sync service, service ↔ database/logs, and one pairing device ↔ another. The service should relay ciphertext, while household content and content keys remain on authorized clients. A compromised authorized client is inside the confidentiality boundary and can expose what it can access.
 
-## v0.9.x Threat Assessment
+## v0.9.x threat assessment (historical; local lock added above)
 
 | Threat                                            | Protected                                                                                                           | Partially protected                                                                                                        | Not protected                                                                  |
 | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
@@ -84,4 +94,4 @@ The relay sees household/member/device/session identifiers; event IDs; per-devic
 
 ## Remaining Limitations
 
-The incubation service stores identity and relay records in memory. Full restart loses household identity, sessions, pairing state, relay envelopes, and service-side cursors; there is no mechanism to restore the same authenticated household, so surviving local canonical history/outbox cannot alone resume that household's sync. A relay-only reset is detected by cursor high-water and exact cached envelopes are requeued when identity state survives. Ciphertext authored only by a lost/revoked device may be unavailable after restart. There is no backup/restore, transparency witness, pre-join history grant for new adults, all-device recovery, or remote erasure. Missing historical/current keys pause sync; all-device key loss can make encrypted history unrecoverable. Browser `CryptoKey` persistence is not hardware-backed. A compromised unlocked browser/runtime defeats content confidentiality. Independent security review and production operational hardening remain required.
+The incubation service stores identity and relay records in memory. Full restart loses household identity, sessions, pairing state, relay envelopes and cursors; surviving local encrypted history cannot alone resume that household's sync. A relay-only reset is detected against local high-water and exact cached envelopes are requeued when identity survives. Encrypted archive restore recovers local data only. There is no transparency witness, pre-join history grant for new adults, server-identity recovery or remote erasure. Missing epoch keys pause sync. Local wrapper removal cannot invalidate a copied wrapper plus its secret, and no in-place local root rotation is implemented. New runtime private keys are imported nonextractable, but that is not hardware-backed storage. A compromised unlocked runtime defeats confidentiality. Independent security review and production operational hardening remain required.

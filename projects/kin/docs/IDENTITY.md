@@ -1,6 +1,6 @@
 # Identity and Trusted Devices
 
-**Status:** Implemented through v0.9.3 for the local incubation service. v0.8 member/passkey/device authorization now gates v0.9 device-key registration, encrypted sync, key provisioning, epoch rotation and revocation. Identity and relay state remain in-memory; see [V0.9.0](V0.9.0.md) for threat and recovery limits.
+**Status:** Implemented through v0.10.0 for the local incubation service. Server member/passkey/device authorization remains distinct from the local encryption unlock. v0.10 protects successor transport private keys and epoch secrets under the local root while retaining public verification history. Identity and relay state remain in-memory; encrypted archive recovery restores local history, not an authenticated server household.
 
 ## Separate identities
 

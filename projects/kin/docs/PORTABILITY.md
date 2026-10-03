@@ -1,6 +1,30 @@
 # Portable Household Data
 
-**Status:** Current release v0.9.3 implements encrypted sync, but no portable export/import. The secure archive boundary in [V0.10.0](V0.10.0.md) is the v0.10 implementation contract. Normal archives preserve encryption and require a surviving recovery wrapper. Rust owns framing, bounds, version validation and import planning; browser APIs own crypto/files/downloads and explicit replacement confirmation. Complete decrypt/canonical validation/replay precedes any import commit. Reject corrupt/unsupported archives without partial import. Do not restore device trust from a backup. Earlier conceptual sections below are design history, not implemented formats.
+**Status:** v0.10.0 implements encrypted `.kin` backup and restore. Rust owns `KARC` v1 framing, 64 MiB bounds, version validation and complete import planning. Browser crypto/files own authenticated encryption, file selection/download and explicit restore confirmation. Corrupt/unsupported archives never partially import. Earlier conceptual sections below are design history.
+
+## Implemented archive boundary
+
+The public metadata carries archive version, recovery-wrapped root metadata and
+encryption parameters. The body is raw AES-GCM ciphertext, avoiding redundant
+base64 expansion of the whole archive. HKDF purpose `kin/archive/v1` separates its
+key from local-record keys; manifest metadata is authenticated as AAD. The encrypted
+body contains exact canonical rows and protected replay/catch-up context. The
+normal export includes recovery wrappers; it never emits plaintext JSON or device
+private keys. Keep the recovery secret separately from the archive.
+
+Restore requires an unlocked empty target and the archive's recovery key. Rust
+validates all bytes/identities/versions, rejects duplicate events and plans the
+whole replay before browser encryption/atomic import. The transaction checks that
+the target history and transport stores are still empty. Imported events remain
+byte-for-byte identical; fresh anonymous local actor/device IDs prevent new local
+commands from impersonating the source trusted device.
+
+Restored history is writable **local-only**. Sync reattachment is deliberately
+blocked: canonical history from several authors cannot be uploaded as one new
+signer's history without an authenticated transport restore protocol. No server
+trust, cookies, provisioning entitlement or epoch access is restored. This is an
+explicit compatibility boundary, not a claim of same-household server recovery.
+The memory-only identity service still cannot reconstruct lost server identity.
 
 ## Ownership principle
 

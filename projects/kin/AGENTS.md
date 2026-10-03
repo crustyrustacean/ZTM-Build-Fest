@@ -100,7 +100,7 @@ If an unrelated parent-repository file was modified accidentally, revert that ch
 
 # Current Development Stage
 
-Kin uses semantic versions. The current implementation/release is `v0.9.3` — Encrypted Event Sync Stabilization; the v0.9.x line ends at this encrypted-sync stabilization gate. The next development line is `v0.10.x` — Portable Core + Local Data Security, followed by `v0.11.x` — UX/UI Consolidation. Do not begin v1.0 implementation until BOTH v0.10 architectural/security readiness AND v0.11 UX/UI readiness criteria have been satisfied. Relay/identity state remains in-memory; no production certification is claimed. No automatic kin-main or kin-development merge. The active v0.10 contract is [V0.10.0](docs/V0.10.0.md); development contracts are not completed releases.
+Kin uses semantic versions. The current implementation is `v0.10.0` — Portable Core + Local Data Security, built from merged v0.9.3. Publication/tagging requires separate approval. The active line remains v0.10 for architectural/security stabilization; `v0.11.x` will consolidate UX/UI after its readiness gate. Do not begin v1.0 implementation until BOTH v0.10 architectural/security readiness AND v0.11 UX/UI readiness criteria have been satisfied. Relay/identity state remains in-memory; no production certification is claimed. No automatic kin-main or kin-development merge. See [V0.10.0](docs/V0.10.0.md) for implementation evidence, compatibility and remaining work; do not present planned work as completed.
 
 The pre-implementation releases are:
 

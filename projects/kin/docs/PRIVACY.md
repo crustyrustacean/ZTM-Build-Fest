@@ -1,8 +1,14 @@
 # Privacy
 
-**Status:** Current through v0.9.3. Sync is optional and uploads client-encrypted canonical event envelopes. The service receives no plaintext household event payloads or content keys, but it sees routing and traffic metadata; no anonymity or zero-knowledge claim is made.
+**Status:** Current through v0.10.0. Local protected content is encrypted after verified migration. Sync is optional and uploads client-encrypted canonical event envelopes. The service receives no plaintext household event payloads or content keys, but it sees routing and traffic metadata; no anonymity or zero-knowledge claim is made.
 
-The in-progress compose draft may be held in tab-scoped `sessionStorage` to survive a reload. It is not part of the event log, is not shared with another tab, and is cleared after successful save or explicit clear. Browser site-data controls remove both the event store and any draft.
+v0.10 encrypts local canonical events, duplicated outbox content, protected metadata
+and private sync key material. Household drafts remain in unlocked memory only;
+lock/reload discards them. Startup removes historical sessionStorage draft keys.
+Locked startup does not load/replay household plaintext. The content-free
+`household-locked` peer message and durable lock epoch invalidate peer capabilities.
+Minimal routing IDs, format/lock state, ciphertext lengths and root wrappers remain
+visible. Recovery secrets are user-held and never persisted or sent to the relay.
 
 Same-origin tabs may exchange the fixed `events-changed` notification over `BroadcastChannel` after a committed write. The notification contains no household or event content; each tab reloads the event log from IndexedDB and reconstructs its own view locally.
 

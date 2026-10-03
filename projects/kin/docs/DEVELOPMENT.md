@@ -1,6 +1,6 @@
 # Development Workflow
 
-**Status:** Current through v0.9.3 Encrypted Event Sync stabilization; earlier version sections are historical contracts.
+**Status:** Current through v0.10.0 Portable Core + Local Data Security; earlier version sections are historical contracts.
 
 ## Build and run
 
@@ -40,7 +40,7 @@ Windows developers should be able to use PowerShell and standard Rust tooling. m
 ## Intended minimal tools
 
 - Rust toolchain (`rustup`, `cargo`) and the `wasm32-unknown-unknown` target
-- A modern browser with the platform APIs in [IMPLEMENTATION](IMPLEMENTATION.md)
+- A modern secure-context browser with WebAssembly, Web Crypto, IndexedDB, Web Locks, BroadcastChannel, service workers and the platform APIs in [IMPLEMENTATION](IMPLEMENTATION.md)
 - Node.js 22 or later for the same-origin application/API server and built-in tests
 - Python 3.11 or later for version checks and launcher smoke tests; it is not needed to serve the app
 
@@ -48,7 +48,7 @@ No npm dependency tree or framework runtime is planned. If static serving later 
 
 ## Browser capabilities
 
-The application requires WebAssembly, ES modules, Custom Elements, IndexedDB, `CustomEvent`, text encoders/decoders, and secure-context browser APIs. WebAuthn is used for identity and authorization; Web Crypto implements opt-in encrypted event sync and key wrapping. Browser validation is recorded per release and does not certify the full browser support target.
+The application requires WebAssembly, ES modules, Custom Elements, IndexedDB, Web Locks, `BroadcastChannel`, `CustomEvent`, text encoders/decoders and Web Crypto. WebAuthn is used for server identity and pairing. Credential-bound local unlock additionally requires actual PRF output; the independently held recovery key remains the explicit fallback and works offline. Web Locks are required for safe v0.9.3 migration. The service worker caches only an allowlisted static shell. Browser validation is recorded per release and does not certify the full support target.
 
 ## Development data
 

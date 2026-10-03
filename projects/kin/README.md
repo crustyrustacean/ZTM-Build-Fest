@@ -2,9 +2,9 @@
 
 > A private, lightweight household coordination app for the little things families need to know, remember, hand off, or discuss.
 
-**Current status: `v0.9.3` — Encrypted Event Sync stabilization.** Kin supports opt-in encrypted synchronization of canonical household events between the two passkey-paired adults' trusted devices. Browser Web Crypto encrypts events before the authenticated service relay; the relay coordinates opaque delivery and still sees routing metadata, timing, counts, ciphertext sizes, and device membership. Device revocation invalidates sessions and advances the content-key epoch. Existing local event bytes are preserved during migration, and offline retries reuse the same encrypted envelope.
+**Current status: `v0.10.0` — Portable Core + Local Data Security.** Household events, metadata and private sync keys are encrypted in browser storage. Startup remains locked until a verified recovery secret or supported passkey PRF unwraps the local root. Rust owns commands, canonical event codecs, replay and archive framing; browser APIs own cryptography, storage and authentication. Opt-in encrypted relay sync preserves canonical identity and exact retry envelopes.
 
-The next development line is `v0.10.x` — Portable Core + Local Data Security; its [architecture, migration and release contract](docs/V0.10.0.md) is under development. `v0.11.x` then consolidates UX/UI and accessibility. v1.0.0 requires both readiness gates. The current release remains v0.9.3, whose local events and drafts are plaintext and whose persisted sync keys remain usable after logout; encrypted relay sync is not local-at-rest protection.
+The [v0.10.0 implementation and validation record](docs/V0.10.0.md) describes recovery, migration, compatibility, measurements and remaining review. Publication/tagging is separate. `v0.11.x` will consolidate UX/UI and accessibility after the v0.10 readiness gate; v1.0.0 requires both. Upgrading v0.9.3 requires security setup and verified migration before the old plaintext dataset gains this protection.
 
 ## The problem
 
@@ -79,13 +79,13 @@ The intended technical direction is Rust compiled to WebAssembly, native Web Com
 - `v0.9.1` — Device Provisioning, Epochs, and Revocation (`kin-v0.9.1`)
 - `v0.9.2` — Offline Reconciliation and Conflict Semantics (`kin-v0.9.2`)
 - `v0.9.3` — Recovery, Privacy, and Feedback Readiness (`kin-v0.9.3`)
-- Next development line: `v0.10.x` — Portable Core + Local Data Security
+- `v0.10.0` — Portable Core + Local Data Security (implemented; publication pending)
 - Then `v0.11.x` — UX/UI Consolidation, before `v1.0.0` — Stable Kin Platform
 - See the [changelog](CHANGELOG.md) for the completed release history.
 
 ## Install, build, and run
 
-Requirements: Rust/Cargo with the `wasm32-unknown-unknown` target, Node.js 22 or later, and a modern browser with WebAssembly, WebAuthn/passkeys, ES modules, Custom Elements, and IndexedDB.
+Requirements: Rust/Cargo with the `wasm32-unknown-unknown` target, Node.js 22 or later, and a modern browser with WebAssembly, Web Crypto, Web Locks, ES modules, Custom Elements and IndexedDB. Passkeys are needed for server identity/pairing; PRF support is optional because a user-held recovery secret is an explicit local unlock path. Use HTTPS outside localhost.
 
 From the repository root in PowerShell:
 
@@ -96,7 +96,9 @@ rustup target add wasm32-unknown-unknown
 
 The script builds the WASM module and serves the web app at `http://localhost:8000`. On macOS/Linux, run `sh projects/kin/run.sh` from the repository root.
 
-Kin stores canonical household events and encrypted outbox envelopes in the current browser profile's IndexedDB. Sync is off until an authenticated adult enables it. The local Node service holds identity, relay ciphertext, cursors, and provisioning state in memory; restarting it ends sessions and loses relay records. Local canonical history and exact cached envelopes remain on devices, but this prototype does not provide durable relay storage, backup, all-device recovery, or last-device recovery. A newly joined/replacement adult receives current and later epochs only; pre-join history is unavailable in v0.9.x. Existing adults can pair another device to the same member identity after comparing its device fingerprint. Browser storage and encryption do not protect against a compromised unlocked browser/runtime or extensions. Use synthetic household text while evaluating this prototype.
+First setup generates a recovery secret that must be confirmed and stored separately. Losing all unlock paths loses access; losing the browser profile also requires an encrypted backup. Drafts are memory-only and disappear on lock/reload. Encrypted archives restore exact history into an empty installation for local use; they do not recreate server identity or device trust. The static application shell supports offline recovery unlock after its first successful cache installation.
+
+Sync is off until an authenticated adult enables it. The Node service holds identity, relay ciphertext, cursors and provisioning state in memory; restarting it loses those records. Local encrypted history survives, but durable relay storage and server-identity recovery are unavailable. A new/replacement adult cannot receive pre-join epochs. Existing adults can pair another device after comparing fingerprints. Encryption does not protect a compromised unlocked runtime, origin, privileged extension or OS. This prototype has not received an independent security audit.
 
 ## AI usage
 

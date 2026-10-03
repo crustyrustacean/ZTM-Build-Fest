@@ -1,6 +1,6 @@
 # Data Migrations
 
-**Status:** v0.9.3 uses additive schema 1→2 sync stores without rewriting canonical bytes. The recoverable local-encryption migration below is a v0.10 development contract; earlier version sections are historical.
+**Status:** v0.10.0 implements recoverable local-encryption migration. v0.9.3's additive schema 1→2 migration remains supported as input; canonical bytes are not rewritten. Earlier version sections are historical.
 
 ## v0.9.3 → v0.10 local protection
 
@@ -17,6 +17,26 @@ legacy dataset or a verified replacement recoverable with the same wrappers.
 Restart resumes the journal and never silently creates another root. Cross-DB
 progress is recoverable, not one fictional atomic transaction. Schema upgrades
 only establish structure; asynchronous crypto and network work happen outside them.
+
+Implemented phases are absent/unconfigured, `preparing`, `cleanup-pending`, and
+`encrypted`. Event DB 3 adds `security_state`; key DB 4 adds a protected staging
+journal. Setup verifies an independent recovery wrapper before writing it. Web
+Locks serializes migration; source snapshots and lock epochs are checked again
+inside replacement transactions. Each staged value is decrypted and compared;
+Rust replays the entire recovered canonical corpus. Legacy AES and sealed epoch
+copies must agree (including fingerprint and authenticated test encryption)
+before either is replaced. The root and signed successor remain stable on retry.
+`cleanup-pending` cannot open a household; it resumes only key cleanup and final
+commit. Quota, transaction abort, changed sources, cancelled unlock, corrupt keys
+or lost capability fail without publishing a partial secure state.
+
+New security metadata starts with `configRevision: 0` and `lockEpoch: 0`.
+Compatibility reads treat an absent revision or epoch as zero. Wrapper updates
+use a transactional revision comparison; removing an unlock wrapper increments
+both the configuration revision and lock epoch atomically. This prevents a stale
+tab from restoring a removed credential through a later wrapper write. Migration
+replacement and final publication compare lock epochs again, so an interrupted
+setup cannot overwrite a newer lock with its earlier journal snapshot.
 
 ## Migration categories
 

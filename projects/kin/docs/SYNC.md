@@ -1,8 +1,34 @@
 # Synchronization Design
 
-**Status:** Implemented through v0.9.3 for the local incubation service. Encrypted event envelopes, key epochs/provisioning, opaque push/pull, bounded cursors, local outbox, v8 deterministic replay, and revocation checks are implemented. The relay and identity service remain in-memory; acknowledgements are process-local, not durable. See the release record in [V0.9.0](V0.9.0.md).
+**Status:** Implemented through v0.10.0 for the local incubation service. Existing encrypted envelopes and v8 canonical replay remain compatible. The local outbox, sync state, epoch secrets and private device keys are encrypted at rest and unavailable while locked. Signed device-key successors preserve verification history and repair entitled post-join epoch grants. The relay and identity service remain in-memory; acknowledgements are process-local, not durable.
 
 ## Intended direction
+
+## v0.10 local security integration
+
+Transport envelope/protocol v1 and canonical event protocols v1–v8 remain unchanged.
+Local canonical events/outbox copies, epoch records and device private serializations
+are now protected by the unlocked local vault; transport encryption alone never
+substitutes for this protection. Sync starts only after unlock and stops/aborts on
+lock. Browser adapters read validated Rust metadata instead of canonical offsets.
+
+Migration replaces nonextractable legacy private keys through a versioned signed
+successor certificate with expected fingerprint, identity and monotonic generation
+(at most 16 transitions). The server verifies and accepts exact retries, publishes
+bounded public verification history and removes obsolete provisioning packages.
+Peers authenticate the chain from existing pins; historical exact envelopes and
+approval certificates retain their original signatures. Fingerprint-bound retry
+state reprovisions entitled current/history epochs after transition. A queued
+transition is accepted before pairing or sync, even if sync itself is disabled.
+Local offline migration can finish while that network transition remains pending.
+
+Archive restore is explicitly local-only and cannot silently rejoin sync; see
+[PORTABILITY](PORTABILITY.md). Relay restart still loses server-side state. Member
+removal/device revocation still reserves future sync key epochs and cannot erase
+prior plaintext/keys. Local recovery possession is a separate authorized path;
+removing a server member does not magically revoke a copied recovery key/root.
+
+## Historical transport progression
 
 ```text
 Device A

@@ -1,16 +1,14 @@
 # Architecture
 
-**Status:** Current through v0.9.3 encrypted sync. JavaScript owns Web Crypto, local key persistence, pairing/device transport, and IndexedDB v2 outbox/cursor integration. Rust owns protocol v8 identity resolution, deterministic distributed replay, and domain state. The same-origin service authorizes and relays opaque encrypted records but remains in-memory.
+**Status:** Current through v0.10.0. Rust owns portable commands, canonical codecs, replay and archive framing/import validation. JavaScript owns the local encryption/unlock boundary and browser capabilities. Event DB schema 3 and key DB schema 4 persist encrypted protected values. The same-origin identity/relay service remains in-memory.
 
-## System shape
+## v0.10 implementation boundary
 
-## v0.10 target and current implementation boundary
-
-v0.9.3 already implements encrypted relay sync, two-adult passkey pairing,
+v0.10 preserves v0.9.3 encrypted relay sync, two-adult passkey pairing,
 recipient-bound key provisioning, deterministic v8 replay, exact-envelope retries
-and revocation/epoch rotation. It does **not** encrypt its local canonical event
-store or gate replay on authentication. The [v0.10 contract](V0.10.0.md) records
-the inspected baseline and freezes the following target before implementation.
+and revocation/epoch rotation. It additionally encrypts local persistent content
+and gates replay on successful unlock. The [implementation record](V0.10.0.md)
+contains the baseline, frozen contract and validation evidence.
 
 ```text
 HTML / CSS / Web Components

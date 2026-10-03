@@ -1,6 +1,6 @@
 # Derived Household State
 
-**Status:** Current through v0.9.3. Rust remains the authoritative deterministic projection/replay engine; synchronized v8 replay resolves verified identities and orders equal-time concurrent events without changing canonical bytes.
+**Status:** Current through v0.10.0. Rust owns deterministic commands and projection/replay; synchronized v8 replay resolves verified identities and orders equal-time concurrent events without changing canonical bytes. Browser startup obtains authorized local unlock before decrypting and replaying; locked state holds no household projection.
 
 ## Projection pipeline
 

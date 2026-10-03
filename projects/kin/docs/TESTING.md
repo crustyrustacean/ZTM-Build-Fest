@@ -1,6 +1,34 @@
-# v0.1.0 Testing Contract
+# Testing Contracts
 
-**Status:** Current through v0.9.3 Encrypted Sync stabilization. Earlier version sections are historical release gates; see the v0.9.3 gate below.
+**Status:** Current through v0.10.0. Earlier version sections are historical release gates. See [V0.10.0](V0.10.0.md) for exact final counts, environment and measurements.
+
+## v0.10 security and portability gate
+
+Run from the repository root after building the current WASM artifact. Browser
+runners use isolated temporary profiles and synthetic text/credentials. They do
+not bypass production recovery, storage encryption or WebAuthn verification.
+
+```powershell
+cargo fmt --manifest-path projects/kin/Cargo.toml -- --check
+cargo clippy --manifest-path projects/kin/Cargo.toml --all-targets -- -D warnings
+cargo test --manifest-path projects/kin/Cargo.toml
+cargo build --manifest-path projects/kin/Cargo.toml --target wasm32-unknown-unknown --release
+Copy-Item projects/kin/target/wasm32-unknown-unknown/release/kin.wasm projects/kin/web/wasm/kin_engine.wasm
+node --test (rg --files projects/kin/server projects/kin/web -g '*.test.mjs')
+python projects/kin/scripts/check_version.py
+$kinBrowser = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
+node projects/kin/scripts/browser-regression.mjs $kinBrowser
+node projects/kin/scripts/security-storage-regression.mjs $kinBrowser
+node projects/kin/scripts/security-ui-regression.mjs $kinBrowser
+node projects/kin/scripts/passkey-regression.mjs $kinBrowser
+```
+
+The storage runner includes legacy-key migration checks. Optional `--performance`
+and `--maximum-payload` measure 10,000-event migration/unlock and encrypted archive
+round trips. The WebAuthn runner uses a CDP virtual authenticator supporting PRF,
+real browser ceremonies and the real server verifier; it is not physical hardware
+or cross-platform certification. Preserve prior feature suites when changing
+startup/draft expectations: security must not weaken domain, rollback or a11y checks.
 
 ## Rust domain tests
 
