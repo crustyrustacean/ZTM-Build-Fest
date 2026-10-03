@@ -8,7 +8,7 @@ Kin version numbers describe product releases; they do not version every persist
 
 | Version axis | v0.10.1 read/write contract | Governs |
 | --- | --- | --- |
-| Application | `0.10.1` | Correctness patch; remote publication separate |
+| Application | `0.10.1` | Correctness patch; `kin-v0.10.1` published at `e65db23` |
 | Canonical event schema | Item add 1/2; other kinds 1 | Immutable event interpretation; original bytes retained |
 | Replay protocol | Reads v1–v8; writes local v7 / synchronized v8 | Request context and projection semantics |
 | Manual WASM ABI | Existing exports plus additive command/metadata/archive/import APIs | Host ownership and calls; new command packet v1 |

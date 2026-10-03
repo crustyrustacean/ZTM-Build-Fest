@@ -1,6 +1,6 @@
 # Release Process
 
-**Status:** Current implementation: v0.10.1 Security Lifecycle & Sync Recovery Correctness; remote publication pending. Stabilization remains on v0.10 until the architecture/security readiness gate, followed by v0.11 UX/UI Consolidation and then v1.0.0. Sync is opt-in and encrypted, but identity/relay state remains process-memory only; accepted relay data is not durable.
+**Status:** Current implementation: v0.10.1 Security Lifecycle & Sync Recovery Correctness; release branch and both v0.10 tags pushed to `origin` for PR review into `kin-development`. Stabilization remains on v0.10 until the architecture/security readiness gate, followed by v0.11 UX/UI Consolidation and then v1.0.0. Sync is opt-in and encrypted, but identity/relay state remains process-memory only; accepted relay data is not durable.
 
 ## Release sequence
 
@@ -38,10 +38,12 @@ A tag is created only for a completed, validated milestone. Use a descriptive an
 
 Before a new version starts, verify that the previous completed Kin version has its matching tag. Inspect the entire worktree and stage/commit only paths under `projects/kin/`. Do not include another contributor's changes.
 
-The v0.10.1 patch starts from the untagged v0.10.0 development commit `2dc94f8`.
-The requested patch packages that implementation and its correctness fixes into
-one validated local milestone; it does not create a retrospective v0.10.0 tag.
-Remote push and kin-main/kin-development merges remain separate actions.
+The v0.10.1 patch starts from the completed v0.10.0 commit `2dc94f8`.
+At the user's publication request, the missing annotated `kin-v0.10.0` tag was
+restored on that commit and pushed to `origin`. The existing published annotated
+`kin-v0.10.1` tag remains on `e65db23`. The branch
+`kin-v0.10.1-security-correctness` is pushed for PR review into `kin-development`;
+kin-main/kin-development merges remain separate actions.
 
 ## Changelog
 

@@ -1,6 +1,6 @@
 # Roadmap
 
-Current implementation: `v0.10.1 — Security Lifecycle & Sync Recovery Correctness` (remote publication pending).
+Current implementation: `v0.10.1 — Security Lifecycle & Sync Recovery Correctness` (release branch and both v0.10 tags pushed for PR review into `kin-development`).
 
 ```text
 v0.9.3 — Encrypted Event Sync Stabilization
