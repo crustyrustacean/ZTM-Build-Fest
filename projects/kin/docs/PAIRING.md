@@ -1,6 +1,6 @@
 # Pairing and Device Enrollment
 
-**Status:** Current through v0.8.6. Manual pairing codes/invitation URLs, passkey identity and reauthentication, explicit approval/activation, trusted-device controls, terminal-claim recovery, and fresh-auth member removal are implemented. QR, key exchange, encrypted sync, and durable service storage are not implemented.
+**Status:** Current through v0.8.7. Manual pairing codes/invitation URLs, passkey identity and reauthentication, member-bound approval/activation, trusted-device session invalidation, terminal-claim cleanup, and fresh-auth member removal are implemented. QR, key exchange, encrypted sync, and durable service storage are not implemented.
 
 ## Distinct operations
 

@@ -2,6 +2,10 @@
 
 This file records completed Kin releases. The `v0.0.x` releases are planning and documentation milestones; they do not represent implemented application features. The first implementation milestone remains `v0.1.0`.
 
+## [0.8.7] — Pairing Security and State Hygiene
+
+Bind pairing approval assertions to the authenticated adult's credential, eagerly remove every session for a revoked device, lazily prune expired sessions and terminal pairing capabilities, and normalize malformed WebAuthn/CBOR/COSE input into controlled verification failures. Clarify realistic signature-counter semantics and retain fresh-session behavior without adding product scope.
+
 ## [0.8.6] — Pairing Feedback-Gate Corrections
 
 Use rejection sampling for valid, uniformly selected pairing-code characters; validate invitations before WebAuthn; and give claimed requests a separate 15-minute approval window. Add trusted-device-bound passkey reauthentication, action-bound fresh authentication for adult removal, terminal-claim recovery, early invitation-URL cleanup, HTTPS-aware Secure cookies, and bounded/pruned transient security state. No sync or new household scope is added.

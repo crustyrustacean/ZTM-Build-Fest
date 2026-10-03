@@ -238,11 +238,11 @@ async function api(request, response, url, context) {
       flow.memberId !== auth.member.id
     )
       throw badRequest();
-    webauthn.verifyAuthentication(
-      body.credential,
-      body.flow,
-      service.credentials.get(body.credential?.id),
+    const credential = service.credentialForAuthenticatedMember(
+      session,
+      body.credential?.id,
     );
+    webauthn.verifyAuthentication(body.credential, body.flow, credential);
     json(
       response,
       200,

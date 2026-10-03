@@ -100,7 +100,7 @@ If an unrelated parent-repository file was modified accidentally, revert that ch
 
 # Current Development Stage
 
-Kin uses semantic versions. Current release: `v0.8.6` — Pairing Feedback-Gate Corrections. This patch hardens existing household pairing, authentication, and recovery UX without adding product scope. The v0.8.x line remains at its feedback gate. Do not begin v0.9.x without explicit approval. No automatic kin-main merge.
+Kin uses semantic versions. Current release: `v0.8.7` — Pairing Security and State Hygiene. This patch binds approval credentials to the authenticated adult, eagerly invalidates revoked-device sessions, prunes expired ephemeral state, and hardens malformed WebAuthn handling without adding product scope. The v0.8.x line remains at its feedback gate. Do not begin v0.9.x without explicit approval. No automatic kin-main merge.
 
 The pre-implementation releases are:
 
@@ -1091,6 +1091,7 @@ kin-v0.8.3
 kin-v0.8.4
 kin-v0.8.5
 kin-v0.8.6
+kin-v0.8.7
 kin-v1.0.0
 ```
 

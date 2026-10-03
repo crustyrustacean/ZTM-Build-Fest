@@ -1,6 +1,6 @@
 # Release Process
 
-**Status:** v0.8.6 Pairing Feedback-Gate Corrections. The v0.8.x line remains at its product-feedback gate; encrypted sync requires separate authorization.
+**Status:** v0.8.7 Pairing Security and State Hygiene. The v0.8.x line remains at its product-feedback gate; encrypted sync requires separate authorization.
 
 ## Release sequence
 
@@ -77,4 +77,4 @@ Follow [V0.7.0](V0.7.0.md) for capability, correctness, resilience/accessibility
 
 ## v0.8.0 Household Pairing
 
-The v0.7.x line is complete at `kin-v0.7.4`, which points to validated release commit `a8ded079be6fdbedba8738a64a5f0fb753e7fdd6` and is pushed to the fork, not upstream. The v0.8.x implementation and stabilization record is in [V0.8.0](V0.8.0.md). Stop after `kin-v0.8.6` for product feedback; encrypted sync remains a separately authorized future capability.
+The v0.7.x line is complete at `kin-v0.7.4`, which points to validated release commit `a8ded079be6fdbedba8738a64a5f0fb753e7fdd6` and is pushed to the fork, not upstream. The v0.8.x implementation and stabilization record is in [V0.8.0](V0.8.0.md). Stop after `kin-v0.8.7` for product feedback; encrypted sync remains a separately authorized future capability.

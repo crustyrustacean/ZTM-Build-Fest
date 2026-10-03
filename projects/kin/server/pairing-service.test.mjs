@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import test from "node:test";
 import {
   CLAIM_TTL_MS,
@@ -7,6 +8,8 @@ import {
   PairingError,
   PairingService,
   RATE_WINDOW_MS,
+  SESSION_TTL_MS,
+  TERMINAL_PAIRING_RETENTION_MS,
 } from "./pairing-service.mjs";
 import { createKinServer } from "./server.mjs";
 import { CHALLENGE_TTL_MS, WebAuthn } from "./webauthn.mjs";
@@ -128,6 +131,74 @@ function cookieValue(cookies, name) {
   return cookies
     .find((value) => value.startsWith(`${name}=`))
     ?.slice(name.length + 1);
+}
+
+const base64url = (value) => Buffer.from(value).toString("base64url");
+const cborHead = (major, length) => {
+  if (length < 24) return Buffer.from([(major << 5) | length]);
+  if (length < 256) return Buffer.from([(major << 5) | 24, length]);
+  const result = Buffer.alloc(3);
+  result[0] = (major << 5) | 25;
+  result.writeUInt16BE(length, 1);
+  return result;
+};
+function encodeCbor(value) {
+  if (Buffer.isBuffer(value))
+    return Buffer.concat([cborHead(2, value.length), value]);
+  if (typeof value === "string") {
+    const bytes = Buffer.from(value);
+    return Buffer.concat([cborHead(3, bytes.length), bytes]);
+  }
+  if (typeof value === "number")
+    return cborHead(value >= 0 ? 0 : 1, value >= 0 ? value : -1 - value);
+  if (value instanceof Map) {
+    const entries = [...value].flatMap(([key, item]) => [
+      encodeCbor(key),
+      encodeCbor(item),
+    ]);
+    return Buffer.concat([cborHead(5, value.size), ...entries]);
+  }
+  throw new Error("Unsupported test CBOR value");
+}
+function registrationAttestation(cose) {
+  const credentialId = Buffer.from([1, 2, 3]);
+  const idLength = Buffer.alloc(2);
+  idLength.writeUInt16BE(credentialId.length);
+  const authData = Buffer.concat([
+    createHash("sha256").update("localhost").digest(),
+    Buffer.from([0x45]),
+    Buffer.alloc(4),
+    Buffer.alloc(16),
+    idLength,
+    credentialId,
+    encodeCbor(cose),
+  ]);
+  return {
+    id: base64url(credentialId),
+    attestationObject: base64url(
+      encodeCbor(new Map([["authData", authData]])),
+    ),
+  };
+}
+function clientData(challenge, overrides = {}) {
+  return base64url(
+    JSON.stringify({
+      type: "webauthn.get",
+      challenge,
+      origin: "http://localhost",
+      ...overrides,
+    }),
+  );
+}
+function assertVerificationError(action) {
+  assert.throws(
+    action,
+    (error) =>
+      error instanceof PairingError &&
+      ["passkey_verification_failed", "unsupported_passkey"].includes(
+        error.code,
+      ),
+  );
 }
 
 test("HTTP logout and passkey login restore the same member and household", async () => {
@@ -479,6 +550,55 @@ test("HTTP member removal requires fresh action-bound passkey proof", async () =
   }
 });
 
+test("HTTP pairing approval binds the assertion credential to the signed-in adult", async () => {
+  const { service, adult } = setup();
+  const other = service.bootstrap({
+    credential: credential("other-adult"),
+    deviceLabel: "Other household phone",
+  });
+  const invitation = service.createPairing(adult.sessionToken);
+  const claim = service.claimPairing({
+    code: invitation.code,
+    credential: credential("joining"),
+    deviceLabel: "Joining phone",
+  });
+  const server = await startTestServer({ service });
+  const path = `/api/pairings/${invitation.pairingId}/approve`;
+  const cookie = `kin_session=${adult.sessionToken}`;
+  const options = async () => {
+    const response = await apiRequest(server, `${path}/options`, {
+      method: "POST",
+      cookie,
+      body: { expectedVersion: claim.version },
+    });
+    assert.equal(response.status, 200);
+    return response.json();
+  };
+  const finish = (flow, id) =>
+    apiRequest(server, `${path}/finish`, {
+      method: "POST",
+      cookie,
+      body: { flow, credential: { id, flow } },
+    });
+  try {
+    for (const id of ["credential-other-adult", "unknown-credential"]) {
+      const attempt = await options();
+      const response = await finish(attempt.flow, id);
+      assert.equal(response.status, 401);
+      assert.equal((await response.json()).error, "passkey_member_mismatch");
+      assert.equal(service.households.get(adult.householdId).members.size, 1);
+    }
+
+    const valid = await options();
+    assert.equal((await finish(valid.flow, "credential-a")).status, 200);
+    assert.equal(service.households.get(adult.householdId).members.size, 2);
+    assert.equal((await finish(valid.flow, "credential-a")).status, 410);
+    assert.equal(service.credentials.get("credential-other-adult").memberId, other.memberId);
+  } finally {
+    await server.close();
+  }
+});
+
 test("expired WebAuthn challenges are pruned without evicting active ones", () => {
   let now = 10_000;
   const webauthn = new WebAuthn({
@@ -501,6 +621,133 @@ test("expired WebAuthn challenges are pruned without evicting active ones", () =
   assert.equal(webauthn.challenges.has(first), false);
   assert.equal(webauthn.challenges.has(second), true);
   assert.equal(webauthn.challenges.has(third), true);
+});
+
+test("malformed registration CBOR and COSE fail with controlled errors", () => {
+  const malformedAttestations = [
+    Buffer.alloc(0),
+    Buffer.from([0xa1]),
+    Buffer.from([0x58, 0x05, 0x01]),
+    Buffer.from([0xc0]),
+  ];
+  const malformedCose = [
+    new Map(),
+    new Map([
+      [1, 2],
+      [3, -8],
+    ]),
+    new Map([
+      [1, 2],
+      [3, -7],
+      [-1, 2],
+      [-2, Buffer.alloc(32)],
+      [-3, Buffer.alloc(32)],
+    ]),
+    new Map([
+      [1, 3],
+      [3, -257],
+      [-1, Buffer.alloc(0)],
+      [-2, Buffer.from([1])],
+    ]),
+    new Map([
+      [1, 3],
+      [3, -257],
+      [-1, Buffer.from([1])],
+      [-2, Buffer.alloc(0)],
+    ]),
+  ];
+  for (const attestationObject of [
+    ...malformedAttestations.map(base64url),
+    ...malformedCose.map((cose) => registrationAttestation(cose).attestationObject),
+  ]) {
+    const webauthn = new WebAuthn({
+      rpId: "localhost",
+      origin: "http://localhost",
+    });
+    const challenge = webauthn.challenge("register", "flow");
+    const valid = registrationAttestation(new Map());
+    assertVerificationError(() =>
+      webauthn.verifyRegistration(
+        {
+          id: valid.id,
+          response: {
+            clientDataJSON: clientData(challenge, { type: "webauthn.create" }),
+            attestationObject,
+          },
+        },
+        "flow",
+      ),
+    );
+  }
+});
+
+test("malformed authentication input never escapes as a runtime parser error", () => {
+  const rpHash = createHash("sha256").update("localhost").digest();
+  const validAuthData = Buffer.concat([
+    rpHash,
+    Buffer.from([0x05]),
+    Buffer.alloc(4),
+  ]);
+  const cases = [
+    { clientDataJSON: base64url("{"), authData: validAuthData },
+    { client: { type: "wrong.type" }, authData: validAuthData },
+    { client: { challenge: "wrong" }, authData: validAuthData },
+    { client: { origin: "https://wrong.test" }, authData: validAuthData },
+    { authData: Buffer.alloc(0) },
+    { authData: Buffer.alloc(31) },
+    { authData: rpHash },
+    { authData: Buffer.concat([rpHash, Buffer.from([0x05])]) },
+    { authData: Buffer.alloc(37) },
+    { authData: Buffer.concat([rpHash, Buffer.from([0x01]), Buffer.alloc(4)]) },
+    { authData: Buffer.concat([rpHash, Buffer.from([0x04]), Buffer.alloc(4)]) },
+    { authData: validAuthData, signature: Buffer.alloc(0) },
+    { authData: validAuthData, signature: Buffer.from([1, 2, 3]) },
+  ];
+  for (const item of cases) {
+    const webauthn = new WebAuthn({
+      rpId: "localhost",
+      origin: "http://localhost",
+    });
+    const challenge = webauthn.challenge("authenticate", "flow");
+    const encodedClient =
+      item.clientDataJSON ?? clientData(challenge, item.client);
+    assertVerificationError(() =>
+      webauthn.verifyAuthentication(
+        {
+          id: "credential-a",
+          response: {
+            clientDataJSON: encodedClient,
+            authenticatorData: base64url(item.authData),
+            signature: base64url(item.signature ?? Buffer.from([1])),
+          },
+        },
+        "flow",
+        {
+          id: "credential-a",
+          algorithm: -7,
+          publicKey: "not a public key",
+          signCount: 0,
+        },
+      ),
+    );
+  }
+});
+
+test("expired sessions are pruned while active sessions remain", () => {
+  const { service, adult, advance } = setup();
+  const active = service.issueSession(adult.memberId, adult.deviceId);
+  for (let index = 0; index < 64; index += 1)
+    service.issueSession(adult.memberId, adult.deviceId);
+  assert.equal(service.sessions.size, 66);
+  advance(SESSION_TTL_MS);
+  assert.throws(
+    () => service.authorize(active.sessionToken),
+    (error) => error.code === "authentication_required",
+  );
+  assert.equal(service.sessions.size, 0);
+  const fresh = service.issueSession(adult.memberId, adult.deviceId);
+  assert.equal(service.sessions.size, 1);
+  assert.equal(service.authorize(fresh.sessionToken).member.id, adult.memberId);
 });
 
 test("pairing codes use only unbiased alphabet characters and remain unique", () => {
@@ -651,7 +898,7 @@ test("duplicate claims, stale approval, full households, and revoked devices fai
   );
   assert.throws(
     () => service.authorize(activated.sessionToken),
-    (error) => error.code === "device_not_trusted",
+    (error) => error.code === "authentication_required",
   );
   assert.throws(
     () => service.createPairing(adult.sessionToken),
@@ -892,6 +1139,69 @@ test("logout invalidates only the session and preserves device trust", () => {
     () => service.reauthenticate(adult.deviceToken, "credential-a"),
     (error) => error.code === "device_not_trusted",
   );
+});
+
+test("device revocation eagerly invalidates all of its sessions and is idempotent", () => {
+  const { service, adult } = setup();
+  const invitation = service.createPairing(adult.sessionToken);
+  const claim = service.claimPairing({
+    code: invitation.code,
+    credential: credential("b"),
+    deviceLabel: "B",
+  });
+  service.approvePairing(adult.sessionToken, invitation.pairingId, claim.version);
+  const joined = service.activateClaim(claim.claimToken);
+  const second = service.issueSession(joined.memberId, joined.deviceId);
+
+  const firstResult = service.revokeDevice(adult.sessionToken, joined.deviceId);
+  assert.ok(firstResult.revokedAt);
+  for (const sessionToken of [joined.sessionToken, second.sessionToken])
+    assert.throws(
+      () => service.authorize(sessionToken),
+      (error) => error.code === "authentication_required",
+    );
+  assert.equal(
+    [...service.sessions.values()].some(
+      (session) => session.deviceId === joined.deviceId,
+    ),
+    false,
+  );
+
+  const eventCount = service.events.filter(
+    (event) => event.type === "device_revoked" && event.deviceId === joined.deviceId,
+  ).length;
+  assert.deepEqual(
+    service.revokeDevice(adult.sessionToken, joined.deviceId),
+    firstResult,
+  );
+  assert.equal(
+    service.events.filter(
+      (event) => event.type === "device_revoked" && event.deviceId === joined.deviceId,
+    ).length,
+    eventCount,
+  );
+});
+
+test("confirmed claim capabilities expire and terminal pairing records are collectible", () => {
+  const { service, adult, advance } = setup();
+  const invitation = service.createPairing(adult.sessionToken);
+  const claim = service.claimPairing({
+    code: invitation.code,
+    credential: credential("b"),
+    deviceLabel: "B",
+  });
+  service.approvePairing(adult.sessionToken, invitation.pairingId, claim.version);
+  assert.equal(service.claimTokens.size, 1);
+  advance(CLAIM_TTL_MS);
+  service.prunePairingCapabilities();
+  assert.equal(service.claimTokens.size, 0);
+  assert.throws(
+    () => service.activateClaim(claim.claimToken),
+    (error) => error.code === "claim_not_confirmed",
+  );
+  advance(TERMINAL_PAIRING_RETENTION_MS - CLAIM_TTL_MS);
+  service.prunePairingCapabilities();
+  assert.equal(service.pairings.has(invitation.pairingId), false);
 });
 
 test("reauthentication rejects unknown credentials, revoked devices, and removed members", () => {

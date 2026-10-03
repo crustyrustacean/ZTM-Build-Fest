@@ -11,6 +11,8 @@ export const MAX_CODE_ATTEMPTS = 8;
 export const RATE_WINDOW_MS = 60_000;
 export const RATE_LIMIT = 12;
 export const MAX_RATE_BUCKETS = 4096;
+export const SESSION_TTL_MS = 12 * 60 * 60_000;
+export const TERMINAL_PAIRING_RETENTION_MS = 24 * 60 * 60_000;
 export const PAIRING_CODE_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
 
 export class PairingError extends Error {
@@ -135,18 +137,25 @@ export class PairingService {
   }
 
   issueSession(memberId, deviceId) {
+    this.pruneSessions();
     const value = token();
     this.sessions.set(hash(value), {
       memberId,
       deviceId,
-      expiresAt: this.now() + 12 * 60 * 60_000,
+      expiresAt: this.now() + SESSION_TTL_MS,
     });
     return { sessionToken: value };
   }
 
+  pruneSessions(now = this.now()) {
+    for (const [sessionHash, session] of this.sessions)
+      if (session.expiresAt <= now) this.sessions.delete(sessionHash);
+  }
+
   authorize(sessionToken, { requireTrusted = true } = {}) {
+    this.pruneSessions();
     const session = this.sessions.get(hash(String(sessionToken ?? "")));
-    if (!session || session.expiresAt <= this.now())
+    if (!session)
       throw new PairingError(
         "authentication_required",
         "Authenticate with your passkey to continue.",
@@ -225,8 +234,21 @@ export class PairingService {
     };
   }
 
+  credentialForAuthenticatedMember(sessionToken, credentialId) {
+    const { member } = this.authorize(sessionToken);
+    const credential = this.credentials.get(credentialId);
+    if (!credential || credential.memberId !== member.id)
+      throw new PairingError(
+        "passkey_member_mismatch",
+        "Use this member's passkey to continue.",
+        401,
+      );
+    return credential;
+  }
+
   createPairing(sessionToken) {
     const { member, household } = this.authorize(sessionToken);
+    this.prunePairingCapabilities();
     if (household.members.size >= 2)
       throw new PairingError(
         "household_full",
@@ -280,6 +302,7 @@ export class PairingService {
       pairing.expiresAt <= this.now()
     ) {
       pairing.state = "Expired";
+      pairing.terminalAt = this.now();
       pairing.version += 1;
       this.codeIndex.delete(pairing.verifier);
       this.audit("pairing_expired", {
@@ -347,6 +370,7 @@ export class PairingService {
     pairing.attempts += 1;
     if (pairing.attempts > MAX_CODE_ATTEMPTS) {
       pairing.state = "Revoked";
+      pairing.terminalAt = this.now();
       pairing.version += 1;
       this.audit("pairing_revoked", {
         pairingId: pairing.id,
@@ -429,6 +453,8 @@ export class PairingService {
     pairing.confirmedMemberId = memberId;
     pairing.confirmedDeviceId = deviceId;
     pairing.state = "Confirmed";
+    pairing.terminalAt = this.now();
+    pairing.expiresAt = this.now() + CLAIM_TTL_MS;
     pairing.version += 1;
     this.codeIndex.delete(pairing.verifier);
     this.audit("pairing_confirmed", {
@@ -459,6 +485,7 @@ export class PairingService {
     if (!["Pending", "Claimed"].includes(state))
       throw terminalPairingError(state);
     pairing.state = "Revoked";
+    pairing.terminalAt = this.now();
     pairing.version += 1;
     this.codeIndex.delete(pairing.verifier);
     this.audit("pairing_revoked", { householdId: household.id, pairingId });
@@ -486,9 +513,19 @@ export class PairingService {
         "This pairing request is unavailable.",
         404,
       );
+    if (pairing.state === "Confirmed" && pairing.expiresAt <= this.now()) {
+      this.claimTokens.delete(claimHash);
+      this.prunePairingCapabilities();
+      throw new PairingError(
+        "claim_unavailable",
+        "This pairing request is unavailable.",
+        404,
+      );
+    }
     const view = this.pairingView(pairing);
     if (["Expired", "Revoked"].includes(view.state))
       this.claimTokens.delete(claimHash);
+    this.prunePairingCapabilities();
     return view;
   }
 
@@ -497,6 +534,7 @@ export class PairingService {
   }
 
   claimCredential(claimToken) {
+    this.prunePairingCapabilities();
     const pairing = this.pairings.get(
       this.claimTokens.get(hash(String(claimToken ?? ""))),
     );
@@ -510,6 +548,7 @@ export class PairingService {
   }
 
   activateClaim(claimToken) {
+    this.prunePairingCapabilities();
     const pairing = this.pairings.get(
       this.claimTokens.get(hash(String(claimToken ?? ""))),
     );
@@ -535,6 +574,27 @@ export class PairingService {
 
   logout(sessionToken) {
     this.sessions.delete(hash(String(sessionToken ?? "")));
+  }
+
+  prunePairingCapabilities(now = this.now()) {
+    for (const pairing of this.pairings.values()) this.state(pairing);
+    for (const [claimHash, pairingId] of this.claimTokens) {
+      const pairing = this.pairings.get(pairingId);
+      if (
+        !pairing ||
+        ["Expired", "Revoked"].includes(this.state(pairing)) ||
+        (pairing.state === "Confirmed" && pairing.expiresAt <= now)
+      )
+        this.claimTokens.delete(claimHash);
+    }
+    const claimedPairings = new Set(this.claimTokens.values());
+    for (const [pairingId, pairing] of this.pairings)
+      if (
+        pairing.terminalAt != null &&
+        pairing.terminalAt + TERMINAL_PAIRING_RETENTION_MS <= now &&
+        !claimedPairings.has(pairingId)
+      )
+        this.pairings.delete(pairingId);
   }
 
   pairingView(pairing) {
@@ -666,6 +726,9 @@ export class PairingService {
         deviceId,
       });
     }
+    for (const [sessionHash, activeSession] of this.sessions)
+      if (activeSession.deviceId === device.id)
+        this.sessions.delete(sessionHash);
     return { id: device.id, revokedAt: device.revokedAt };
   }
 }

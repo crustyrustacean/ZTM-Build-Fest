@@ -81,11 +81,15 @@ export class WebAuthn {
   consume(clientDataJSON, kind, flow) {
     this.pruneChallenges();
     let client;
+    let encoded;
     try {
-      client = JSON.parse(b64(clientDataJSON));
+      encoded = b64(clientDataJSON);
+      client = JSON.parse(encoded);
     } catch {
       throw authError();
     }
+    if (!client || typeof client !== "object" || Array.isArray(client))
+      throw authError();
     const record = this.challenges.get(client.challenge);
     this.challenges.delete(client.challenge);
     if (
@@ -97,70 +101,87 @@ export class WebAuthn {
       client.type !== (kind === "register" ? "webauthn.create" : "webauthn.get")
     )
       throw authError();
-    return b64(clientDataJSON);
+    return encoded;
   }
 
   verifyRegistration(response, flow) {
-    const clientData = this.consume(
-      response?.response?.clientDataJSON,
-      "register",
-      flow,
-    );
-    const attestation = decodeCbor(b64(response?.response?.attestationObject));
-    const authData =
-      attestation instanceof Map ? attestation.get("authData") : null;
-    if (!Buffer.isBuffer(authData) || authData.length < 55) throw authError();
-    verifyRpAndFlags(authData, this.rpId, true);
-    let offset = 37;
-    const aaguidEnd = offset + 16;
-    const idLength = authData.readUInt16BE(aaguidEnd);
-    const idStart = aaguidEnd + 2;
-    const idEnd = idStart + idLength;
-    if (idEnd > authData.length) throw authError();
-    const credentialId = authData.subarray(idStart, idEnd);
-    const decoded = decodeCbor(authData, idEnd, true);
-    const cose = decoded.value;
-    if (!(cose instanceof Map)) throw authError();
-    const algorithm = cose.get(3);
-    const publicKey = coseToPem(cose, algorithm);
-    if (response.id !== b64url(credentialId)) throw authError();
-    return {
-      id: response.id,
-      publicKey,
-      algorithm,
-      signCount: authData.readUInt32BE(33),
-      transports: response.response.transports ?? [],
-    };
+    try {
+      const clientData = this.consume(
+        response?.response?.clientDataJSON,
+        "register",
+        flow,
+      );
+      const attestation = decodeCbor(
+        b64(response?.response?.attestationObject),
+      );
+      const authData =
+        attestation instanceof Map ? attestation.get("authData") : null;
+      if (!Buffer.isBuffer(authData) || authData.length < 55) throw authError();
+      verifyRpAndFlags(authData, this.rpId, true);
+      const aaguidEnd = 37 + 16;
+      const idLength = authData.readUInt16BE(aaguidEnd);
+      const idStart = aaguidEnd + 2;
+      const idEnd = idStart + idLength;
+      if (!idLength || idEnd > authData.length) throw authError();
+      const credentialId = authData.subarray(idStart, idEnd);
+      const cose = decodeCbor(authData, idEnd, true).value;
+      if (!(cose instanceof Map)) throw authError();
+      const algorithm = cose.get(3);
+      const publicKey = coseToPem(cose, algorithm);
+      if (
+        typeof response.id !== "string" ||
+        response.id !== b64url(credentialId)
+      )
+        throw authError();
+      return {
+        id: response.id,
+        publicKey,
+        algorithm,
+        signCount: authData.readUInt32BE(33),
+        transports: Array.isArray(response.response.transports)
+          ? response.response.transports
+          : [],
+      };
+    } catch (error) {
+      normalizeVerificationError(error);
+    }
   }
 
   verifyAuthentication(response, flow, credential) {
-    const clientData = this.consume(
-      response?.response?.clientDataJSON,
-      "authenticate",
-      flow,
-    );
-    if (!credential || response.id !== credential.id) throw authError();
-    const authData = b64(response.response.authenticatorData);
-    verifyRpAndFlags(authData, this.rpId, false);
-    const signed = Buffer.concat([authData, sha256(clientData)]);
-    if (
-      !verify(
-        credential.algorithm === -7 ? "sha256" : "RSA-SHA256",
-        signed,
-        credential.publicKey,
-        b64(response.response.signature),
-      )
-    )
-      throw authError();
-    const count = authData.readUInt32BE(33);
-    if (credential.signCount && count && count <= credential.signCount)
-      throw new PairingError(
-        "credential_replayed",
-        "The passkey response could not be verified.",
-        401,
+    try {
+      const clientData = this.consume(
+        response?.response?.clientDataJSON,
+        "authenticate",
+        flow,
       );
-    credential.signCount = count;
-    return true;
+      if (!credential || response?.id !== credential.id) throw authError();
+      if (![-7, -257].includes(credential.algorithm)) throw authError();
+      const authData = b64(response.response.authenticatorData);
+      verifyRpAndFlags(authData, this.rpId, false);
+      const signature = b64(response.response.signature);
+      if (!signature.length) throw authError();
+      const signed = Buffer.concat([authData, sha256(clientData)]);
+      if (
+        !verify(
+          credential.algorithm === -7 ? "sha256" : "RSA-SHA256",
+          signed,
+          credential.publicKey,
+          signature,
+        )
+      )
+        throw authError();
+      const count = authData.readUInt32BE(33);
+      if (credential.signCount && count && count <= credential.signCount)
+        throw new PairingError(
+          "credential_replayed",
+          "The passkey response could not be verified.",
+          401,
+        );
+      credential.signCount = count;
+      return true;
+    } catch (error) {
+      normalizeVerificationError(error);
+    }
   }
 }
 
@@ -200,7 +221,13 @@ function coseToPem(cose, algorithm) {
   if (algorithm === -257 && cose.get(1) === 3) {
     const n = cose.get(-1);
     const e = cose.get(-2);
-    if (!Buffer.isBuffer(n) || !Buffer.isBuffer(e)) throw authError();
+    if (
+      !Buffer.isBuffer(n) ||
+      !Buffer.isBuffer(e) ||
+      n.length === 0 ||
+      e.length === 0
+    )
+      throw authError();
     const rsa = derSequence(derInteger(n), derInteger(e));
     const algorithmId = Buffer.from("300d06092a864886f70d0101010500", "hex");
     const spki = derSequence(
@@ -243,7 +270,17 @@ function derLength(length) {
 }
 
 function decodeCbor(buffer, start = 0, withOffset = false) {
+  if (!Buffer.isBuffer(buffer) || start < 0 || start >= buffer.length)
+    throw authError();
   let offset = start;
+  const requireBytes = (length) => {
+    if (
+      !Number.isSafeInteger(length) ||
+      length < 0 ||
+      offset + length > buffer.length
+    )
+      throw authError();
+  };
   const read = () => {
     const initial = buffer[offset++];
     if (initial === undefined) throw authError();
@@ -251,28 +288,38 @@ function decodeCbor(buffer, start = 0, withOffset = false) {
     const info = initial & 31;
     let length;
     if (info < 24) length = info;
-    else if (info === 24) length = buffer[offset++];
-    else if (info === 25) {
+    else if (info === 24) {
+      requireBytes(1);
+      length = buffer[offset++];
+    } else if (info === 25) {
+      requireBytes(2);
       length = buffer.readUInt16BE(offset);
       offset += 2;
     } else if (info === 26) {
+      requireBytes(4);
       length = buffer.readUInt32BE(offset);
       offset += 4;
     } else throw authError();
     if (major === 0) return length;
     if (major === 1) return -1 - length;
     if (major === 2) {
+      requireBytes(length);
       const value = buffer.subarray(offset, offset + length);
       offset += length;
       return value;
     }
     if (major === 3) {
+      requireBytes(length);
       const value = buffer.toString("utf8", offset, offset + length);
       offset += length;
       return value;
     }
-    if (major === 4) return Array.from({ length }, read);
+    if (major === 4) {
+      if (length > buffer.length - offset) throw authError();
+      return Array.from({ length }, read);
+    }
     if (major === 5) {
+      if (length > Math.floor((buffer.length - offset) / 2)) throw authError();
       const map = new Map();
       for (let i = 0; i < length; i += 1) map.set(read(), read());
       return map;
@@ -282,6 +329,11 @@ function decodeCbor(buffer, start = 0, withOffset = false) {
   };
   const value = read();
   return withOffset ? { value, offset } : value;
+}
+
+function normalizeVerificationError(error) {
+  if (error instanceof PairingError) throw error;
+  throw authError();
 }
 
 function authError() {

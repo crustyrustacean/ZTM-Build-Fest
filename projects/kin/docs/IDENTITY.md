@@ -1,6 +1,6 @@
 # Identity and Trusted Devices
 
-**Status:** Current through v0.8.6. Household/member identity, passkey credentials, trusted-device-bound sessions and reauthentication, membership removal, and device revocation are implemented by the same-origin in-memory service. Encrypted sync and content-key management remain future work.
+**Status:** Current through v0.8.7. Household/member identity, passkey credentials, member-bound approvals, trusted-device-bound sessions and reauthentication, membership removal, and eager revoked-device session invalidation are implemented by the same-origin in-memory service. Encrypted sync and content-key management remain future work.
 
 ## Separate identities
 
