@@ -1,6 +1,6 @@
 # Release Process
 
-**Status:** v0.7.4 Routine Stale-Action Correctness release. No capability is added. The fork branch and tag are pushed; no upstream push or kin-main merge is authorized.
+**Status:** v0.7.4 Routine Stale-Action Correctness and manual Wasm ABI ownership-hardening release. No capability is added. The fork branch and tag are pushed; no upstream push or kin-main merge is authorized.
 
 ## Release sequence
 

@@ -2,7 +2,7 @@
 
 > A private, lightweight household coordination app for the little things families need to know, remember, hand off, or discuss.
 
-**Current status: `v0.7.4` — Routine Stale-Action Correctness.** Kin supports Daily and Monday-start Weekly household routines: create, complete the current occurrence, reopen and archive. Rust derives occurrences from saved events and explicit browser-local civil context through protocol v7. The IndexedDB preflight rejects stale same-period completion/reopen actions against the latest Rust projection; the release adds two-tab regression coverage and refreshes pairing-planning status only. Midnight/focus refresh never creates an event. IndexedDB stays schema 1; protocols v1–v6 and source event bytes remain supported. No framework, analytics, AI or remote service is present.
+**Current status: `v0.7.4` — Routine Stale-Action Correctness.** Kin supports Daily and Monday-start Weekly household routines: create, complete the current occurrence, reopen and archive. Rust derives occurrences from saved events and explicit browser-local civil context through protocol v7. The IndexedDB preflight rejects stale same-period completion/reopen actions against the latest Rust projection, with two-tab regression coverage. v0.7.4 also hardens the manual Wasm ABI so `kin_apply_events` accepts only the exact tracked allocation returned by `kin_alloc`, with expanded ownership regressions; protocol layouts and persisted event bytes remain unchanged. Pairing remains planning-only. Midnight/focus refresh never creates an event. IndexedDB stays schema 1; protocols v1–v6 and source event bytes remain supported. No framework, analytics, AI or remote service is present.
 
 ## The problem
 

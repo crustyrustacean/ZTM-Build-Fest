@@ -1,6 +1,6 @@
 # Roadmap
 
-Current release: `v0.7.4 — Routine Stale-Action Correctness`. Daily/Weekly capability is implemented; this patch rejects stale same-period occurrence actions and updates release documentation without adding feature scope.
+Current release: `v0.7.4 — Routine Stale-Action Correctness`. Daily/Weekly capability is implemented; this patch rejects stale same-period occurrence actions, adds two-tab regressions, hardens manual Wasm ABI allocation ownership, and updates pairing-planning documentation without adding feature scope. Protocol layouts and persisted event bytes remain unchanged.
 
 ## Planning releases
 
@@ -182,7 +182,7 @@ Audit ABI/allocation/maximum replay, privacy and documentation consistency; rest
 
 ### `v0.7.4` — Routine Stale-Action Correctness
 
-Reject stale same-period completion/reopen commands before persistence, add multi-client regression coverage, and refresh pairing-document status for the v0.8.0 planning checkpoint. No product capability or persistent-contract change.
+Reject stale same-period completion/reopen commands before persistence, add multi-client regression coverage, harden manual Wasm ABI allocation ownership, and refresh pairing-document status for the v0.8.0 planning checkpoint. No product capability, protocol-layout or persistent-storage change.
 
 ### `v0.8.0` — Household Pairing
 

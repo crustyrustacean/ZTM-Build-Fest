@@ -1,6 +1,6 @@
 # JavaScript–WASM ABI
 
-**Status:** Current through v0.7.0 Routines; earlier version sections are historical contracts. See v0.7.0 below.
+**Status:** Current through v0.7.4 Routine Stale-Action Correctness and ABI ownership hardening; earlier version sections are historical contracts.
 
 ## Target and exports
 

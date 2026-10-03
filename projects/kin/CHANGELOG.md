@@ -4,7 +4,7 @@ This file records completed Kin releases. The `v0.0.x` releases are planning and
 
 ## [0.7.4] — Routine Stale-Action Correctness
 
-Reject routine completion unless the latest occurrence is open, and reject reopen unless it is completed, even when the submitted period key remains current. Preserve existence, archive and period-key preflight checks and the existing stale-state error code. Add two-tab persistence regressions for stale completion and reopen, refresh the pairing-document status through the v0.8.0 planning checkpoint, and update current release metadata. No product capability or persistent contract changed.
+Reject routine completion unless the latest occurrence is open, and reject reopen unless it is completed, even when the submitted period key remains current. Preserve existence, archive and period-key preflight checks and the existing stale-state error code. Add two-tab persistence regressions for stale completion and reopen. Harden the manual Wasm ABI so `kin_apply_events` accepts only the exact tracked allocation returned by `kin_alloc`, with expanded ownership regressions. Refresh pairing-planning status through the v0.8.0 checkpoint and update current release metadata. Protocol layouts, persisted event bytes and product capability remain unchanged.
 
 ## [0.7.3] — Routine Hardening & Polish
 
