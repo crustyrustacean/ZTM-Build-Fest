@@ -32,6 +32,33 @@ function makeEnvelope(adult, overrides = {}) {
   };
 }
 
+function makeBindings(adult, count, start = 1) {
+  return Array.from({ length: count }, (_, index) => {
+    const sequence = start + index;
+    return makeEnvelope(adult, {
+      eventId: sequence.toString(16).padStart(32, "0"),
+      deviceSequence: sequence,
+    });
+  });
+}
+
+function storeBindings(sync, adult, bindings) {
+  for (let index = 0; index < bindings.length; index += 20)
+    sync.pushBindings(adult.sessionToken, bindings.slice(index, index + 20));
+}
+
+function pullAllBindings(sync, adult) {
+  const bindings = [];
+  let cursor = "";
+  do {
+    const page = sync.pullBindings(adult.sessionToken, cursor);
+    bindings.push(...page.bindings);
+    cursor = page.nextCursor;
+    if (!page.hasMore) break;
+  } while (true);
+  return bindings;
+}
+
 function keyPairMarker(suffix) {
   return {
     agreement: { kty: "EC", crv: "P-256", x: suffix, y: suffix },
@@ -333,12 +360,7 @@ test("sync requests are rate-limited per trusted device and recover after the wi
 
 test("encrypted identity bindings use a separate bounded cursor", () => {
   const { adult, sync } = fixture();
-  const bindings = Array.from({ length: 25 }, (_, index) =>
-    makeEnvelope(adult, {
-      eventId: (index + 1).toString(16).padStart(32, "0"),
-      deviceSequence: index + 1,
-    }),
-  );
+  const bindings = makeBindings(adult, 25);
   assert.equal(
     sync.pushBindings(adult.sessionToken, bindings.slice(0, 20)).accepted,
     20,
@@ -353,4 +375,107 @@ test("encrypted identity bindings use a separate bounded cursor", () => {
   const second = sync.pullBindings(adult.sessionToken, first.nextCursor);
   assert.equal(second.bindings.length, 5);
   assert.equal(second.hasMore, false);
+});
+
+test("identity binding exact retry succeeds at capacity without adding a record", () => {
+  const { adult, sync } = fixture();
+  const bindings = makeBindings(adult, 256);
+  storeBindings(sync, adult, bindings);
+
+  assert.equal(
+    sync.pushBindings(adult.sessionToken, [bindings[0]]).accepted,
+    1,
+  );
+  assert.deepEqual(pullAllBindings(sync, adult), bindings);
+});
+
+test("identity binding conflict at capacity is rejected without mutation", () => {
+  const { adult, sync } = fixture();
+  const bindings = makeBindings(adult, 256);
+  storeBindings(sync, adult, bindings);
+  const before = pullAllBindings(sync, adult);
+
+  assert.throws(
+    () =>
+      sync.pushBindings(adult.sessionToken, [
+        makeEnvelope(adult, {
+          eventId: bindings[0].eventId,
+          ciphertext: Buffer.alloc(32, 9).toString("base64url"),
+        }),
+      ]),
+    (error) => error.code === "event_duplicate_conflict",
+  );
+  assert.deepEqual(pullAllBindings(sync, adult), before);
+});
+
+test("identity binding conflict does not commit earlier records in the request", () => {
+  const { adult, sync } = fixture();
+  const existing = makeBindings(adult, 1)[0];
+  const newBinding = makeBindings(adult, 1, 2)[0];
+  sync.pushBindings(adult.sessionToken, [existing]);
+
+  assert.throws(
+    () =>
+      sync.pushBindings(adult.sessionToken, [
+        newBinding,
+        makeEnvelope(adult, {
+          eventId: existing.eventId,
+          ciphertext: Buffer.alloc(32, 9).toString("base64url"),
+        }),
+      ]),
+    (error) => error.code === "event_duplicate_conflict",
+  );
+  assert.deepEqual(pullAllBindings(sync, adult), [existing]);
+});
+
+test("new identity binding beyond capacity is rejected without mutation", () => {
+  const { adult, sync } = fixture();
+  const bindings = makeBindings(adult, 256);
+  storeBindings(sync, adult, bindings);
+  const before = pullAllBindings(sync, adult);
+
+  assert.throws(
+    () =>
+      sync.pushBindings(adult.sessionToken, [makeBindings(adult, 1, 257)[0]]),
+    (error) => error.code === "sync_limit",
+  );
+  assert.deepEqual(pullAllBindings(sync, adult), before);
+});
+
+test("duplicate identity bindings in one request are committed once", () => {
+  const { adult, sync } = fixture();
+  const binding = makeBindings(adult, 1)[0];
+
+  assert.equal(
+    sync.pushBindings(adult.sessionToken, [binding, binding]).accepted,
+    2,
+  );
+  assert.deepEqual(pullAllBindings(sync, adult), [binding]);
+});
+
+test("identity binding storage accepts the final slot then rejects the next", () => {
+  const { adult, sync } = fixture();
+  const bindings = makeBindings(adult, 255);
+  storeBindings(sync, adult, bindings);
+  const [finalBinding, overCapacityBinding] = makeBindings(adult, 2, 256);
+
+  assert.throws(
+    () =>
+      sync.pushBindings(adult.sessionToken, [finalBinding, overCapacityBinding]),
+    (error) => error.code === "sync_limit",
+  );
+  assert.deepEqual(pullAllBindings(sync, adult), bindings);
+
+  assert.equal(
+    sync.pushBindings(adult.sessionToken, [finalBinding]).accepted,
+    1,
+  );
+  const atCapacity = pullAllBindings(sync, adult);
+  assert.equal(atCapacity.length, 256);
+  assert.throws(
+    () =>
+      sync.pushBindings(adult.sessionToken, [makeBindings(adult, 1, 257)[0]]),
+    (error) => error.code === "sync_limit",
+  );
+  assert.deepEqual(pullAllBindings(sync, adult), atCapacity);
 });

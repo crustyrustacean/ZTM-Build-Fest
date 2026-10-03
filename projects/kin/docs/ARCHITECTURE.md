@@ -57,6 +57,12 @@ A manual ABI is implemented for v0.1.0 in [ABI](ABI.md), including exported func
 
 The manual boundary keeps the interface visible and avoids convenience bindings before a demonstrated need. A later requirement may justify revisiting that choice through an explicit architecture decision; the v0.1.0 implementation must follow the current contract.
 
+## Deferred v0.10.x architectural debt
+
+JavaScript currently participates in constructing canonical domain-event layouts while Rust independently decodes and validates them. This duplicates wire-format knowledge across the boundary. In addition, browser-side storage and sync code reads canonical fields directly from fixed byte offsets, including logical time at offset 76. Outside a narrow Wasm/codec adapter, browser subsystems should not depend on hard-coded canonical event offsets.
+
+The v0.10.x line should establish one Rust-owned codec/metadata boundary. Options include exposing validated metadata through the Wasm API, storing validated structured metadata alongside authoritative canonical bytes, or providing an explicit Rust-owned codec API. Until then, canonical bytes remain authoritative; this debt does not justify changing v0.9.3 event bytes or moving Web Crypto, networking, IndexedDB, or DOM behavior into Rust.
+
 ## Local-first progression
 
 The current implementation works locally:

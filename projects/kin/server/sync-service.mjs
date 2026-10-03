@@ -203,27 +203,32 @@ export class EncryptedSyncService {
         "That sync batch is invalid.",
         400,
       );
-    if (state.bindings.size + envelopes.length > 256)
-      throw new PairingError(
-        "sync_limit",
-        "This household reached its sync limit.",
-        413,
-      );
+    const staged = new Map();
     for (const envelope of envelopes) {
       validateEventEnvelope(envelope, auth, state.currentEpoch);
       const canonical = canonicalEventEnvelope(envelope);
-      const existing = state.bindings.get(envelope.eventId);
+      const existing =
+        state.bindings.get(envelope.eventId) ?? staged.get(envelope.eventId);
       if (existing && existing.canonical !== canonical)
         throw new PairingError(
           "event_duplicate_conflict",
           "A synchronized identity record conflicts with one already received.",
           409,
         );
-      state.bindings.set(envelope.eventId, {
-        canonical,
-        envelope: structuredClone(envelope),
-      });
+      if (!existing)
+        staged.set(envelope.eventId, {
+          canonical,
+          envelope: structuredClone(envelope),
+        });
     }
+    if (state.bindings.size + staged.size > 256)
+      throw new PairingError(
+        "sync_limit",
+        "This household reached its sync limit.",
+        413,
+      );
+    for (const [eventId, binding] of staged)
+      state.bindings.set(eventId, binding);
     return { accepted: envelopes.length, durable: false };
   }
 
