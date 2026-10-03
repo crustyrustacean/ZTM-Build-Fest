@@ -6,6 +6,7 @@ use crate::protocol::MAX_PROTOCOL_BYTES;
 pub const ARCHIVE_VERSION: u16 = 1;
 pub const MAX_ARCHIVE_METADATA: usize = 1024 * 1024;
 
+/// Borrowed views into the caller's archive buffer; decoding does not authenticate it.
 #[derive(Debug, Eq, PartialEq)]
 pub struct Archive<'a> {
     pub metadata: &'a [u8],

@@ -1,6 +1,6 @@
 # Synchronization Design
 
-**Status:** v0.11.5 implementation candidate; awaiting human review. Existing encrypted envelopes and v8 canonical replay remain compatible. The local outbox, sync state, epoch secrets and private device keys are encrypted at rest and unavailable while locked. Signed device-key successors preserve verification history and repair entitled post-join epoch grants. The candidate stores identity, authorization and opaque relay state in SQLite and acknowledges an event only after commit; the service remains a relay, not a household source of truth.
+**Status:** v0.11.7 implementation candidate; awaiting human review. Existing encrypted envelopes and v8 canonical replay remain compatible. The local outbox, sync state, epoch secrets and private device keys are encrypted at rest and unavailable while locked. Signed device-key successors preserve verification history and repair entitled post-join epoch grants. The candidate stores identity, authorization and opaque relay state in SQLite and acknowledges an event only after commit; the service remains a relay, not a household source of truth.
 
 ## Intended direction
 

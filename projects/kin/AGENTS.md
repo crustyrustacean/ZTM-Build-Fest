@@ -100,7 +100,7 @@ If an unrelated parent-repository file was modified accidentally, revert that ch
 
 # Current Development Stage
 
-Kin's last published release is `v0.10.3` — Bounded Storage/Archive Hardening & Architecture Closure. The `v0.11.5` Durable Service & Deployment implementation candidate is committed and tagged `kin-v0.11.5` for human review; the tag is not a published release. Preserve every published tag exactly. Root replacement follows [ROOT-ROTATION](docs/ROOT-ROTATION.md); archive recovery remains intentionally local-only and KARC v1 remains supported. Do not begin v0.12 or create/publish further release commits/tags without explicit authorization. The forward roadmap is v0.12 data lifecycle/deletion, v0.13 recovery/continuity, v0.14 UX/UI consolidation, then v1.0 stability. No production certification, mobile readiness or independent audit is claimed. No automatic kin-main or kin-development merge. See [V0.10.0](docs/V0.10.0.md) and [V0.11.0](docs/V0.11.0.md) for actual evidence and limitations.
+Kin's last published release is `v0.10.3` — Bounded Storage/Archive Hardening & Architecture Closure. The `v0.11.7` Durable Service & Deployment implementation candidate (October Roadmap & Startup Diagnostics) is committed and tagged `kin-v0.11.7` for human review; the tag is not a published release. Preserve every published tag exactly. Root replacement follows [ROOT-ROTATION](docs/ROOT-ROTATION.md); archive recovery remains intentionally local-only and KARC v1 remains supported. Do not begin v0.12 or create/publish further release commits/tags without explicit authorization. The [forward roadmap](docs/ROADMAP.md) targets one minor line per day from v0.12 on October 3 through v0.40 on October 31, with v0.41–v0.45 as undated follow-ups and v1.0 dependent on readiness. No production certification, mobile readiness or independent audit is claimed. No automatic kin-main or kin-development merge. See [V0.10.0](docs/V0.10.0.md) and [V0.11.0](docs/V0.11.0.md) for actual evidence and limitations.
 
 The pre-implementation releases are:
 
@@ -1011,7 +1011,11 @@ v0.11.x — Durable Service & Deployment (implementation candidate; awaiting hum
 v0.12.x — Data Lifecycle, Retention & Deletion (planned)
 v0.13.x — Recovery & Household Continuity (planned)
 v0.14.x — UX/UI Consolidation (planned)
-v1.0.0 — Stable Kin Platform (planned)
+v0.15.x — Household Areas (planned)
+v0.16.x — Household Notes & Reference Context (planned)
+v0.17.x–v0.40.x — Incremental household capabilities, portability and device migration (October targets)
+v0.41.x–v0.45.x — Recovery drills, platform validation, performance and release-candidate readiness (undated follow-ups)
+v1.0.0 — Stable Kin Platform (planned, readiness-driven)
 ```
 
 This roadmap may evolve.

@@ -45,7 +45,7 @@ def main() -> int:
     changelog = (PROJECT_ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
     require_match(
         "CHANGELOG latest published release",
-        r"^## \[([0-9]+\.[0-9]+\.[0-9]+)\]",
+        r"^## v([0-9]+\.[0-9]+\.[0-9]+)(?: —|$)",
         changelog,
         version,
     )

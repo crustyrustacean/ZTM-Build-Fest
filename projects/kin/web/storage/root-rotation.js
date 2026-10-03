@@ -39,6 +39,8 @@ export function rotateEventProtection(options, contract) {
       const id = Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) => byte.toString(16).padStart(2, "0")).join("");
       const candidateManifest = { ...structuredClone(candidateVault.manifest), key: KEY,
         phase: "encrypted", lockEpoch: epoch + 1, configRevision: revision + 1 };
+      // Retain the old root only under the candidate root so interruption
+      // recovery requires the new recovery key, not the retired wrapper.
       const root = sourceVault.root.slice();
       let sourceRoot;
       try { sourceRoot = await candidateVault.seal(root, { store: "root-rotation", id }); }

@@ -1,6 +1,6 @@
 # Development Workflow
 
-**Status:** v0.11.5 durable-service implementation candidate; awaiting human review. Earlier version sections remain historical contracts.
+**Status:** v0.11.7 durable-service implementation candidate (October Roadmap & Startup Diagnostics); awaiting human review. Earlier version sections remain historical contracts.
 
 ## Build and run
 
@@ -31,6 +31,19 @@ npm ci --prefix projects/kin
 ```
 
 The launcher builds the WASM module and serves the web app at `http://localhost:8000`; press Ctrl+C to stop it. On macOS/Linux, run `sh projects/kin/run.sh` from the repository root. Never run Cargo from the Build Fest repository root for Kin; generated artifacts belong under `projects/kin/`.
+
+Wait for the server's `service_ready` event before opening the app. A
+`startup_failed` event with `outcome: "listen_failed"` includes the attempted
+host, port, operating-system error code, and recovery guidance. `EADDRINUSE`
+means another listener is using that address; `EACCES` means the operating
+system denied the bind (for example, a reserved port); `EADDRNOTAVAIL` means
+the selected host is unavailable. In PowerShell, inspect the port reported in
+the error with `Get-NetTCPConnection -LocalPort 8000 -State Listen` (replace
+`8000` as needed), then inspect its `OwningProcess` before stopping anything.
+Check `Get-ChildItem Env:KIN_*` in the failing terminal for configuration
+overrides. Kin does not automatically switch ports: a different browser origin
+uses different local storage. A failed bind releases the service's database
+lock; deleting data or a lock does not resolve a listen failure.
 
 ## First-class operating systems
 

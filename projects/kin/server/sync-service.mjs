@@ -151,6 +151,7 @@ export class EncryptedSyncService {
       nextDeviceSequence.set(auth.device.id, envelope.deviceSequence);
     }
 
+    // Publish counters and acknowledge only after the durable batch commits.
     if (this.store && staged.length) {
       try {
         this.store.commitEvents(

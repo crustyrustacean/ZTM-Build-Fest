@@ -2,9 +2,9 @@
 
 > A private, lightweight household coordination app for the little things families need to know, remember, hand off, or discuss.
 
-**Last published release: `v0.10.3` — Bounded Storage/Archive Hardening & Architecture Closure.** The `v0.11.5` durable-service implementation candidate is tagged `kin-v0.11.5` for human review; it is not a published release. Household events, metadata and private sync keys remain encrypted in browser storage. Startup remains locked until a verified recovery secret or supported passkey PRF unwraps the local root. Recovery protection can be replaced with a new random root and a newly confirmed recovery key. Protected reads use bounded batches, and KARC v1 archives avoid redundant ciphertext copies. Rust owns commands, canonical event codecs, replay and archive framing; browser APIs own cryptography, storage and authentication. Opt-in encrypted relay sync preserves canonical identity and exact retry envelopes.
+**Last published release: `v0.10.3` — Bounded Storage/Archive Hardening & Architecture Closure.** The `v0.11.7` durable-service implementation candidate is tagged `kin-v0.11.7` for human review; it is not a published release. Household events, metadata and private sync keys remain encrypted in browser storage. Startup remains locked until a verified recovery secret or supported passkey PRF unwraps the local root. Recovery protection can be replaced with a new random root and a newly confirmed recovery key. Protected reads use bounded batches, and KARC v1 archives avoid redundant ciphertext copies. Rust owns commands, canonical event codecs, replay and archive framing; browser APIs own cryptography, storage and authentication. Opt-in encrypted relay sync preserves canonical identity and exact retry envelopes.
 
-The [v0.10 release record](docs/V0.10.0.md) describes recovery, migration, compatibility, measurements and validation. Root replacement preserves canonical history and sync keys, resumes after interruption using the new recovery key, and requires adding passkey unlock again afterward. Archives are intentionally local-only history recovery and do not restore sync authority. Maximum-history memory and latency remain desktop measurements; mobile readiness is not claimed. This line stops for human review. The v0.11 durable-service candidate awaits review; v0.12–v0.14 and v1.0 remain planned. See the [roadmap](docs/ROADMAP.md). Upgrading v0.9.3 requires security setup and verified migration before the old plaintext dataset gains this protection.
+The [v0.10 release record](docs/V0.10.0.md) describes recovery, migration, compatibility, measurements and validation. Root replacement preserves canonical history and sync keys, resumes after interruption using the new recovery key, and requires adding passkey unlock again afterward. Archives are intentionally local-only history recovery and do not restore sync authority. Maximum-history memory and latency remain desktop measurements; mobile readiness is not claimed. This line stops for human review. The v0.11 durable-service candidate awaits review; v0.12–v0.45 and eventual v1.0 remain planned. See the [roadmap](docs/ROADMAP.md). Upgrading v0.9.3 requires security setup and verified migration before the old plaintext dataset gains this protection.
 
 ## The problem
 
@@ -17,6 +17,16 @@ Kin aims to make useful household context easier to share and find. It is not a 
 Kin is intended as a private, lightweight shared household operating layer. Today and Needs views, lightweight classification, capture, completion, reopening, and archival are implemented locally. Handoff capture, acknowledgement, and recent context are implemented locally. Talk captures short topics for later, with Open/Resolved lists, resolve, reopen, and archive. Resolved is workflow state only, not agreement or an objective solution. Pulse adds fixed current capacity, set/replace/clear and explicit expiry, introduced in Rust protocol v5. Since You Last Looked shows at most eight recent meaningful household changes with an omitted-change count; Pulse is excluded. The user explicitly marks the displayed snapshot caught up. Values are context only, never scores or diagnoses. Routines support Daily/Weekly coordination without reminders, streaks, assignments or calendar UI.
 
 The intended technical direction is Rust compiled to WebAssembly, native Web Components, vanilla JavaScript, and browser APIs, with a local-first start and no external framework unless a demonstrated requirement justifies one.
+
+## October Build Fest plan
+
+> Kin should help a household remember, coordinate, hand off, and recover context without requiring everyone to become a project manager.
+
+The October plan builds on the existing product and technical foundation with one small, coherent capability per minor release, followed by meaningful correctness, resilience, accessibility, and hardening work. The [roadmap](docs/ROADMAP.md) and [planned release contracts](docs/releases/) define the scope; they do not describe implemented features or authorize release tags.
+
+October 3–31, 2026 spans 29 days, matching the 29 planned minor lines from `v0.12.x` through `v0.40.x`. The first target is completing `v0.12.0` on October 3, followed by `v0.13.x` on October 4 and one minor line per day through `v0.40.x` on October 31. The platform work through `v0.16.x` is part of this daily plan. These are targets, not completion claims: the current `v0.11.7` candidate still awaits human review. If prerequisites or a day's acceptance criteria are not met, narrow the feature or move the dates. Create patches only for real stabilization work; never fabricate releases or tags to meet the calendar.
+
+The month targets a coherent, demoable pre-1.0 build at `v0.40.x`. The `v0.41.x`–`v0.45.x` plans remain undated follow-up work after October for recovery drills, broader platform validation, performance, and release-candidate readiness. `v1.0` depends on readiness and human feedback, with no deadline forcing it onto October 31. AI runtime features, gamification, surveillance, and enterprise workflows remain outside this plan.
 
 ## Release history
 
@@ -83,11 +93,16 @@ The intended technical direction is Rust compiled to WebAssembly, native Web Com
 - `v0.10.1` — Security Lifecycle & Sync Recovery Correctness (`kin-v0.10.1`)
 - `v0.10.2` — Local Root Rotation & Recovery Lifecycle (`kin-v0.10.2`)
 - `v0.10.3` — Bounded Storage/Archive Hardening & Architecture Closure (`kin-v0.10.3`)
-- Candidate: `v0.11.5` — Durable Semantic Integrity (awaiting human review)
+- Earlier candidate: `v0.11.6` — Release Documentation & Code Clarity (includes v0.11.5 durable semantic integrity; not a published release)
+- Candidate: `v0.11.7` — October Roadmap & Startup Diagnostics (awaiting human review)
 - Planned: `v0.12.x` — Data Lifecycle, Retention & Deletion
 - Planned: `v0.13.x` — Recovery & Household Continuity
 - Planned: `v0.14.x` — UX/UI Consolidation
-- Planned: `v1.0.0` — Stable Kin Platform
+- Planned: `v0.15.x` — Household Areas
+- Planned: `v0.16.x` — Household Notes & Reference Context
+- Planned: `v0.17.x`–`v0.40.x` — Incremental household capabilities, portability, and device migration within the October plan; see the [daily roadmap](docs/ROADMAP.md)
+- Planned after October, undated: `v0.41.x`–`v0.45.x` — Recovery drills, broader platform validation, performance, and release-candidate readiness
+- Planned: `v1.0.0` — Stable Kin Platform, when readiness and human feedback support it
 - See the [changelog](CHANGELOG.md) for the completed release history.
 
 ## Install, build, and run
@@ -134,7 +149,7 @@ Sync is off until an authenticated adult enables it. The v0.11 implementation ca
 
 ## AI usage
 
-AI-assisted development tools are used for brainstorming, product planning, architecture exploration, documentation, implementation support, debugging, and testing. Kin has no AI runtime, analytics, or third-party runtime dependency. When sync is explicitly enabled, the service receives encrypted event envelopes and limited routing metadata, never plaintext household semantics or content keys.
+AI-assisted development tools are used for brainstorming, product planning, architecture exploration, documentation, implementation support, debugging, and testing. Kin has no AI runtime or analytics, and household data is not sent to an AI service. When sync is explicitly enabled, the service receives encrypted event envelopes and limited routing metadata, never plaintext household semantics or content keys.
 
 ## License
 
@@ -192,10 +207,17 @@ Kin is nested in the ZTM Build Fest repository. Its community files and template
 - [Accepted architecture decision: event-sourced household state](docs/decisions/0001-event-sourced-household-state.md)
 - [UX flows](docs/UX.md)
 - [Roadmap](docs/ROADMAP.md)
+- [Build Fest daily cadence](docs/BUILD-FEST-CADENCE.md)
+- [Platform foundation and early October sequence through v0.16](docs/BRIDGE-0.11-0.16.md)
+- [Product boundaries for the October plan](docs/PRODUCT-BOUNDARIES.md)
+- [Minor-release stabilization protocol](docs/RELEASE-LINE-PROTOCOL.md)
 - [v0.11 Durable Service & Deployment implementation candidate](docs/V0.11.0.md)
 - [Planned v0.12 Data Lifecycle, Retention & Deletion contract](docs/V0.12.0.md)
 - [Planned v0.13 Recovery & Household Continuity contract](docs/V0.13.0.md)
 - [Planned v0.14 UX/UI Consolidation contract](docs/V0.14.0.md)
+- [Planned v0.15 Household Areas contract](docs/releases/V0.15.0.md)
+- [Planned v0.16 Household Notes & Reference Context contract](docs/releases/V0.16.0.md)
+- [Planned release contracts: October through v0.40 and undated v0.41–v0.45 follow-up](docs/releases/)
 - [v0.1.0 implementation specification](docs/V0.1.0.md)
 - [Handoff release contract and final validation](docs/V0.3.0.md)
 

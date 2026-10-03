@@ -143,6 +143,7 @@ pub extern "C" fn kin_plan_import(pointer: u32, length: u32) -> i32 {
 }
 
 fn operate(pointer: u32, length: u32, operation: fn(&[u8]) -> Result<Vec<u8>, KinError>) -> i32 {
+    // Keep inputs and published buffers stable against concurrent free, clear, or calls.
     let mut state = lock_state();
     state.result.clear();
     state.error.clear();
