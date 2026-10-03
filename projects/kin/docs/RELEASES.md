@@ -1,8 +1,18 @@
 # Release Process
 
-**Status:** Current implementation/release: v0.9.3 Encrypted Event Sync Stabilization. The v0.9.x line ends at its encrypted-sync stabilization gate. The next planned development line is v0.10.x — Portable Core / Architectural Consolidation — before v1.0.0. Sync is opt-in and encrypted, but identity/relay state remains process-memory only; accepted relay data is not durable.
+**Status:** Current implementation: v0.10.3 Bounded Storage/Archive Hardening & Architecture Closure. The user authorized v0.10.2 and v0.10.3, annotated tags before updating existing PR #15 into `kin-development`, then a stop for human review. No merge is authorized. Identity/relay state remains process-memory only; accepted relay data is not durable.
 
 ## Release sequence
+
+The intended progression is `kin-v0.9.3` → `kin-v0.10.0` (Portable Core + Local
+Data Security) → `kin-v0.10.1` (Security Lifecycle & Sync Recovery Correctness) →
+`kin-v0.10.2` (Local Root Rotation & Recovery Lifecycle) →
+`kin-v0.10.3` (Bounded Storage/Archive Hardening & Architecture Closure) →
+human review → `kin-v0.11.0` (UX/UI Consolidation) → `kin-v1.0.0` (Stable Kin
+Platform). v1.0 requires BOTH architecture/security and UX/UI readiness. Use the
+concrete development slices and gates in [V0.10.0](V0.10.0.md); do not manufacture
+patch releases or knowingly defer a necessary correctness fix. Create tags only
+after completed validation and requested approval, never at development start.
 
 ```text
 scope complete
@@ -29,6 +39,13 @@ push commit/tag when explicitly authorized
 A tag is created only for a completed, validated milestone. Use a descriptive annotated tag such as `kin-v0.0.8` or `kin-v0.1.0`. Never use generic tags such as `v0.1.0`; the repository contains multiple independent projects. Published tags are immutable: do not move, force-update, or reuse them. Correct a released mistake with a new patch version.
 
 Before a new version starts, verify that the previous completed Kin version has its matching tag. Inspect the entire worktree and stage/commit only paths under `projects/kin/`. Do not include another contributor's changes.
+
+The v0.10.1 patch starts from the completed v0.10.0 commit `2dc94f8`.
+At the user's publication request, the missing annotated `kin-v0.10.0` tag was
+restored on that commit and pushed to `origin`. The existing published annotated
+`kin-v0.10.1` tag remains on `e65db23`. The branch
+`kin-v0.10.1-security-correctness` is pushed for PR review into `kin-development`;
+kin-main/kin-development merges remain separate actions.
 
 ## Changelog
 
@@ -77,4 +94,4 @@ Follow [V0.7.0](V0.7.0.md) for capability, correctness, resilience/accessibility
 
 ## v0.8.0 Household Pairing
 
-The v0.7.x line is complete at `kin-v0.7.4`, which points to validated release commit `a8ded079be6fdbedba8738a64a5f0fb753e7fdd6` and is pushed to the fork, not upstream. The v0.8.x implementation and stabilization record is in [V0.8.0](V0.8.0.md). `kin-v0.8.8` corrected active-member slot accounting. The v0.9.x sync contract and release record is in [V0.9.0](V0.9.0.md). Stop after `kin-v0.9.3`; next plan v0.10.x, and do not begin v1.0 implementation until its readiness criteria are met.
+The v0.7.x line completed at `kin-v0.7.4`, validated commit `a8ded079be6fdbedba8738a64a5f0fb753e7fdd6`, pushed to the fork. The v0.8 record is [V0.8.0](V0.8.0.md); `kin-v0.8.8` corrected active-member slots. The v0.9 record is [V0.9.0](V0.9.0.md). The merged v0.9.3 base and active v0.10 milestone are recorded in [V0.10.0](V0.10.0.md). v1.0 remains gated by both v0.10 and v0.11 readiness.

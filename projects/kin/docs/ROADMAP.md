@@ -1,16 +1,18 @@
 # Roadmap
 
-Current implementation: `v0.9.3 — Encrypted Event Sync Stabilization`.
+Current implementation: `v0.10.3 — Bounded Storage/Archive Hardening & Architecture Closure`. This completes the requested implementation line and stops for human review of PR #15. v0.11 and v1.0 have not begun.
 
 ```text
 v0.9.3 — Encrypted Event Sync Stabilization
 	↓
-v0.10.x — Portable Core / Architectural Consolidation
+v0.10.x — Portable Core + Local Data Security
+	↓
+v0.11.x — UX/UI Consolidation
 	↓
 v1.0.0 — Stable Kin Platform
 ```
 
-Kin supports opt-in encrypted canonical-event sync across paired trusted devices, recipient-bound epoch-key provisioning, session/device revocation, separate transport and catch-up cursors, offline outbox retries, and deterministic v8 replay. The local identity service and relay remain in-memory; relay acknowledgements are process-local, all-device recovery is unavailable, and independent security/cross-browser review remain future work.
+Kin supports encrypted local storage, recovery/optional PRF unlock, verified migration, Rust commands/codecs, encrypted archives and a static offline shell alongside opt-in encrypted sync. The identity service and relay remain in-memory. Archives recover local history, not server identity. Independent security review and broader browser/authenticator coverage remain outstanding.
 
 ## Planning releases
 
@@ -214,16 +216,28 @@ Completed: persistent exact-envelope outbox, crash-safe remote commit/cursor adv
 
 Completed: recovery and metadata threat assessment, encrypted logging/privacy boundary, bounds and malformed-envelope handling, same-member device enrollment, relay restart semantics, browser storage migration verification, and product-facing sync states. The identity service/relay remain memory-only and no independent security audit is claimed. This is the final v0.9.x encrypted-sync stabilization gate.
 
-### `v0.10.x` — Portable Core / Architectural Consolidation
+### `v0.10.x` — Portable Core + Local Data Security
 
-The final architectural development line before v1.0. Consolidate Rust-owned command semantics and a single canonical event encoder/decoder boundary; reduce duplicated JavaScript knowledge of the wire protocol; grow a portable, deterministic Rust domain core; and address backup/export/import, data portability, PWA/offline hardening, and synchronization/reconciliation boundary cleanup. Stabilize protocol and compatibility contracts, then define explicit v1.0 readiness criteria. These are planned areas, not v0.9.3 accomplishments.
+The final architecture/security development line. v0.10.0 implements cryptographically locked local household data, independent credential/recovery wrappers, recoverable plaintext migration, Rust-owned command semantics and canonical codecs, encrypted export/import, native domain tests, a static offline shell and signed transport-key migration. v0.10.1 corrects overlapping unlock feedback, asynchronous trusted-device pinning and interrupted key-rotation recovery. The evidence inventory, compatibility, measured limits and readiness work are in [V0.10.0](V0.10.0.md). Remaining architectural/security review belongs here before the v0.11 handoff.
 
 Increase the Rust footprint by increasing the amount of Kin that is deterministic, portable, invariant-driven, and independently testable — not by moving browser-native capabilities into Wasm. Web Crypto and networking remain browser/server adapter responsibilities.
 
+### `v0.11.x` — UX/UI Consolidation
+
+Refine information architecture, navigation, responsive behavior, accessibility,
+keyboard interaction, focus management and screen-reader semantics. Consolidate
+authentication/unlock, pairing, backup/recovery, sync status and onboarding;
+loading/empty/error states; component consistency, visual hierarchy, typography,
+spacing, motion, modern CSS, PWA/install experience and cross-browser UX. v0.10
+must deliver working accessible security states, while this line owns holistic
+product polish. It must not need to redesign encryption, storage or commands.
+
 ### `v1.0.0` — Stable Kin Platform
 
-Begin implementation only after the v0.10.x readiness criteria are satisfied. Establish and validate the explicit stable-platform acceptance criteria; this is not part of the v0.9.3 scope.
+Begin implementation only after BOTH v0.10 architecture/security and v0.11 UX/UI
+readiness criteria are satisfied. Stabilize what those lines secured and refined;
+do not introduce another major architecture at v1.0.
 
 ## Scope discipline
 
-Each roadmap item is future work unless explicitly marked as completed. Authentication, passkeys, pairing, trusted-device authorization, and opt-in encrypted event synchronization are implemented through v0.9.3. The next planned development line is v0.10.x; do not begin v1.0 implementation before its readiness criteria are met. Releases through `v0.0.12` were documentation-only; v0.1.0 is the first coded release. Handoff is implemented in v0.3.0; Talk in v0.4.0; Pulse in v0.5.0; Since You Last Looked in v0.6.0; Routines in v0.7.0.
+Each roadmap item is future work unless explicitly marked as implemented. v0.9.3 supplies authentication, pairing and encrypted sync; v0.10.0 adds local security, portable commands/codecs and encrypted recovery archives. v0.11 remains future work. Do not begin v1.0 before both readiness gates pass. Releases through `v0.0.12` were documentation-only; v0.1.0 was the first coded release. Earlier version sections preserve release history, including draft persistence later removed by v0.10.

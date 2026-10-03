@@ -2,6 +2,60 @@
 
 This file records completed Kin releases. The `v0.0.x` releases are planning and documentation milestones; they do not represent implemented application features. The first implementation milestone remains `v0.1.0`.
 
+## [0.10.3] — Bounded Storage/Archive Hardening & Architecture Closure
+
+Page protected reads and bound decryption concurrency, remove redundant migration
+and restore copies, and preserve exact comparison, full Rust replay and atomic
+publication. KARC v1 remains the archive format: raw ciphertext stays in browser
+buffers while Rust validates compact framing metadata. Legacy archives and ABI
+entry points remain supported. Additional corruption and mid-operation lock
+checks exercise fail-closed publication.
+
+Archive restoration is intentionally local-only and grants no sync authority.
+The [release record](docs/V0.10.0.md) contains same-harness before/after desktop
+measurements, compatibility and the internal architecture/security review. No
+independent audit, mobile certification, v0.11 redesign or v1.0 work is claimed.
+
+Passed 118 Rust tests, 150 Node/real-WASM tests on both Windows and Linux,
+313 security storage assertions, 97 security UI assertions, 18 virtual-authenticator
+assertions, the complete product browser gate and PowerShell/POSIX launch workflows.
+Maximum-history sampled renderer memory fell from 2.82 to 1.32 GiB; typical 10k
+unlock measured 9% slower. KARC v1 archive sizes and canonical bytes are unchanged.
+
+## [0.10.2] — Local Root Rotation & Recovery Lifecycle
+
+Replace recovery protection with an independent random root and a new, re-entered
+256-bit recovery key. Durable staging verifies every protected record, canonical
+replay and restored sync key before publication. Interrupted replacement resumes
+the same candidate; monotonic root versions and lock epochs reject stale tabs.
+Existing PRF unlock wrappers are retired and must be re-added with authentication.
+Old copied recovery wrappers cannot decrypt newly protected data; rotation cannot
+erase previously copied plaintext, keys or backups.
+
+Event/key database schemas remain 3/4. Rotated roots use manifest/local-envelope
+v2 with authenticated root versions; original v1 remains readable. Canonical
+events, replay protocols, sync-envelope v1 and KARC v1 remain compatible. See
+[the release record](docs/V0.10.0.md) and [rotation contract](docs/ROOT-ROTATION.md).
+
+## [0.10.1] — Security Lifecycle & Sync Recovery Correctness
+
+- Keep cancelled security operations from changing a newer unlock's status, controls or busy state. Late completion cannot label an unlocked household as locked or remove its lock control.
+- Verify a stable copy of a trusted device's public keys before opening its pinning transaction. Slow fingerprint hashing no longer lets IndexedDB commit before the pin is saved; conflicting pins still fail atomically.
+- Recover interrupted key rotations when recipient packages expire or recipient keys change, retaining the proposed epoch key and reconciling accepted proposals after lost responses. Protect pending-rotation updates against stale tabs.
+- Advance the static shell cache so offline clients receive the fixes. Canonical events, ABI protocols, encrypted envelopes, archive framing and database versions remain unchanged. No new product capability or dependency.
+
+Passed 117 Rust and 140 Node/WASM/server tests, formatting, Clippy, release WASM build, version consistency, the complete product browser suite, 78 security UI assertions, 18 virtual-authenticator assertions, and encrypted storage/migration/pinning checks including 12 new rotation-storage assertions. Validation and remaining readiness work are recorded in [V0.10.0](docs/V0.10.0.md). Published as annotated tag `kin-v0.10.1` at `e65db23`; the release branch is pushed for PR review into `kin-development`. Merging remains separate.
+
+## [0.10.0] — Portable Core + Local Data Security
+
+Implemented and validated on the v0.10 development branch; the missing annotated tag `kin-v0.10.0` was restored at `2dc94f8` and pushed at the user's request. Startup now requires recovery or verified PRF unlock before loading protected history. A random local root encrypts complete event/context/outbox values and private sync material; independent credential wrappers avoid corpus re-encryption. Revision checks and a durable lock epoch prevent stale-tab wrapper resurrection and protected writes after lock. Drafts are memory-only.
+
+Post-gate lifecycle review fixed a focus/visibility race in the brief interval between attaching an unlocked vault and binding its durable store epoch. Wake checks now wait for the encrypted store, epoch-bearing peer notifications distinguish a newer revocation from a delayed notification delivered after a valid re-unlock, and lock aborts in-flight PRF WebAuthn/server requests.
+
+Migration preserves legacy data until exact-byte decryption and full Rust replay verify the replacement. Nonextractable legacy transport keys authorize encrypted successor keys through a signed, idempotent transition; original canonical events and relay envelopes retain their identity. Rust now owns all 17 household command encoders, command validation, canonical metadata extraction, bounded archive framing and import planning through the existing dependency-free manual ABI.
+
+Encrypted archives restore into an empty installation with fresh local author identity; restored history stays local and does not recreate device trust. The service worker caches static shell assets only and supports offline recovery unlock. Event DB schema is 3, key DB schema 4, local envelope/archive/successor format 1; canonical protocols v1–v8 and sync envelope v1 remain compatible. See [V0.10.0](docs/V0.10.0.md) for actual validation counts, measurements, limitations and v0.11 handoff. The memory-only identity/relay service, lack of in-place local-root rotation, maximum-history latency and broader platform/security review remain explicit limitations.
+
 ## [0.9.3] — Recovery, Privacy, and Feedback Readiness
 
 Completed the v0.9 recovery, metadata, logging, corruption, storage-bound, and UX audit. Added same-member trusted-device pairing, fingerprint-confirmed approval, exact-envelope retry after relay cursor reset, and explicit process-local acknowledgement semantics. An exact identity-binding retry remains idempotent at the 256-record capacity boundary; conflicting or new bindings remain rejected, and rejected batches do not partially commit. Canonical IndexedDB event bytes remain authoritative. The identity service and relay remain memory-only; there is no all-device recovery, durable remote history, independent security audit, or cross-browser certification. Ready for product feedback only after the complete release gates pass.

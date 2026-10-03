@@ -1,4 +1,3 @@
-const DRAFT_KEY = "kin.routine.draft";
 
 class KinRoutines extends HTMLElement {
   constructor() {
@@ -44,11 +43,6 @@ class KinRoutines extends HTMLElement {
     this.message.id = "routine-message";
     this.message.setAttribute("role", "alert");
     this.input.setAttribute("aria-describedby", this.message.id);
-    try {
-      const draft = JSON.parse(sessionStorage.getItem(DRAFT_KEY));
-      if (typeof draft?.text === "string") this.input.value = draft.text;
-      if (["daily", "weekly"].includes(draft?.cadence)) this.cadence.value = draft.cadence;
-    } catch { /* Drafts are best-effort, never household truth. */ }
     this.input.addEventListener("input", () => this.saveDraft());
     this.cadence.addEventListener("change", () => this.saveDraft());
     form.addEventListener("submit", event => {
@@ -82,10 +76,7 @@ class KinRoutines extends HTMLElement {
   }
   focusInput() { this.input.focus(); }
   saveDraft() {
-    try {
-      if (this.input.value) sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ text: this.input.value, cadence: this.cadence.value }));
-      else sessionStorage.removeItem(DRAFT_KEY);
-    } catch { /* Capture remains available without draft storage. */ }
+    // Keep drafts only in the unlocked input.
   }
   clearIfMatches({ text, cadence }) {
     if (this.input.value !== text || this.cadence.value !== cadence) return;

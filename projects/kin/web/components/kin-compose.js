@@ -1,6 +1,4 @@
 const MAX_ITEM_TEXT_BYTES = 4096;
-const DRAFT_STORAGE_KEY = "kin.compose.draft";
-const CLASSIFICATION_STORAGE_KEY = "kin.compose.classification";
 const textEncoder = new TextEncoder();
 
 class KinCompose extends HTMLElement {
@@ -89,12 +87,6 @@ class KinCompose extends HTMLElement {
     this.input.value = "";
     this.classification.value = "need";
     this.message.textContent = "";
-    try {
-      sessionStorage.removeItem(DRAFT_STORAGE_KEY);
-      sessionStorage.removeItem(CLASSIFICATION_STORAGE_KEY);
-    } catch {
-      // Draft retention is best-effort when browser storage is unavailable.
-    }
   }
 
   focusInput() {
@@ -102,33 +94,12 @@ class KinCompose extends HTMLElement {
   }
 
   restoreDraft() {
-    try {
-      this.input.value = sessionStorage.getItem(DRAFT_STORAGE_KEY) ?? "";
-      const savedClassification = sessionStorage.getItem(
-        CLASSIFICATION_STORAGE_KEY,
-      );
-      this.classification.value =
-        savedClassification === "today" ? "today" : "need";
-    } catch {
-      this.input.value = "";
-      this.classification.value = "need";
-    }
+    this.input.value = "";
+    this.classification.value = "need";
   }
 
   saveDraft() {
-    try {
-      if (this.input.value) {
-        sessionStorage.setItem(DRAFT_STORAGE_KEY, this.input.value);
-      } else {
-        sessionStorage.removeItem(DRAFT_STORAGE_KEY);
-      }
-      sessionStorage.setItem(
-        CLASSIFICATION_STORAGE_KEY,
-        this.classification.value,
-      );
-    } catch {
-      // Draft retention is best-effort when browser storage is unavailable.
-    }
+    // Drafts remain in the unlocked input only; lock replaces the component.
   }
 
   submit(event) {

@@ -1,8 +1,54 @@
 # Portable Household Data
 
-**Status:** Current through v0.7.4 Routine Stale-Action Correctness; export/import design only. No export file, import path, integrity checker, or encryption exists. Format versioning is discussed in [VERSIONING](VERSIONING.md), migration failure behavior in [MIGRATIONS](MIGRATIONS.md), and retention/deletion in [RETENTION](RETENTION.md).
+**Status:** v0.10.3 implements encrypted `.kin` backup and restore. Rust owns `KARC` v1 framing, 64 MiB bounds, version validation and complete import planning. Browser crypto/files own authenticated encryption, file selection/download and explicit restore confirmation. Corrupt/unsupported archives never partially import. Earlier conceptual sections below are design history.
+
+## Implemented archive boundary
+
+**Stable architecture decision (v0.10.2/v0.10.3): Option A — intentionally
+local-only restore.** Archives are recovery copies of household history. They
+grant no membership or trusted-device authority. Rejoining a synchronized
+household requires a separately authorized future workflow; no partial sync
+reattachment is supported. v0.11 must design recovery UX around this boundary.
+Root rotation does not change old archives: each retains its original recovery key.
+
+The public metadata carries archive version, recovery-wrapped root metadata and
+encryption parameters. The body is raw AES-GCM ciphertext, avoiding redundant
+base64 expansion of the whole archive. HKDF purpose `kin/archive/v1` separates its
+key from local-record keys; manifest metadata is authenticated as AAD. The encrypted
+body contains exact canonical rows and protected replay/catch-up context. The
+normal export includes recovery wrappers; it never emits plaintext JSON or device
+private keys. Keep the recovery secret separately from the archive.
+
+Restore requires an unlocked empty target and the archive's recovery key. Rust
+validates all bytes/identities/versions, rejects duplicate events and plans the
+whole replay before browser encryption/atomic import. The transaction checks that
+the target history and transport stores are still empty. Imported events remain
+byte-for-byte identical; fresh anonymous local actor/device IDs prevent new local
+commands from impersonating the source trusted device.
+
+Restored history is writable **local-only**. Sync reattachment is deliberately
+blocked: canonical history from several authors cannot be uploaded as one new
+signer's history without an authenticated transport restore protocol. No server
+trust, cookies, provisioning entitlement or epoch access is restored. This is an
+explicit compatibility boundary, not a claim of same-household server recovery.
+The memory-only identity service still cannot reconstruct lost server identity.
 
 ## Ownership principle
+
+### v0.10.3 bounded KARC v1 processing
+
+KARC v1 remains one authenticated payload with unchanged bytes/AAD semantics.
+Internal raw-ciphertext APIs avoid base64 conversion of the whole archive.
+Additive compact Rust framing/layout calls validate metadata/ciphertext lengths
+and headers while browser-owned buffers retain opaque ciphertext. Existing
+full-buffer ABI exports and old archives remain supported. Import authenticates
+the complete body, verifies canonical data and full Rust replay, then publishes
+atomically; corruption at the end cannot partially import. Durable lock checks
+guard archive phases and the final native transaction aborts on lock.
+
+This reduces avoidable copies without introducing KARC v2. Web Crypto's complete
+AES-GCM payload and the bounded full canonical replay still require whole buffers;
+desktop measurements in [V0.10.0](V0.10.0.md) quantify the practical limit.
 
 > Household members should be able to obtain a usable copy of their Kin data.
 

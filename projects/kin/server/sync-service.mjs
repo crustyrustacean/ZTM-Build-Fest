@@ -61,6 +61,8 @@ export class EncryptedSyncService {
         publicKeys: device.syncPublicKeys ?? null,
         fingerprint: device.syncKeyFingerprint ?? null,
         certificate: device.deviceAuthorizationCertificate ?? null,
+        keyHistory: device.syncKeyHistory ?? undefined,
+        keyTransitions: device.syncKeyTransitions ?? [],
         revokedAt: device.revokedAt,
         historyFromEpoch: device.syncHistoryFromEpoch ?? 1,
         provisionedEpochs: [...(device.syncProvisionedEpochs ?? [])],
@@ -316,7 +318,8 @@ export class EncryptedSyncService {
       keyEpoch < 1 ||
       keyEpoch > MAX_KEY_EPOCHS ||
       keyEpoch > maximumEpoch ||
-      (recipient.memberId !== auth.member.id && keyEpoch < maximumEpoch)
+      keyEpoch < (recipient.syncHistoryFromEpoch ?? 1) ||
+      keyEpoch < (auth.device.syncHistoryFromEpoch ?? 1)
     )
       throw new PairingError(
         "provisioning_device_mismatch",
@@ -442,7 +445,7 @@ export class EncryptedSyncService {
       )
         return {
           currentEpoch: state.currentEpoch,
-          rotationPending: false,
+          rotationPending: state.rotationPending,
           retried: true,
           proposalId,
         };
@@ -528,10 +531,23 @@ export class EncryptedSyncService {
     };
   }
 
+  onDeviceKeyTransition(householdId, deviceId) {
+    const state = this.state(householdId);
+    // Every package binds a recipient fingerprint or an issuer signing key.
+    // Remove obsolete packages and their retry mappings without altering events.
+    for (const [id, grant] of state.grants) {
+      if (grant.senderDeviceId !== deviceId && grant.recipientDeviceId !== deviceId) continue;
+      state.grants.delete(id);
+      for (const [request, grantId] of state.grantRequests)
+        if (grantId === id) state.grantRequests.delete(request);
+    }
+  }
+
   onAccessChange(householdId, excludedDeviceIds = []) {
     const state = this.state(householdId);
     state.rotationPending = true;
-    state.lastRotation = null;
+    // Keep the latest committed proposal recoverable after a lost response,
+    // even when an access change already requires the following rotation.
     for (const [grantId, grant] of state.grants)
       if (
         excludedDeviceIds.includes(grant.senderDeviceId) ||

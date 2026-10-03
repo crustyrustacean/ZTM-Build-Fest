@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { readFile } from "node:fs/promises";
 import { webcrypto } from "node:crypto";
 import { PairingService } from "./pairing-service.mjs";
 import { EncryptedSyncService } from "./sync-service.mjs";
@@ -10,9 +11,11 @@ import {
   generateHouseholdKey,
   SyncCryptoError,
 } from "../web/sync/crypto.js";
-import { encodeAddedRecord, idFromHex } from "../web/wasm/kin-engine.js";
+import { encodeAddedRecord, idFromHex, loadKinEngine } from "../web/wasm/kin-engine.js";
 
 globalThis.crypto ??= webcrypto;
+const wasm = await readFile(new URL("../web/wasm/kin_engine.wasm", import.meta.url));
+await loadKinEngine(`data:application/wasm;base64,${wasm.toString("base64")}`);
 
 const credential = (id) => ({ id, publicKey: `key-${id}`, algorithm: -7 });
 

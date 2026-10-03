@@ -1,6 +1,6 @@
 # Pairing and Device Enrollment
 
-**Status:** Implemented through v0.9.3. Manual adult and same-member device pairing use one-time codes, passkey claim/approval/activation, locally generated device keys and human-compared key fingerprints. Encrypted key provisioning and epoch rotation are implemented. QR, durable service storage and account recovery are not implemented.
+**Status:** Implemented through v0.10.0. Manual adult and same-member device pairing use one-time codes, passkey claim/approval/activation, locally generated device keys and compared fingerprints. A queued signed device-key successor completes before pairing/provisioning proceeds. Private transport material is available only while the local household is unlocked. QR, durable service storage and server-account recovery are not implemented; local encrypted archive restore does not restore device trust.
 
 ## Distinct operations
 

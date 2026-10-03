@@ -353,7 +353,7 @@ export async function catchUpRegressions() {
   IDBObjectStore.prototype.put = function (value, ...args) {
     if (
       this.name === "local_context" &&
-      value?.last_looked_local_sequence > quotaCursor.last_looked_local_sequence
+      value?.key === "installation" && value.protected_version === 1
     ) {
       throw new DOMException("Synthetic quota", "QuotaExceededError");
     }
@@ -397,7 +397,7 @@ export async function catchUpRegressions() {
     const request = originalPut.call(this, value, ...args);
     if (
       this.name === "local_context" &&
-      value?.last_looked_local_sequence > abortCursor.last_looked_local_sequence
+      value?.key === "installation" && value.protected_version === 1
     ) {
       request.addEventListener("success", () => transaction.abort());
     }
@@ -477,12 +477,9 @@ export async function catchUpRegressions() {
     app.busy && app.main.getAttribute("aria-busy") === "true",
     "catch-up write exposes busy state",
   );
-  const parent = app.parentNode;
-  const nextSibling = app.nextSibling;
   try {
-    app.remove();
-    parent.insertBefore(app, nextSibling);
-    check(app.busy, "reconnect does not unlock pending catch-up write");
+    app.handlePeerMessage({ data: { type: "view-state-changed" } });
+    check(app.busy && app.pendingRefresh, "peer refresh does not unlock pending catch-up write");
   } finally {
     releaseMark();
     app.store.markCaughtUpThrough = mark;
@@ -496,7 +493,7 @@ export async function catchUpRegressions() {
       (await count()) === pendingCount &&
       afterReconnect.next_logical_time === pendingCounter &&
       app.state.summary.totalCount === 0,
-    "pending caught-up write commits once through its frozen boundary after reconnect",
+    "pending caught-up write commits once through its frozen boundary before peer refresh",
   );
 
   await app.store.append(

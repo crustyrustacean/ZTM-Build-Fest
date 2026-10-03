@@ -562,7 +562,13 @@ fn encode_state_with_summary(
     Ok(result)
 }
 
-fn decode_event(record: &[u8], protocol_version: u16) -> Result<EventEnvelope, KinError> {
+pub fn decode_event(record: &[u8], protocol_version: u16) -> Result<EventEnvelope, KinError> {
+    if !(PROTOCOL_V1..=PROTOCOL_V8).contains(&protocol_version) {
+        return Err(KinError::UnsupportedVersion);
+    }
+    if record.len() > MAX_PROTOCOL_BYTES {
+        return Err(KinError::SizeLimit);
+    }
     if record.len() < EVENT_HEADER_BYTES {
         return Err(KinError::MalformedProtocol);
     }

@@ -2,7 +2,6 @@ const PROTOCOL_VERSION = 7;
 const REQUEST_HEADER_BYTES = 44;
 const MAX_TIMESTAMP = 8_640_000_000_000_000;
 const PULSE_VALUES = ["good", "okay", "drained", "rough-day", "need-quiet"];
-const EVENT_HEADER_BYTES = 88;
 const RESULT_HEADER_BYTES = 12;
 const ITEM_HEADER_BYTES = 48;
 const MAX_EVENT_COUNT = 10_000;
@@ -65,6 +64,8 @@ const USER_MESSAGES = new Map([
   ],
 ]);
 
+let sharedCodec = null;
+
 export async function loadKinEngine(
   wasmUrl = new URL("./kin_engine.wasm", import.meta.url),
 ) {
@@ -77,12 +78,22 @@ export async function loadKinEngine(
   }
   const bytes = await response.arrayBuffer();
   const { instance } = await WebAssembly.instantiate(bytes, {});
-  const exports = instance.exports;
+  let exports = instance.exports;
   const requiredExports = [
     "memory",
     "kin_alloc",
     "kin_free",
     "kin_apply_events",
+    "kin_event_metadata",
+    "kin_event_metadata_batch",
+    "kin_encode_command",
+    "kin_execute_command",
+    "kin_encode_archive",
+    "kin_decode_archive",
+    "kin_archive_header",
+    "kin_archive_layout",
+    "kin_plan_import",
+    "kin_clear",
     "kin_result_ptr",
     "kin_result_len",
     "kin_error_ptr",
@@ -95,7 +106,55 @@ export async function loadKinEngine(
     throw new KinEngineError(6, "Kin loaded an incompatible household engine.");
   }
 
+  sharedCodec = exports;
   return {
+    dispose() {
+      if (exports) {
+        exports.kin_clear();
+        if (sharedCodec === exports) sharedCodec = null;
+        exports = null;
+      }
+    },
+    eventMetadata: (bytes) =>
+      decodeMetadata(callCore(exports, "kin_event_metadata", asBytes(bytes))),
+    eventMetadataBatch: (records) => metadataBatch(exports, records),
+    executeCommand: (
+      command,
+      identity,
+      records,
+      asOf,
+      cursorEventId = null,
+      civilDate,
+      syncIdentity = null,
+    ) =>
+      executeCommand(
+        exports,
+        command,
+        identity,
+        records,
+        asOf,
+        cursorEventId,
+        civilDate,
+        syncIdentity,
+      ),
+    encodeArchive: (metadata, ciphertext) =>
+      encodeArchive(exports, metadata, ciphertext),
+    decodeArchive: (bytes) => decodeArchive(exports, bytes),
+    planImport: (
+      records,
+      asOf,
+      cursorEventId = null,
+      civilDate,
+      syncIdentity = null,
+    ) =>
+      planImport(
+        exports,
+        records,
+        asOf,
+        cursorEventId,
+        civilDate,
+        syncIdentity,
+      ),
     applyEvents: (
       records,
       asOf,
@@ -139,57 +198,6 @@ function assertCivilDate(value) {
   }
 }
 
-export function encodeRoutineCreatedRecord({
-  routineId,
-  text,
-  cadence,
-  createdOn,
-  ...identity
-}) {
-  assertCivilDate(createdOn);
-  assertTimestamp(identity.timestamp);
-  const code = ["daily", "weekly"].indexOf(cadence);
-  const bytes = textEncoder.encode(text);
-  if (
-    code < 0 ||
-    bytes.length < 1 ||
-    bytes.length > 4096 ||
-    strictTextDecoder.decode(bytes) !== text
-  ) {
-    throw new KinEngineError(
-      2,
-      "Choose a cadence and valid text up to 4096 UTF-8 bytes.",
-    );
-  }
-  const payload = new Uint8Array(28 + bytes.length);
-  payload.set(assertId(routineId));
-  payload[16] = code;
-  const view = new DataView(payload.buffer);
-  view.setUint32(20, createdOn, true);
-  view.setUint32(24, bytes.length, true);
-  payload.set(bytes, 28);
-  return encodeEventRecord({ ...identity, kind: 14, eventVersion: 1, payload });
-}
-
-export function encodeRoutineActionRecord({
-  routineId,
-  occurrenceKey,
-  action,
-  ...identity
-}) {
-  assertTimestamp(identity.timestamp);
-  const kind = { complete: 15, reopen: 16, archive: 17 }[action];
-  if (!kind)
-    throw new KinEngineError(2, "Kin received an invalid routine action.");
-  const payload = new Uint8Array(kind === 17 ? 16 : 20);
-  payload.set(assertId(routineId));
-  if (kind !== 17) {
-    assertCivilDate(occurrenceKey);
-    new DataView(payload.buffer).setUint32(16, occurrenceKey, true);
-  }
-  return encodeEventRecord({ ...identity, kind, eventVersion: 1, payload });
-}
-
 export function idFromHex(value) {
   if (typeof value !== "string" || !/^[0-9a-fA-F]{32}$/.test(value)) {
     throw new KinEngineError(4, "Kin received an invalid household reference.");
@@ -207,219 +215,169 @@ export function idToHex(value) {
     .join("");
 }
 
-export function encodeAddedRecord({
-  eventId,
-  householdId,
-  actorId,
-  deviceId,
-  timestamp,
-  logicalTime,
-  itemId,
-  text,
-  classification = "need",
-}) {
+// Compatibility helpers encode intent packets; Rust alone writes event bytes.
+export const encodeAddedRecord = (value) => encodeIntent("add", value);
+export const encodeCompletedRecord = (value) => encodeIntent("complete", value);
+export const encodeReopenedRecord = (value) => encodeIntent("reopen", value);
+export const encodeArchivedRecord = (value) => encodeIntent("archive", value);
+export const encodeHandoffAddedRecord = (value) =>
+  encodeIntent("add-handoff", value);
+export const encodeHandoffAcknowledgedRecord = (value) =>
+  encodeIntent("acknowledge-handoff", value);
+export const encodeHandoffArchivedRecord = (value) =>
+  encodeIntent("archive-handoff", value);
+export const encodeTalkAddedRecord = (value) => encodeIntent("add-talk", value);
+export const encodeTalkResolvedRecord = (value) =>
+  encodeIntent("resolve-talk", value);
+export const encodeTalkReopenedRecord = (value) =>
+  encodeIntent("reopen-talk", value);
+export const encodeTalkArchivedRecord = (value) =>
+  encodeIntent("archive-talk", value);
+export const encodePulseSetRecord = (value) => encodeIntent("set-pulse", value);
+export const encodePulseClearedRecord = (value) =>
+  encodeIntent("clear-pulse", value);
+export const encodeRoutineCreatedRecord = (value) =>
+  encodeIntent("create-routine", value);
+export const encodeRoutineActionRecord = (value) =>
+  encodeIntent(
+    {
+      complete: "complete-routine-occurrence",
+      reopen: "reopen-routine-occurrence",
+      archive: "archive-routine",
+    }[value.action],
+    value,
+  );
+export const eventMetadata = (bytes) =>
+  decodeMetadata(callCore(sharedCodec, "kin_event_metadata", asBytes(bytes)));
+export const eventMetadataBatch = (records) =>
+  metadataBatch(sharedCodec, records);
+
+const COMMAND_TYPES = [
+  null,
+  "add",
+  "complete",
+  "reopen",
+  "archive",
+  "add-handoff",
+  "acknowledge-handoff",
+  "archive-handoff",
+  "add-talk",
+  "resolve-talk",
+  "reopen-talk",
+  "archive-talk",
+  "set-pulse",
+  "clear-pulse",
+  "create-routine",
+  "complete-routine-occurrence",
+  "reopen-routine-occurrence",
+  "archive-routine",
+];
+const EVENT_KINDS = [
+  null,
+  "ITEM_ADDED",
+  "ITEM_COMPLETED",
+  "ITEM_REOPENED",
+  "ITEM_ARCHIVED",
+  "HANDOFF_ADDED",
+  "HANDOFF_ACKNOWLEDGED",
+  "HANDOFF_ARCHIVED",
+  "TALK_ADDED",
+  "TALK_RESOLVED",
+  "TALK_REOPENED",
+  "TALK_ARCHIVED",
+  "PULSE_SET",
+  "PULSE_CLEARED",
+  "ROUTINE_CREATED",
+  "ROUTINE_OCCURRENCE_COMPLETED",
+  "ROUTINE_OCCURRENCE_REOPENED",
+  "ROUTINE_ARCHIVED",
+];
+
+function encodeIntent(type, value) {
+  return callCore(
+    sharedCodec,
+    "kin_encode_command",
+    encodeIntentPacket({ ...value, type }, value),
+  );
+}
+
+function encodeIntentPacket(command, identity) {
+  const kind = COMMAND_TYPES.indexOf(command.type);
+  if (kind < 1)
+    throw new KinEngineError(2, "Kin received an invalid household action.");
+  const hasText = [1, 5, 8, 14].includes(kind);
+  const text = hasText ? command.text : "";
   const textBytes = textEncoder.encode(text);
-  const classificationCode =
-    classification === "today" ? 0 : classification === "need" ? 1 : -1;
-  if (classificationCode < 0) {
-    throw new KinEngineError(2, "Choose a valid list.");
-  }
   if (
-    strictTextDecoder.decode(textBytes) !== text ||
-    textBytes.length < 1 ||
-    textBytes.length > MAX_ITEM_TEXT_BYTES
+    hasText &&
+    (typeof text !== "string" ||
+      strictTextDecoder.decode(textBytes) !== text ||
+      textBytes.length < 1 ||
+      textBytes.length > MAX_ITEM_TEXT_BYTES)
   ) {
     throw new KinEngineError(
       2,
-      "Item text must be valid Unicode and no more than 4096 UTF-8 bytes.",
+      "Text must be valid Unicode and no more than 4096 UTF-8 bytes.",
     );
   }
-  const payload = new Uint8Array(24 + textBytes.length);
-  payload.set(assertId(itemId), 0);
-  payload[16] = classificationCode;
-  new DataView(payload.buffer).setUint32(20, textBytes.length, true);
-  payload.set(textBytes, 24);
-  return encodeEventRecord({
-    eventId,
-    householdId,
-    actorId,
-    deviceId,
-    timestamp,
-    logicalTime,
-    eventVersion: 2,
-    kind: 1,
-    payload,
-  });
-}
-
-export function encodeCompletedRecord({
-  eventId,
-  householdId,
-  actorId,
-  deviceId,
-  timestamp,
-  logicalTime,
-  itemId,
-}) {
-  return encodeEventRecord({
-    eventId,
-    householdId,
-    actorId,
-    deviceId,
-    timestamp,
-    logicalTime,
-    eventVersion: 1,
-    kind: 2,
-    payload: assertId(itemId),
-  });
-}
-
-export function encodeReopenedRecord({
-  eventId,
-  householdId,
-  actorId,
-  deviceId,
-  timestamp,
-  logicalTime,
-  itemId,
-}) {
-  return encodeEventRecord({
-    eventId,
-    householdId,
-    actorId,
-    deviceId,
-    timestamp,
-    logicalTime,
-    eventVersion: 1,
-    kind: 3,
-    payload: assertId(itemId),
-  });
-}
-
-export function encodeArchivedRecord({
-  eventId,
-  householdId,
-  actorId,
-  deviceId,
-  timestamp,
-  logicalTime,
-  itemId,
-}) {
-  return encodeEventRecord({
-    eventId,
-    householdId,
-    actorId,
-    deviceId,
-    timestamp,
-    logicalTime,
-    eventVersion: 1,
-    kind: 4,
-    payload: assertId(itemId),
-  });
-}
-
-export function encodeHandoffAddedRecord({ handoffId, text, ...identity }) {
-  const textBytes = textEncoder.encode(text);
-  if (
-    strictTextDecoder.decode(textBytes) !== text ||
-    textBytes.length < 1 ||
-    textBytes.length > MAX_ITEM_TEXT_BYTES
-  ) {
-    throw new KinEngineError(
-      2,
-      "Handoff text must be valid Unicode and no more than 4096 UTF-8 bytes.",
+  const packet = new Uint8Array(128 + textBytes.length);
+  packet.set([75, 67, 77, 68, 1, 0, 0, 0]);
+  const view = new DataView(packet.buffer);
+  view.setUint16(8, kind, true);
+  for (const [name, offset] of [
+    ["eventId", 12],
+    ["householdId", 28],
+    ["actorId", 44],
+    ["deviceId", 60],
+  ]) {
+    packet.set(
+      typeof identity[name] === "string"
+        ? idFromHex(identity[name])
+        : assertId(identity[name]),
+      offset,
     );
   }
-  const payload = new Uint8Array(20 + textBytes.length);
-  payload.set(assertId(handoffId));
-  new DataView(payload.buffer).setUint32(16, textBytes.length, true);
-  payload.set(textBytes, 20);
-  return encodeEventRecord({ ...identity, eventVersion: 1, kind: 5, payload });
-}
-
-export function encodeHandoffAcknowledgedRecord({ handoffId, ...identity }) {
-  return encodeEventRecord({
-    ...identity,
-    eventVersion: 1,
-    kind: 6,
-    payload: assertId(handoffId),
-  });
-}
-
-export function encodeHandoffArchivedRecord({ handoffId, ...identity }) {
-  return encodeEventRecord({
-    ...identity,
-    eventVersion: 1,
-    kind: 7,
-    payload: assertId(handoffId),
-  });
-}
-
-export function encodeTalkAddedRecord({ talkId, text, ...identity }) {
-  const textBytes = textEncoder.encode(text);
-  if (
-    strictTextDecoder.decode(textBytes) !== text ||
-    textBytes.length < 1 ||
-    textBytes.length > MAX_ITEM_TEXT_BYTES
-  ) {
-    throw new KinEngineError(
-      2,
-      "Talk text must be valid Unicode and no more than 4096 UTF-8 bytes.",
-    );
-  }
-  const payload = new Uint8Array(20 + textBytes.length);
-  payload.set(assertId(talkId));
-  new DataView(payload.buffer).setUint32(16, textBytes.length, true);
-  payload.set(textBytes, 20);
-  return encodeEventRecord({ ...identity, eventVersion: 1, kind: 8, payload });
-}
-
-export function encodeTalkResolvedRecord({ talkId, ...identity }) {
-  return encodeEventRecord({
-    ...identity,
-    eventVersion: 1,
-    kind: 9,
-    payload: assertId(talkId),
-  });
-}
-
-export function encodeTalkArchivedRecord({ talkId, ...identity }) {
-  return encodeEventRecord({
-    ...identity,
-    eventVersion: 1,
-    kind: 11,
-    payload: assertId(talkId),
-  });
-}
-
-export function encodeTalkReopenedRecord({ talkId, ...identity }) {
-  return encodeEventRecord({
-    ...identity,
-    eventVersion: 1,
-    kind: 10,
-    payload: assertId(talkId),
-  });
-}
-
-export function encodePulseSetRecord({ value, expiresAt, ...identity }) {
-  const code = PULSE_VALUES.indexOf(value);
-  if (code < 0) throw new KinEngineError(2, "Choose a valid capacity.");
   assertTimestamp(identity.timestamp);
-  assertTimestamp(expiresAt);
-  const payload = new Uint8Array(16);
-  payload[0] = code;
-  new DataView(payload.buffer).setBigInt64(8, BigInt(expiresAt), true);
-  return encodeEventRecord({ ...identity, eventVersion: 1, kind: 12, payload });
-}
-
-export function encodePulseClearedRecord(identity) {
-  assertTimestamp(identity.timestamp);
-  return encodeEventRecord({
-    ...identity,
-    eventVersion: 1,
-    kind: 13,
-    payload: new Uint8Array(0),
-  });
+  view.setBigInt64(76, BigInt(identity.timestamp), true);
+  const logicalTime = BigInt(identity.logicalTime);
+  if (logicalTime < 0n || logicalTime > 0xffffffffffffffffn)
+    throw new KinEngineError(2, "Kin received an invalid event order.");
+  view.setBigUint64(84, logicalTime, true);
+  if (![12, 13].includes(kind)) {
+    const entity =
+      command.itemId ??
+      command.handoffId ??
+      command.talkId ??
+      command.routineId ??
+      identity.entityId;
+    packet.set(
+      typeof entity === "string" ? idFromHex(entity) : assertId(entity),
+      92,
+    );
+  }
+  if ([14, 15, 16].includes(kind)) {
+    const date = kind === 14 ? command.createdOn : command.occurrenceKey;
+    assertCivilDate(date);
+    view.setUint32(108, date, true);
+  }
+  if (kind === 1) {
+    const code = ["today", "need"].indexOf(command.classification ?? "need");
+    if (code < 0) throw new KinEngineError(2, "Choose a valid list.");
+    packet[112] = code;
+  } else if (kind === 12) {
+    const code = PULSE_VALUES.indexOf(command.value);
+    if (code < 0) throw new KinEngineError(2, "Choose a valid capacity.");
+    packet[112] = code;
+    assertTimestamp(command.expiresAt);
+    view.setBigInt64(116, BigInt(command.expiresAt), true);
+  } else if (kind === 14) {
+    const code = ["daily", "weekly"].indexOf(command.cadence);
+    if (code < 0) throw new KinEngineError(2, "Choose a valid cadence.");
+    packet[112] = code;
+  }
+  view.setUint32(124, textBytes.length, true);
+  packet.set(textBytes, 128);
+  return packet;
 }
 
 function assertTimestamp(value) {
@@ -428,30 +386,212 @@ function assertTimestamp(value) {
   }
 }
 
-function encodeEventRecord({
-  eventId,
-  householdId,
-  actorId,
-  deviceId,
-  timestamp,
-  logicalTime,
-  eventVersion,
-  kind,
-  payload,
-}) {
-  const record = new Uint8Array(EVENT_HEADER_BYTES + payload.length);
-  const view = new DataView(record.buffer);
-  view.setUint16(0, eventVersion, true);
-  view.setUint16(2, kind, true);
-  record.set(assertId(eventId), 4);
-  record.set(assertId(householdId), 20);
-  record.set(assertId(actorId), 36);
-  record.set(assertId(deviceId), 52);
-  view.setBigInt64(68, BigInt(timestamp), true);
-  view.setBigUint64(76, BigInt(logicalTime), true);
-  view.setUint32(84, payload.length, true);
-  record.set(payload, EVENT_HEADER_BYTES);
-  return record;
+function decodeMetadata(bytes) {
+  if (bytes.length !== 92 || readAscii(bytes, 0, 4) !== "KMET")
+    throw new KinEngineError(6, "Kin received invalid event metadata.");
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  if (view.getUint16(4, true) !== 1 || view.getUint16(6, true) !== 0)
+    throw new KinEngineError(6, "Kin received unsupported event metadata.");
+  const kind = EVENT_KINDS[view.getUint16(90, true)];
+  if (!kind)
+    throw new KinEngineError(6, "Kin received unsupported event metadata.");
+  const timestamp = Number(view.getBigInt64(72, true));
+  if (!Number.isSafeInteger(timestamp))
+    throw new KinEngineError(6, "Kin received an invalid event timestamp.");
+  return {
+    eventId: bytes.slice(8, 24),
+    householdId: bytes.slice(24, 40),
+    actorId: bytes.slice(40, 56),
+    deviceId: bytes.slice(56, 72),
+    timestamp,
+    logicalTime: view.getBigUint64(80, true),
+    eventVersion: view.getUint16(88, true),
+    kind,
+  };
+}
+
+function metadataBatch(exports, records) {
+  if (!Array.isArray(records) || records.length > MAX_EVENT_COUNT)
+    throw new KinEngineError(5, USER_MESSAGES.get(5));
+  const sources = records.map(asBytes);
+  const length = sources.reduce((total, bytes) => total + 4 + bytes.length, 12);
+  if (length > MAX_PROTOCOL_BYTES)
+    throw new KinEngineError(5, USER_MESSAGES.get(5));
+  const request = new Uint8Array(length);
+  request.set([75, 77, 68, 81, 1, 0, 0, 0]);
+  const view = new DataView(request.buffer);
+  view.setUint32(8, sources.length, true);
+  let offset = 12;
+  for (const source of sources) {
+    view.setUint32(offset, source.length, true);
+    request.set(source, offset + 4);
+    offset += 4 + source.length;
+  }
+  const output = callCore(exports, "kin_event_metadata_batch", request);
+  if (
+    output.length !== 12 + 92 * sources.length ||
+    readAscii(output, 0, 4) !== "KMDL"
+  )
+    throw new KinEngineError(6, "Kin received invalid batch metadata.");
+  const resultView = new DataView(
+    output.buffer,
+    output.byteOffset,
+    output.byteLength,
+  );
+  if (
+    resultView.getUint16(4, true) !== 1 ||
+    resultView.getUint16(6, true) !== 0 ||
+    resultView.getUint32(8, true) !== sources.length
+  )
+    throw new KinEngineError(6, "Kin received invalid batch metadata.");
+  return sources.map((_, index) =>
+    decodeMetadata(output.subarray(12 + 92 * index, 12 + 92 * (index + 1))),
+  );
+}
+
+function executeCommand(
+  exports,
+  command,
+  identity,
+  records,
+  asOf,
+  cursor,
+  civilDate,
+  syncIdentity,
+) {
+  const intent = encodeIntentPacket(
+    {
+      ...command,
+      ...(command.type === "create-routine" ? { createdOn: civilDate } : {}),
+    },
+    identity,
+  );
+  const history = encodeRequest(records, asOf, cursor, civilDate, syncIdentity);
+  const request = new Uint8Array(4 + intent.length + history.length);
+  new DataView(request.buffer).setUint32(0, intent.length, true);
+  request.set(intent, 4);
+  request.set(history, 4 + intent.length);
+  const bytes = callCore(exports, "kin_execute_command", request);
+  if (bytes.length < 20 || readAscii(bytes, 0, 4) !== "KCMT")
+    throw new KinEngineError(6, "Kin received an invalid command result.");
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const eventLength = view.getUint32(8, true),
+    metadataLength = view.getUint32(12, true),
+    stateLength = view.getUint32(16, true);
+  if (
+    view.getUint16(4, true) !== 1 ||
+    view.getUint16(6, true) !== 0 ||
+    20 + eventLength + metadataLength + stateLength !== bytes.length
+  )
+    throw new KinEngineError(6, "Kin received an invalid command result.");
+  return {
+    encodedEvent: bytes.slice(20, 20 + eventLength),
+    metadata: decodeMetadata(
+      bytes.subarray(20 + eventLength, 20 + eventLength + metadataLength),
+    ),
+    state: decodeState(bytes.subarray(20 + eventLength + metadataLength)),
+  };
+}
+
+function encodeArchive(exports, metadata, ciphertext) {
+  metadata = asBytes(metadata);
+  ciphertext = asBytes(ciphertext);
+  if (metadata.length + ciphertext.length + 16 > MAX_PROTOCOL_BYTES)
+    throw new KinEngineError(5, USER_MESSAGES.get(5));
+  const lengths = new Uint8Array(8);
+  const view = new DataView(lengths.buffer);
+  view.setUint32(0, metadata.length, true);
+  view.setUint32(4, ciphertext.length, true);
+  const header = callCore(exports, "kin_archive_header", lengths);
+  if (header.length !== 16)
+    throw new KinEngineError(6, "Kin received an invalid archive header.");
+  const bytes = new Uint8Array(16 + metadata.length + ciphertext.length);
+  bytes.set(header);
+  bytes.set(metadata, 16);
+  bytes.set(ciphertext, 16 + metadata.length);
+  return bytes;
+}
+function planImport(exports, records, asOf, cursor, civilDate, syncIdentity) {
+  const bytes = callCore(
+    exports,
+    "kin_plan_import",
+    encodeRequest(records, asOf, cursor, civilDate, syncIdentity),
+  );
+  if (bytes.length < 24 || readAscii(bytes, 0, 4) !== "KIMP")
+    throw new KinEngineError(6, "Kin received an invalid import plan.");
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  if (
+    view.getUint16(4, true) !== 1 ||
+    view.getUint16(6, true) !== 0 ||
+    view.getUint32(20, true) + 24 !== bytes.length
+  )
+    throw new KinEngineError(6, "Kin received an invalid import plan.");
+  return {
+    eventCount: view.getUint32(8, true),
+    nextLogicalTime: view.getBigUint64(12, true),
+    state: decodeState(bytes.subarray(24)),
+  };
+}
+function decodeArchive(exports, bytes) {
+  bytes = asBytes(bytes);
+  if (bytes.length > MAX_PROTOCOL_BYTES)
+    throw new KinEngineError(5, USER_MESSAGES.get(5));
+  if (bytes.length < 16)
+    throw new KinEngineError(2, USER_MESSAGES.get(2));
+  const request = new Uint8Array(20);
+  request.set(bytes.subarray(0, 16));
+  new DataView(request.buffer).setUint32(16, bytes.length, true);
+  const output = callCore(exports, "kin_archive_layout", request);
+  if (output.length !== 8)
+    throw new KinEngineError(6, "Kin received an invalid archive result.");
+  const length = new DataView(
+    output.buffer,
+    output.byteOffset,
+    output.byteLength,
+  ).getUint32(0, true);
+  const ciphertextLength = new DataView(output.buffer, output.byteOffset, output.byteLength).getUint32(4, true);
+  if (16 + length + ciphertextLength !== bytes.length)
+    throw new KinEngineError(6, "Kin received an invalid archive result.");
+  return {
+    version: 1,
+    // These copies deliberately detach caller-owned archive input before any
+    // asynchronous authentication; no view escapes into mutable source bytes.
+    metadata: bytes.slice(16, 16 + length),
+    ciphertext: bytes.slice(16 + length),
+  };
+}
+
+function callCore(exports, operation, request) {
+  if (!exports)
+    throw new KinEngineError(
+      6,
+      "Unlock Kin before using its household engine.",
+    );
+  if (request.length > MAX_PROTOCOL_BYTES)
+    throw new KinEngineError(5, USER_MESSAGES.get(5));
+  const pointer = exports.kin_alloc(request.length);
+  if (!pointer) throw new KinEngineError(5, USER_MESSAGES.get(5));
+  try {
+    new Uint8Array(exports.memory.buffer, pointer, request.length).set(request);
+    const status = exports[operation](pointer, request.length);
+    const bytes =
+      status === 0
+        ? copyWasmBytes(
+            exports.memory,
+            exports.kin_result_ptr(),
+            exports.kin_result_len(),
+          )
+        : copyWasmBytes(
+            exports.memory,
+            exports.kin_error_ptr(),
+            exports.kin_error_len(),
+          );
+    if (status !== 0) throw decodeError(bytes, status);
+    return bytes;
+  } finally {
+    if (exports.kin_free(pointer, request.length) !== 0)
+      throw new KinEngineError(1, USER_MESSAGES.get(1));
+  }
 }
 
 function applyEvents(
@@ -462,6 +602,11 @@ function applyEvents(
   civilDate,
   syncIdentity,
 ) {
+  if (!exports)
+    throw new KinEngineError(
+      6,
+      "Unlock Kin before using its household engine.",
+    );
   if (records.length > MAX_EVENT_COUNT) {
     throw new KinEngineError(5, USER_MESSAGES.get(5));
   }

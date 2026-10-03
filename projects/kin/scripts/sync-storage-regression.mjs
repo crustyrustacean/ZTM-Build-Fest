@@ -2,6 +2,9 @@ export async function syncStorageRegressions(client) {
   const result = await client.evaluate(`(async()=>{
     const app=document.querySelector('kin-app');
     const {EventStore}=await import('/storage/event-store.js');
+    const {EVENT_STORE_DEFINITIONS}=await import('/storage/event-store.js');
+    const {encryptedDatabase}=await import('/storage/encrypted-idb.js');
+    const {getActiveVault}=await import('/security/local-vault.js');
     const {SyncKeyStore}=await import('/sync/key-store.js');
     const {createHouseholdEpochKey,restoreHouseholdEpochKey}=await import('/sync/crypto.js');
     const {encodeAddedRecord,idFromHex,idToHex}=await import('/wasm/kin-engine.js');
@@ -73,7 +76,7 @@ export async function syncStorageRegressions(client) {
       request.onsuccess=()=>resolve(request.result);
       request.onerror=()=>reject(request.error);
     });
-    const store=new EventStore(database);
+    const store=new EventStore(encryptedDatabase(database,getActiveVault(),EVENT_STORE_DEFINITIONS));
     const context=await store.ensureContext();
     store.actorId=idToHex(context.actor_id);
     await store.append({type:'add',text:'Legacy local event',classification:'need'},app.engine);

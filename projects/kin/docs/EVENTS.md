@@ -1,6 +1,6 @@
 # Household Events
 
-**Status:** Current through v0.9.3. Event schemas/kinds and canonical bytes are unchanged by sync; protocol v8 supplies verified identity context and deterministic distributed replay. Earlier version sections remain historical contracts.
+**Status:** Current through v0.10.0. Rust owns canonical command encoding and decoding; existing schemas/kinds and immutable bytes remain unchanged. Protocol v8 supplies verified identity context and deterministic distributed replay. Local encryption wraps those bytes without rewriting them. Earlier version sections remain historical contracts.
 
 ## Canonical record
 

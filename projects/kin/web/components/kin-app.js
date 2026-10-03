@@ -11,6 +11,13 @@ import "./kin-talk-list.js";
 import "./kin-pulse.js";
 import "./kin-catch-up.js";
 import "./kin-household.js";
+import "./kin-security.js";
+import { clearLegacyDrafts } from "./kin-security.js";
+import {
+  getActiveVault,
+  setActiveVault,
+  VaultError,
+} from "../security/local-vault.js";
 
 const START_ERROR =
   "Kin could not start its household engine or local storage. Your saved information was not intentionally deleted.";
@@ -23,13 +30,9 @@ class KinApp extends HTMLElement {
     this.engine = null;
     this.store = null;
     this.syncCoordinator = null;
-    this.state = {
-      items: [],
-      handoffs: [],
-      talks: [],
-      pulses: [],
-      routines: [],
-    };
+    this.state = null;
+    this.vault = null;
+    this.securityGeneration = 0;
     this.busy = false;
     this.starting = null;
     this.initialized = false;
@@ -85,16 +88,38 @@ class KinApp extends HTMLElement {
       this.focusTimer = setTimeout(this.onTimeWake, 150);
     };
     this.onClearPulse = () => this.savePulse({ type: "clear-pulse" });
-    this.onTimeWake = (event) => {
+    this.onTimeWake = async (event) => {
       if (event?.type === "focus" && event.target !== window) return;
       if (document.visibilityState === "hidden") return;
+      const vault = this.vault;
+      const generation = this.securityGeneration;
+      // The vault becomes visible just before EventStore.open binds its durable
+      // epoch. A focus/visibility event in that window must not compare an
+      // unbound vault against storage and revoke an otherwise valid unlock.
+      if (!vault || vault.locked || !this.store) return;
+      try {
+        await EventStore.checkSecurityEpoch(vault);
+      } catch {
+        if (vault === this.vault && generation === this.securityGeneration)
+          this.lockHousehold(false);
+        return;
+      }
+      if (vault !== this.vault || generation !== this.securityGeneration)
+        return;
       this.refreshFromEvents();
       void this.checkHouseholdAuthorization();
     };
     this.onPeerMessage = (event) => this.handlePeerMessage(event);
+    this.onLockRequest = () => this.lockHousehold();
+    this.onPageHide = () => this.lockHousehold(false);
   }
 
   connectedCallback() {
+    if ("serviceWorker" in navigator) {
+      void navigator.serviceWorker.register("/service-worker.js").catch(() => {
+        // Online use still follows the same security boundary without offline cache.
+      });
+    }
     if (!this.initialized) {
       this.initializeElements();
       this.initialized = true;
@@ -115,6 +140,8 @@ class KinApp extends HTMLElement {
     this.addEventListener("kin:caught-up", this.onCaughtUp);
     this.addEventListener("kin:sync-enabled", this.onSyncEnabled);
     this.addEventListener("kin:sync-now", this.onSyncNow);
+    this.addEventListener("kin:lock", this.onLockRequest);
+    window.addEventListener("pagehide", this.onPageHide);
     for (const action of [
       "create-routine",
       "complete-routine-occurrence",
@@ -141,6 +168,7 @@ class KinApp extends HTMLElement {
   }
 
   initializeElements() {
+    clearLegacyDrafts();
     const header = document.createElement("header");
     header.className = "site-header";
     const brand = document.createElement("div");
@@ -153,14 +181,14 @@ class KinApp extends HTMLElement {
     header.append(brand);
 
     this.household = document.createElement("kin-household");
-    header.append(this.household);
+    this.header = header;
 
     const main = document.createElement("main");
     main.id = "main";
     main.tabIndex = -1;
     main.setAttribute("aria-busy", "true");
     // The invitation route exposes only the enrollment surface until authorization.
-    main.hidden = window.location.pathname === "/pair";
+    main.hidden = true;
     this.main = main;
     this.catchUp = document.createElement("kin-catch-up");
     this.today = document.createElement("kin-today");
@@ -196,11 +224,17 @@ class KinApp extends HTMLElement {
     this.retryButton.hidden = true;
     feedback.append(this.status, this.alert, this.retryButton);
 
-    this.replaceChildren(header, main, feedback);
+    this.security = document.createElement("kin-security");
+    this.security.onUnlocked = (vault) => this.openUnlockedHousehold(vault);
+    this.security.onLockRequested = () => this.lockHousehold();
+    this.replaceChildren(header, this.security, main, feedback);
     this.retryButton.addEventListener("click", () => this.retryAction?.());
   }
 
   disconnectedCallback() {
+    this.lockHousehold(false);
+    this.removeEventListener("kin:lock", this.onLockRequest);
+    window.removeEventListener("pagehide", this.onPageHide);
     this.removeEventListener("kin:add-item", this.onAddItem);
     this.removeEventListener("kin:complete-item", this.onCompleteItem);
     this.removeEventListener("kin:reopen-item", this.onReopenItem);
@@ -239,19 +273,56 @@ class KinApp extends HTMLElement {
     this.syncCoordinator = null;
   }
 
+  captureSession() {
+    return {
+      generation: this.securityGeneration,
+      vault: this.vault,
+      store: this.store,
+      engine: this.engine,
+    };
+  }
+
+  isCurrentSession(session) {
+    return (
+      session.generation === this.securityGeneration &&
+      session.vault === this.vault &&
+      Boolean(session.vault) &&
+      !session.vault.locked &&
+      (!Object.hasOwn(session, "store") || session.store === this.store) &&
+      (!Object.hasOwn(session, "engine") || session.engine === this.engine)
+    );
+  }
+
+  assertCurrentSession(session) {
+    if (!this.isCurrentSession(session))
+      throw new VaultError(
+        "Kin was locked or reopened during the operation.",
+        "locked",
+      );
+  }
+
   async initialize() {
-    if (this.starting) {
+    if (this.starting && this.startingGeneration === this.securityGeneration)
       return this.starting;
-    }
-    this.starting = this.loadApplication();
+    const starting = this.loadApplication();
+    this.starting = starting;
+    this.startingGeneration = this.securityGeneration;
     try {
-      await this.starting;
+      await starting;
     } finally {
-      this.starting = null;
+      if (this.starting === starting) this.starting = null;
     }
   }
 
   async loadApplication() {
+    const session = { generation: this.securityGeneration, vault: this.vault };
+    if (!session.vault || session.vault.locked) {
+      await this.security.initialize();
+      if (session.generation !== this.securityGeneration || this.vault) return;
+      this.setBusy(false);
+      this.setStatus("Household locked.");
+      return;
+    }
     const retrying = !this.retryButton.hidden;
     this.setBusy(true);
     this.clearAlert();
@@ -260,38 +331,62 @@ class KinApp extends HTMLElement {
       this.syncCoordinator?.stop();
       this.syncCoordinator = null;
       this.store?.close();
-      this.engine = await loadKinEngine();
-      this.store = await EventStore.open();
+      this.store = null;
+      this.engine?.dispose?.();
+      this.engine = null;
+      const engine = await loadKinEngine();
+      if (!this.isCurrentSession(session)) {
+        engine.dispose();
+        this.assertCurrentSession(session);
+      }
+      this.engine = engine;
+      session.engine = engine;
+      const store = await EventStore.open({ vault: session.vault, engine });
+      if (!this.isCurrentSession(session)) {
+        store.close();
+        this.assertCurrentSession(session);
+      }
+      this.store = store;
+      session.store = store;
       this.openPeerChannel();
-      const snapshot = await this.store.getCatchUpState();
+      const snapshot = await store.getCatchUpState();
+      this.assertCurrentSession(session);
       this.applyCatchUpSnapshot(snapshot);
       this.renderState();
+      this.main.hidden = false;
+      if (!this.household.isConnected) this.header.append(this.household);
       this.setStatus("Ready.");
       this.retryButton.hidden = true;
       void this.configureSyncCoordinator();
     } catch (error) {
-      this.store?.close();
-      this.store = null;
-      this.showAlert(error.userMessage ?? START_ERROR, () => this.initialize());
-      this.setStatus("");
-    } finally {
-      this.setBusy(false);
-      if (retrying && this.store) {
-        this.compose.focusInput();
+      if (this.isCurrentSession(session)) {
+        this.lockHousehold();
+        this.security.error(error.userMessage ? error : new Error(START_ERROR));
       }
-      this.flushPeerRefresh();
+    } finally {
+      if (this.isCurrentSession(session)) {
+        this.setBusy(false);
+        if (retrying && this.store) this.compose.focusInput();
+        this.flushPeerRefresh();
+      }
     }
   }
 
   async configureSyncCoordinator() {
+    if (!this.vault || this.vault.locked || !this.store) return;
+    const session = this.captureSession();
     try {
       const identityResponse = await fetch("/api/status");
+      this.assertCurrentSession(session);
       if (!identityResponse.ok) return;
       const { identity } = await identityResponse.json();
+      this.assertCurrentSession(session);
       if (!identity) return;
       const syncResponse = await fetch("/api/sync/status");
+      this.assertCurrentSession(session);
       if (!syncResponse.ok) return;
       const syncStatus = await syncResponse.json();
+      this.assertCurrentSession(session);
       if (syncStatus.enabled) await this.startSyncCoordinator(identity);
     } catch {
       // Local household use remains available while the service is unreachable.
@@ -299,7 +394,10 @@ class KinApp extends HTMLElement {
   }
 
   async checkHouseholdAuthorization() {
-    const identity = this.household?.identity;
+    if (!this.vault || this.vault.locked) return;
+    const session = this.captureSession();
+    const household = this.household;
+    const identity = household?.identity;
     if (
       !identity ||
       this.checkingAuthorization ||
@@ -309,48 +407,67 @@ class KinApp extends HTMLElement {
     this.checkingAuthorization = true;
     try {
       const response = await fetch("/api/status", { cache: "no-store" });
+      this.assertCurrentSession(session);
       if (!response.ok) return;
       const status = await response.json();
-      if (this.household.identity !== identity || status.identity) return;
-      this.syncCoordinator?.stop();
-      this.syncCoordinator = null;
-      this.household.identity = null;
-      this.household.pairing = null;
-      this.household.claim = null;
-      this.household.syncStatus = null;
-      this.household.render();
-      this.setStatus(
-        "You are signed out. Device sync is stopped; local household information remains available on this device.",
-      );
+      this.assertCurrentSession(session);
+      if (
+        this.household !== household ||
+        household.identity !== identity ||
+        status.identity
+      )
+        return;
+      this.lockHousehold();
     } catch {
       // Keep local household use available while the service is unreachable.
     } finally {
-      this.checkingAuthorization = false;
+      if (this.isCurrentSession(session)) this.checkingAuthorization = false;
     }
   }
 
   async startSyncCoordinator(identity) {
-    if (this.syncCoordinator?.identity.deviceId === identity.deviceId) {
+    if (!this.vault || this.vault.locked || !this.store || !this.engine) return;
+    const session = this.captureSession();
+    if (this.syncCoordinator?.identity.deviceId === identity.deviceId)
       return this.syncCoordinator.syncNow();
-    }
     this.syncCoordinator?.stop();
-    this.syncCoordinator = new SyncCoordinator({
-      store: this.store,
-      engine: this.engine,
+    let coordinator;
+    coordinator = new SyncCoordinator({
+      store: session.store,
+      engine: session.engine,
       identity,
-      onState: this.onSyncState,
+      onState: (value) => {
+        if (
+          this.isCurrentSession(session) &&
+          this.syncCoordinator === coordinator
+        )
+          this.handleSyncState(value);
+      },
     });
+    this.syncCoordinator = coordinator;
     try {
-      await this.syncCoordinator.start();
+      await coordinator.start();
     } catch (error) {
-      this.handleSyncState({
-        state: "paused",
-        message: error.message || "Device sync is paused.",
-      });
+      if (
+        this.isCurrentSession(session) &&
+        this.syncCoordinator === coordinator
+      ) {
+        this.handleSyncState({
+          state: "paused",
+          message: error.message || "Device sync is paused.",
+        });
+      }
+    } finally {
+      if (
+        !this.isCurrentSession(session) ||
+        this.syncCoordinator !== coordinator
+      )
+        coordinator.stop();
     }
   }
 
   handleSyncState(value) {
+    if (!this.vault || this.vault.locked) return;
     if (value.projection) {
       if (this.busy) {
         this.pendingRefresh = true;
@@ -368,6 +485,7 @@ class KinApp extends HTMLElement {
     if (this.busy || !this.store || !this.engine) {
       return;
     }
+    const session = this.captureSession();
     const submittedDraft = Object.freeze({
       text: event.detail.text,
       classification: event.detail.classification,
@@ -378,23 +496,27 @@ class KinApp extends HTMLElement {
     let restoreComposeFocus = false;
     try {
       await this.appendCommand({ type: "add", ...submittedDraft });
+      this.assertCurrentSession(session);
       this.renderState();
       this.compose.clearIfMatches(submittedDraft);
       this.setStatus("Added.");
       this.broadcastEventChange();
       restoreComposeFocus = true;
     } catch (error) {
+      if (error.code === "locked" || !this.isCurrentSession(session)) return;
       this.showAlert(error.userMessage ?? SAVE_ERROR, () =>
         this.handleAddItem({ detail: submittedDraft }),
       );
       this.setStatus("");
       restoreComposeFocus = true;
     } finally {
-      this.setBusy(false);
-      if (restoreComposeFocus) {
-        this.compose.focusInput();
+      if (this.isCurrentSession(session)) {
+        this.setBusy(false);
+        if (restoreComposeFocus) {
+          this.compose.focusInput();
+        }
+        this.flushPeerRefresh();
       }
-      this.flushPeerRefresh();
     }
   }
 
@@ -408,12 +530,14 @@ class KinApp extends HTMLElement {
 
   async saveHandoff(command) {
     if (this.busy || !this.store || !this.engine) return;
+    const session = this.captureSession();
     const submitted = Object.freeze({ ...command });
     this.setBusy(true);
     this.clearAlert();
     this.setStatus("Saving…");
     try {
       await this.appendCommand(submitted);
+      this.assertCurrentSession(session);
       this.renderState();
       if (submitted.type === "add-handoff")
         this.handoffs.clearIfMatches(submitted);
@@ -426,6 +550,7 @@ class KinApp extends HTMLElement {
       );
       this.broadcastEventChange();
     } catch (error) {
+      if (error.code === "locked" || !this.isCurrentSession(session)) return;
       if (error.code === 4 && submitted.handoffId) this.pendingRefresh = true;
       this.showAlert(
         error.userMessage ?? SAVE_ERROR,
@@ -434,20 +559,24 @@ class KinApp extends HTMLElement {
       );
       this.setStatus("");
     } finally {
-      this.setBusy(false);
-      this.handoffs.focusInput();
-      this.flushPeerRefresh();
+      if (this.isCurrentSession(session)) {
+        this.setBusy(false);
+        this.handoffs.focusInput();
+        this.flushPeerRefresh();
+      }
     }
   }
 
   async saveTalk(command) {
     if (this.busy || !this.store || !this.engine) return;
+    const session = this.captureSession();
     const submitted = Object.freeze({ ...command });
     this.setBusy(true);
     this.clearAlert();
     this.setStatus("Saving…");
     try {
       await this.appendCommand(submitted);
+      this.assertCurrentSession(session);
       this.renderState();
       if (submitted.type === "add-talk") this.talks.clearIfMatches(submitted);
       this.setStatus(
@@ -461,6 +590,7 @@ class KinApp extends HTMLElement {
       );
       this.broadcastEventChange();
     } catch (error) {
+      if (error.code === "locked" || !this.isCurrentSession(session)) return;
       if (error.code === 4 && submitted.talkId) this.pendingRefresh = true;
       this.showAlert(
         error.userMessage ?? SAVE_ERROR,
@@ -469,20 +599,24 @@ class KinApp extends HTMLElement {
       );
       this.setStatus("");
     } finally {
-      this.setBusy(false);
-      this.talks.focusInput();
-      this.flushPeerRefresh();
+      if (this.isCurrentSession(session)) {
+        this.setBusy(false);
+        this.talks.focusInput();
+        this.flushPeerRefresh();
+      }
     }
   }
 
   async savePulse(command) {
     if (this.busy || !this.store || !this.engine) return;
+    const session = this.captureSession();
     const submitted = Object.freeze({ ...command });
     this.setBusy(true);
     this.clearAlert();
     this.setStatus("Saving…");
     try {
       await this.appendCommand(submitted);
+      this.assertCurrentSession(session);
       this.renderState();
       this.pulse.saved();
       this.setStatus(
@@ -490,19 +624,23 @@ class KinApp extends HTMLElement {
       );
       this.broadcastEventChange();
     } catch (error) {
+      if (error.code === "locked" || !this.isCurrentSession(session)) return;
       this.showAlert(error.userMessage ?? SAVE_ERROR, () =>
         this.savePulse(submitted),
       );
       this.setStatus("");
     } finally {
-      this.setBusy(false);
-      this.pulse.focusInput();
-      this.flushPeerRefresh();
+      if (this.isCurrentSession(session)) {
+        this.setBusy(false);
+        this.pulse.focusInput();
+        this.flushPeerRefresh();
+      }
     }
   }
 
   async saveRoutine(command) {
     if (this.busy || !this.store || !this.engine) return;
+    const session = this.captureSession();
     const submitted = Object.freeze({ ...command });
     const focus = this.routines.captureFocus();
     let committed = false;
@@ -511,6 +649,7 @@ class KinApp extends HTMLElement {
     this.setStatus("Saving…");
     try {
       await this.appendCommand(submitted);
+      this.assertCurrentSession(session);
       committed = true;
       this.broadcastEventChange();
       this.renderState();
@@ -526,6 +665,7 @@ class KinApp extends HTMLElement {
               : "Occurrence reopened.",
       );
     } catch (error) {
+      if (error.code === "locked" || !this.isCurrentSession(session)) return;
       if (error.code === 4 && submitted.routineId) this.pendingRefresh = true;
       this.showAlert(
         committed
@@ -536,14 +676,16 @@ class KinApp extends HTMLElement {
       );
       this.setStatus("");
     } finally {
-      this.setBusy(false);
-      if (
-        submitted.type === "create-routine" ||
-        submitted.type === "archive-routine"
-      )
-        this.routines.focusInput();
-      else this.routines.restoreFocus(focus);
-      this.flushPeerRefresh();
+      if (this.isCurrentSession(session)) {
+        this.setBusy(false);
+        if (
+          submitted.type === "create-routine" ||
+          submitted.type === "archive-routine"
+        )
+          this.routines.focusInput();
+        else this.routines.restoreFocus(focus);
+        this.flushPeerRefresh();
+      }
     }
   }
 
@@ -589,6 +731,7 @@ class KinApp extends HTMLElement {
     if (this.busy || !this.store || !this.engine) {
       return;
     }
+    const session = this.captureSession();
     const submittedItemId = itemId;
     this.setBusy(true);
     this.clearAlert();
@@ -596,6 +739,7 @@ class KinApp extends HTMLElement {
     let restoreComposeFocus = false;
     try {
       await this.appendCommand({ type, itemId: submittedItemId });
+      this.assertCurrentSession(session);
       this.renderState();
       this.setStatus(
         type === "complete"
@@ -607,6 +751,7 @@ class KinApp extends HTMLElement {
       this.broadcastEventChange();
       restoreComposeFocus = true;
     } catch (error) {
+      if (error.code === "locked" || !this.isCurrentSession(session)) return;
       if (error.code === 4) {
         this.pendingRefresh = true;
       }
@@ -618,11 +763,13 @@ class KinApp extends HTMLElement {
       this.setStatus("");
       restoreComposeFocus = true;
     } finally {
-      this.setBusy(false);
-      if (restoreComposeFocus) {
-        this.compose.focusInput();
+      if (this.isCurrentSession(session)) {
+        this.setBusy(false);
+        if (restoreComposeFocus) {
+          this.compose.focusInput();
+        }
+        this.flushPeerRefresh();
       }
-      this.flushPeerRefresh();
     }
   }
 
@@ -643,13 +790,18 @@ class KinApp extends HTMLElement {
   }
 
   async appendCommand(command) {
-    const result = await this.store.append(command, this.engine);
+    const session = this.captureSession();
+    this.assertCurrentSession(session);
+    const result = await session.store.append(command, session.engine);
+    this.assertCurrentSession(session);
     this.state = result.state;
     this.snapshotBoundary = result.snapshotBoundary;
     void this.syncCoordinator?.syncNow();
   }
 
   applyCatchUpSnapshot(snapshot) {
+    if (!this.vault || this.vault.locked || !this.engine)
+      throw new Error("Kin is locked.");
     const { asOf, civilDate } = projectionContext();
     const state = this.engine.applyEvents(
       snapshot.events.map((event) => event.encoded_event),
@@ -678,6 +830,7 @@ class KinApp extends HTMLElement {
 
   async handleCaughtUp() {
     if (this.busy || !this.store || !this.snapshotBoundary) return;
+    const session = this.captureSession();
     const boundary = this.snapshotBoundary;
     const restoreCatchUpFocus = document.activeElement === this.catchUp.button;
     this.setBusy(true);
@@ -685,11 +838,13 @@ class KinApp extends HTMLElement {
     this.setStatus("Saving catch-up state…");
     let committed = false;
     try {
-      await this.store.markCaughtUpThrough(boundary);
+      await session.store.markCaughtUpThrough(boundary);
+      this.assertCurrentSession(session);
       committed = true;
       // Peers must learn about the commit even if this tab cannot reload it.
       this.broadcastViewStateChange();
-      const snapshot = await this.store.getCatchUpState();
+      const snapshot = await session.store.getCatchUpState();
+      this.assertCurrentSession(session);
       this.applyCatchUpSnapshot(snapshot);
       this.renderState();
       this.setStatus(
@@ -698,6 +853,7 @@ class KinApp extends HTMLElement {
           : "Catch-up summary updated.",
       );
     } catch (error) {
+      if (error.code === "locked" || !this.isCurrentSession(session)) return;
       this.showAlert(
         committed
           ? "Your catch-up position was saved, but Kin could not refresh the summary. Try again to reload it."
@@ -707,14 +863,16 @@ class KinApp extends HTMLElement {
       );
       this.setStatus("");
     } finally {
-      this.setBusy(false);
-      if (restoreCatchUpFocus) {
-        (this.catchUp.button.hidden
-          ? this.catchUp.heading
-          : this.catchUp.button
-        ).focus();
+      if (this.isCurrentSession(session)) {
+        this.setBusy(false);
+        if (restoreCatchUpFocus) {
+          (this.catchUp.button.hidden
+            ? this.catchUp.heading
+            : this.catchUp.button
+          ).focus();
+        }
+        this.flushPeerRefresh();
       }
-      this.flushPeerRefresh();
     }
   }
 
@@ -741,6 +899,20 @@ class KinApp extends HTMLElement {
   }
 
   handlePeerMessage(event) {
+    if (event.data?.type === "household-locked") {
+      const peerEpoch = event.data.lockEpoch;
+      // A lock notification may be delivered after this tab has already
+      // re-unlocked at that durable epoch. Only a newer epoch revokes it.
+      if (
+        !Number.isSafeInteger(peerEpoch) ||
+        peerEpoch < 0 ||
+        !this.vault ||
+        peerEpoch > (this.vault.securityEpoch ?? -1)
+      )
+        this.lockHousehold(false);
+      return;
+    }
+    if (!this.vault || this.vault.locked) return;
     if (!["events-changed", "view-state-changed"].includes(event.data?.type)) {
       return;
     }
@@ -752,10 +924,12 @@ class KinApp extends HTMLElement {
   }
 
   async refreshFromEvents() {
+    if (!this.vault || this.vault.locked) return;
     if (!this.store || !this.engine || this.busy || this.refreshing) {
       this.pendingRefresh = true;
       return;
     }
+    const session = this.captureSession();
     this.refreshing = true;
     const focusedControl = this.contains(document.activeElement)
       ? document.activeElement
@@ -779,7 +953,8 @@ class KinApp extends HTMLElement {
     this.clearAlert();
     this.setStatus("Updating from another tab…");
     try {
-      const snapshot = await this.store.getCatchUpState();
+      const snapshot = await session.store.getCatchUpState();
+      this.assertCurrentSession(session);
       this.applyCatchUpSnapshot(snapshot);
       this.renderState();
       this.setStatus("");
@@ -832,6 +1007,7 @@ class KinApp extends HTMLElement {
         }
       }
     } catch (error) {
+      if (error.code === "locked" || !this.isCurrentSession(session)) return;
       this.showAlert(
         error.userMessage ??
           "Kin could not refresh from local household storage. Your saved information was not deleted.",
@@ -840,31 +1016,38 @@ class KinApp extends HTMLElement {
       this.suspendedRetry = previousRetry ? previousFailure : null;
       this.setStatus("");
     } finally {
-      this.refreshing = false;
-      this.setBusy(false);
-      if (focusedControl?.isConnected && !focusedControl.closest("[hidden]"))
-        focusedControl.focus();
-      else if (focusedControl && this.pulse.contains(focusedControl))
-        this.pulse.focusInput();
-      if (restoreHandoffFocus) this.handoffs.focusInput();
-      this.routines.restoreFocus(routineFocus);
-      if (restoreTalkFocus) this.talks.focusInput();
-      if (restoreComposeFocus) {
-        this.compose.focusInput();
+      if (this.isCurrentSession(session)) {
+        this.refreshing = false;
+        this.setBusy(false);
+        if (focusedControl?.isConnected && !focusedControl.closest("[hidden]"))
+          focusedControl.focus();
+        else if (focusedControl && this.pulse.contains(focusedControl))
+          this.pulse.focusInput();
+        if (restoreHandoffFocus) this.handoffs.focusInput();
+        this.routines.restoreFocus(routineFocus);
+        if (restoreTalkFocus) this.talks.focusInput();
+        if (restoreComposeFocus) {
+          this.compose.focusInput();
+        }
+        this.flushPeerRefresh();
       }
-      this.flushPeerRefresh();
     }
   }
 
   flushPeerRefresh() {
+    if (!this.vault || this.vault.locked) return;
     if (!this.pendingRefresh || this.busy || this.refreshing) {
       return;
     }
     this.pendingRefresh = false;
-    queueMicrotask(() => this.refreshFromEvents());
+    const session = this.captureSession();
+    queueMicrotask(() => {
+      if (this.isCurrentSession(session)) this.refreshFromEvents();
+    });
   }
 
   renderState() {
+    if (!this.vault || this.vault.locked || !this.state) return;
     this.catchUp.summary = this.state.summary;
     this.catchUp.lastLookedAt = this.catchUpCursor?.lastLookedAt;
     this.today.items = this.state.items;
@@ -879,6 +1062,7 @@ class KinApp extends HTMLElement {
 
   setBusy(isBusy) {
     this.busy = isBusy;
+    if (!this.isConnected) return;
     this.main.setAttribute("aria-busy", String(isBusy));
     this.compose.disabled = isBusy || !this.store;
     this.today.disabled = isBusy || !this.store;
@@ -905,11 +1089,105 @@ class KinApp extends HTMLElement {
   }
 
   showAlert(message, retryAction = null, retryIntent = null) {
+    if (!this.vault || this.vault.locked) return;
     this.alert.textContent = message;
     this.alert.hidden = false;
     this.retryAction = retryAction;
     this.retryIntent = retryIntent;
     this.retryButton.hidden = typeof retryAction !== "function";
+  }
+
+  async openUnlockedHousehold(vault) {
+    vault.assertUnlocked();
+    this.vault = vault;
+    this.securityGeneration++;
+    setActiveVault(vault);
+    this.removeLockListener?.();
+    this.removeLockListener = vault.onLock(() => this.lockHousehold(false));
+    const generation = this.securityGeneration;
+    await this.initialize();
+    this.assertCurrentSession({ vault, generation });
+    vault.assertUnlocked();
+    if (!this.store)
+      throw new Error("Kin could not verify the household store.");
+    this.main.focus();
+  }
+
+  lockHousehold(broadcast = true, { preserveSecurityOperation = false } = {}) {
+    if (broadcast) {
+      // A protected read holds a native transaction while crypto runs. Notify
+      // peers before the epoch write queues behind that read, so they abort it
+      // promptly. The later committed epoch remains authoritative if delivery
+      // is missed. Numbered intent also cannot revoke a newer unlock epoch.
+      this.notifyPeerLock((this.vault?.securityEpoch ?? this.security?.manifest?.lockEpoch ?? -1) + 1);
+      this.lockBarrier = Promise.resolve(this.lockBarrier)
+        .then(() => EventStore.lockAll())
+        .then((lockEpoch) => {
+          try {
+            this.channel?.postMessage({ type: "household-locked", lockEpoch });
+          } catch {
+            // Durable epoch guards still reject stale capabilities.
+          }
+          return lockEpoch;
+        })
+        .catch((error) => {
+          this.security?.error(error);
+        });
+    }
+    this.securityGeneration++;
+    this.removeLockListener?.();
+    this.removeLockListener = null;
+    const vault = this.vault ?? getActiveVault();
+    this.vault = null;
+    vault?.lock();
+    this.syncCoordinator?.stop();
+    this.syncCoordinator = null;
+    this.store?.close();
+    this.store = null;
+    this.engine?.dispose?.();
+    this.engine = null;
+    this.state = null;
+    this.snapshotBoundary = null;
+    this.catchUpCursor = null;
+    this.pendingRefresh = false;
+    this.refreshing = false;
+    this.checkingAuthorization = false;
+    this.starting = null;
+    this.startingGeneration = null;
+    clearTimeout(this.pulseTimer);
+    clearTimeout(this.focusTimer);
+    this.clearAlert();
+    clearLegacyDrafts();
+    if (this.main) {
+      this.main.hidden = true;
+      // Replacing every component drops private arrays, drafts and DOM nodes.
+      const components = [
+        ["catchUp", "kin-catch-up"],
+        ["today", "kin-today"],
+        ["compose", "kin-compose"],
+        ["handoffs", "kin-handoff-list"],
+        ["talks", "kin-talk-list"],
+        ["pulse", "kin-pulse"],
+        ["routines", "kin-routines"],
+      ];
+      this.main.replaceChildren(
+        ...components.map(
+          ([field, name]) => (this[field] = document.createElement(name)),
+        ),
+      );
+      this.household.syncKeyStore?.close();
+      this.household.remove();
+      this.household = document.createElement("kin-household");
+      this.setBusy(false);
+      this.setStatus("Household locked.");
+      if (!preserveSecurityOperation) this.security.locked();
+    }
+  }
+
+  notifyPeerLock(lockEpoch) {
+    if (!Number.isSafeInteger(lockEpoch) || lockEpoch < 1) return;
+    try { this.channel?.postMessage({ type: "household-locked", lockEpoch }); }
+    catch { /* The durable epoch still fences subsequent operations. */ }
   }
 }
 

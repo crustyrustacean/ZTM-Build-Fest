@@ -1,4 +1,8 @@
 pub mod abi;
+pub mod archive;
+pub mod codec;
+pub mod command;
+pub mod core;
 pub mod error;
 pub mod event;
 pub mod protocol;
@@ -13,3 +17,6 @@ mod catchup_tests;
 
 #[cfg(test)]
 mod routine_tests;
+
+#[cfg(test)]
+mod command_tests;

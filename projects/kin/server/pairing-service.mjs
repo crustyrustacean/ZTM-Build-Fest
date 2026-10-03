@@ -849,6 +849,39 @@ export class PairingService {
     return { fingerprint: device.syncKeyFingerprint, registered: true };
   }
 
+  transitionSyncPublicKeys(sessionToken, transition) {
+    const { device, member, household } = this.authorize(sessionToken);
+    const fail = () => { throw new PairingError("device_transition_invalid", "Kin could not verify this device key transition.", 409); };
+    const t = transition;
+    if (!t || t.version !== 1 || t.purpose !== "kin.sync.device-key-successor.v1" ||
+        t.householdId !== household.id || t.memberId !== member.id || t.deviceId !== device.id ||
+        !Number.isSafeInteger(t.generation) || t.generation < 1 || t.generation > 16 ||
+        !/^[a-f0-9]{32}$/.test(t.transitionId) || !/^[A-Za-z0-9_-]{86}$/.test(t.signature) ||
+        Buffer.from(t.signature, "base64url").toString("base64url") !== t.signature) fail();
+    const transitions = device.syncKeyTransitions ?? [];
+    const existing = transitions.find(value => value.transitionId === t.transitionId);
+    if (existing) {
+      if (canonicalJson(existing) !== canonicalJson(t)) fail();
+      return { fingerprint: device.syncKeyFingerprint, generation: device.syncKeyGeneration, retried: true };
+    }
+    if (t.generation !== (device.syncKeyGeneration ?? 0) + 1 ||
+        t.oldFingerprint !== device.syncKeyFingerprint || t.fingerprint === t.oldFingerprint) fail();
+    const next = validateSyncPublicKeys(t.publicKeys);
+    if (next.syncKeyFingerprint !== t.fingerprint) fail();
+    const { signature, ...unsigned } = t;
+    try {
+      if (!verifySignature("sha256", Buffer.from(canonicalJson(unsigned)), {
+        key: createPublicKey({ key: device.syncPublicKeys.signing, format: "jwk" }), dsaEncoding: "ieee-p1363",
+      }, Buffer.from(signature, "base64url"))) fail();
+    } catch { fail(); }
+    device.syncKeyHistory ??= [{ publicKeys: structuredClone(device.syncPublicKeys), fingerprint: device.syncKeyFingerprint, generation: 0 }];
+    device.syncKeyHistory.push({ publicKeys: structuredClone(t.publicKeys), fingerprint: t.fingerprint, generation: t.generation });
+    device.syncKeyTransitions = [...transitions, structuredClone(t)];
+    device.syncKeyGeneration = t.generation;
+    Object.assign(device, next);
+    return { fingerprint: device.syncKeyFingerprint, generation: t.generation, retried: false };
+  }
+
   householdView(sessionToken) {
     const { member, household } = this.authorize(sessionToken);
     return {

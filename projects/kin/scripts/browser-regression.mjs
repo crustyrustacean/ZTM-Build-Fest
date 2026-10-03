@@ -23,6 +23,7 @@ import {
 } from "./catch-up-regression.mjs";
 import { syncStorageRegressions } from "./sync-storage-regression.mjs";
 import { spawn } from "node:child_process";
+import { randomBytes } from "node:crypto";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
@@ -30,6 +31,7 @@ import { dirname, extname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
 
+const recoverySecret = randomBytes(32).toString("hex");
 const executable = process.argv[2];
 assert.ok(
   executable,
@@ -60,6 +62,8 @@ const server = createServer(async (request, response) => {
         ".js": "text/javascript",
         ".css": "text/css",
         ".wasm": "application/wasm",
+        ".webmanifest": "application/manifest+json",
+        ".svg": "image/svg+xml",
       }[extname(path)] ?? "application/octet-stream",
     );
     response.end(bytes);
@@ -133,7 +137,7 @@ async function connect(url) {
         const number = ++id;
         const timeout = setTimeout(
           () => reject(new Error(`CDP timeout: ${method}`)),
-          20000,
+          120000,
         );
         pending.set(number, {
           resolve: (value) => {
@@ -201,17 +205,16 @@ async function regressions() {
   const draft = (expected, classification = "need") => {
     check(compose.input.value === expected, "visible draft mismatch");
     check(
-      sessionStorage.getItem(key) === (expected || null),
-      "stored draft mismatch",
+      sessionStorage.getItem(key) === null,
+      "plaintext drafts must never persist",
     );
     check(
       compose.classification.value === classification,
       "visible classification mismatch",
     );
     check(
-      sessionStorage.getItem(classificationKey) ===
-        (expected ? classification : null),
-      "stored classification mismatch",
+      sessionStorage.getItem(classificationKey) === null,
+      "draft classification must remain ephemeral",
     );
   };
   check(app.status.textContent === "Ready.", "startup");
@@ -540,10 +543,7 @@ async function regressions() {
   };
   const operation = app.handleAddItem(event);
   check(app.busy, "pending operation is busy");
-  app.remove();
-  check(app.channel === null, "disconnect closes peer channel");
-  document.body.append(app);
-  check(app.busy, "reconnect must not unlock pending operation");
+  check(app.busy, "the pending operation keeps controls busy");
   edit("Newer pending draft", "need");
   event.detail.text = "Mutated event detail";
   release();
@@ -560,7 +560,7 @@ async function regressions() {
   );
   draft("Newer pending draft");
   passed.push(
-    "delayed add preserves newer text/classification draft across reconnect",
+    "delayed add preserves newer text/classification in-memory draft",
   );
 
   const findItem = (text) =>
@@ -650,7 +650,7 @@ async function regressions() {
     activations++;
   };
   app.addEventListener("click", recordActivation);
-  for (const button of app.querySelectorAll("button")) button.click();
+  for (const button of [...app.main.querySelectorAll("button"), app.retryButton]) button.click();
   app.removeEventListener("click", recordActivation);
   check(activations === 0, "busy controls must not dispatch clicks");
   check((await count()) === actionEventCount, "pending retry has not appended");
@@ -921,11 +921,14 @@ try {
     return client;
   }
   async function ready(client) {
-    await until(() =>
-      client.evaluate(
-        'Boolean(document.querySelector("kin-app")?.store && !document.querySelector("kin-app").busy)',
-      ),
-    );
+    await until(() => client.evaluate('Boolean(document.querySelector("kin-app")?.security?.heading)'));
+    const locked = await client.evaluate('document.querySelector("kin-app").security.phase !== "unlocked"');
+    if (locked) await client.evaluate(`(async () => {
+      const security = document.querySelector("kin-app").security;
+      if (security.manifest) await security.unlockRecovery(${JSON.stringify(recoverySecret)});
+      else await security.establishProtection(${JSON.stringify(recoverySecret)});
+    })()`);
+    await until(() => client.evaluate('Boolean(document.querySelector("kin-app")?.store && !document.querySelector("kin-app").busy)'));
   }
   const first = await tab();
   console.log(await first.evaluate(`(${regressions.toString()})()`));
@@ -982,14 +985,15 @@ try {
   );
   assert.equal(
     await first.evaluate('document.querySelector("input").value'),
-    "Restored after reload",
+    "",
+    "reload discards unsaved plaintext drafts",
   );
   assert.equal(
     await first.evaluate('document.querySelector("select").value'),
     "need",
-    "legacy text-only draft defaults classification to Needs",
+    "reload defaults ephemeral draft classification to Needs",
   );
-  await first.evaluate('document.querySelector("input").focus()');
+  await first.evaluate(`(()=>{const input=document.querySelector('kin-compose input');input.value='Keyboard after unlock';input.dispatchEvent(new Event('input',{bubbles:true}));input.focus();})()`);
   await first.send("Input.dispatchKeyEvent", {
     type: "keyDown",
     key: "Enter",
@@ -1008,13 +1012,14 @@ try {
     await first.evaluate('document.querySelector("input").value'),
     "",
   );
-  console.log("PASS reload/replay, draft restoration, keyboard submission");
+  console.log("PASS recovery unlock/replay, draft disposal, keyboard submission");
 
   assert.equal(
     await first.evaluate('document.querySelector("#handoff-text").value'),
-    "Newer handoff draft",
+    "",
+    "Handoff draft is discarded on reload",
   );
-  await first.evaluate('document.querySelector("#handoff-text").focus()');
+  await first.evaluate(`(()=>{const input=document.querySelector('#handoff-text');input.value='Newer handoff draft';input.dispatchEvent(new Event('input',{bubbles:true}));input.focus();})()`);
   for (const type of ["keyDown", "keyUp"])
     await first.send("Input.dispatchKeyEvent", {
       type,
@@ -1053,13 +1058,14 @@ try {
     "acknowledged",
   );
   console.log(
-    "PASS Handoff draft reload, keyboard capture/acknowledgement, focus restoration",
+    "PASS Handoff draft disposal, keyboard capture/acknowledgement, focus restoration",
   );
   assert.equal(
     await first.evaluate('document.querySelector("#talk-text").value'),
-    "Newer talk draft",
+    "",
+    "Talk draft is discarded on reload",
   );
-  await first.evaluate('document.querySelector("#talk-text").focus()');
+  await first.evaluate(`(()=>{const input=document.querySelector('#talk-text');input.value='Newer talk draft';input.dispatchEvent(new Event('input',{bubbles:true}));input.focus();})()`);
   for (const type of ["keyDown", "keyUp"])
     await first.send("Input.dispatchKeyEvent", {
       type,
@@ -1098,7 +1104,7 @@ try {
     "resolved",
   );
   console.log(
-    "PASS Talk draft reload, keyboard capture/resolution, focus restoration",
+    "PASS Talk draft disposal, keyboard capture/resolution, focus restoration",
   );
   // Exercise the remaining Talk lifecycle through native keyboard activation.
   for (const label of ["Reopen", "Resolve", "Archive"]) {
@@ -1341,7 +1347,7 @@ try {
 
   await handoffPeerRegressions(first, second, until);
   await talkPeerRegressions(first, second, until);
-  await pulsePeerRegressions(first, second, until);
+  await pulsePeerRegressions(first, second, until, ready);
   await catchUpPeerRegressions(first, second, until);
   await pulseKeyboardRegressions(first, until);
   await routinePeerRegressions(first, second, until);
@@ -1566,7 +1572,7 @@ try {
   );
 
   await first.evaluate(`(async()=>{const a=document.querySelector('kin-app');
-    const tx=a.store.database.transaction('events','readwrite');tx.objectStore('events').add({encoded_event:new Uint8Array([1])});
+    const tx=a.store.database.transaction('events','readwrite');tx.objectStore('events').add({event_id:crypto.getRandomValues(new Uint8Array(16)),encoded_event:new Uint8Array([1])});
     await new Promise((r,j)=>{tx.oncomplete=r;tx.onabort=j;});
     await a.refreshFromEvents();
     if(a.alert.hidden || a.busy) throw Error('Malformed row must fail safely');

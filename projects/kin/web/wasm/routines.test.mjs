@@ -5,12 +5,14 @@ import { loadKinEngine, encodeRoutineCreatedRecord, encodeRoutineActionRecord } 
 
 const wasm = await readFile(new URL("./kin_engine.wasm", import.meta.url));
 const url = `data:application/wasm;base64,${wasm.toString("base64")}`;
+await loadKinEngine(url);
 const id = value => new Uint8Array(16).fill(value);
 const identity = sequence => ({ eventId: id(sequence), householdId: id(0xaa), actorId: id(0xbb), deviceId: id(0xcc), timestamp: 1234, logicalTime: sequence });
 const create = (cadence = "daily", text = "Starter", createdOn = 20261002) => encodeRoutineCreatedRecord({ ...identity(1), routineId: id(0x11), text, cadence, createdOn });
 const action = (sequence, action, occurrenceKey = 20261002) => encodeRoutineActionRecord({ ...identity(sequence), routineId: id(0x11), action, occurrenceKey });
 
-test("v7 Routine writers have exact field offsets and reject invalid input", () => {
+test("v7 Routine writers have exact field offsets and reject invalid input", async () => {
+  await loadKinEngine(url);
   const row = create("weekly", "x");
   const view = new DataView(row.buffer);
   assert.equal(view.getUint16(0, true), 1);

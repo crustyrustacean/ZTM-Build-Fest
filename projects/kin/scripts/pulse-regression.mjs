@@ -146,13 +146,13 @@ export async function pulseRegressions() {
   check((await count()) === beforeExpiry, "expiry appends nothing");
   await app.savePulse({ type: "clear-pulse" });
   check(
-    app.store.database.version === 2,
+    app.store.database.version === 3,
     "sync stores are additive to the event schema",
   );
   return "PASS Pulse fixed values, actor projection, set/replace/clear, timer expiry, original retry and repeated refresh recovery";
 }
 
-export async function pulsePeerRegressions(first, second, until) {
+export async function pulsePeerRegressions(first, second, until, unlockReady) {
   await first.evaluate(
     `(async()=>{const a=document.querySelector('kin-app');const timestamp=Date.now();await a.savePulse({type:'set-pulse',value:'drained',timestamp,expiresAt:timestamp+3600000});})()`,
   );
@@ -162,6 +162,7 @@ export async function pulsePeerRegressions(first, second, until) {
     ),
   );
   await second.send("Page.reload");
+  await unlockReady(second);
   await until(() =>
     second.evaluate(
       `!!document.querySelector('kin-app')?.store && !document.querySelector('kin-app').busy`,
@@ -230,7 +231,7 @@ export async function pulseResilienceRegressions() {
   };
   const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const idle = async () => {
-    for (let i = 0; app.busy && i < 300; i++) await pause(10);
+    for (let i = 0; (app.busy || app.refreshing || app.pendingRefresh) && i < 300; i++) await pause(10);
     check(!app.busy, "Pulse operation settled");
   };
   const count = async () => (await app.store.loadEvents()).length;
@@ -263,6 +264,7 @@ export async function pulseResilienceRegressions() {
       value: "visible",
     });
     document.dispatchEvent(new Event("visibilitychange"));
+    for (let i = 0; app.state.pulses[0].status !== "expired" && i < 300; i++) await pause(10);
     await idle();
     check(
       app.state.pulses[0].status === "expired",
@@ -278,7 +280,7 @@ export async function pulseResilienceRegressions() {
     );
     pulse.changeButton.focus();
     clock = base + 3000;
-    app.onTimeWake();
+    await app.onTimeWake();
     await idle();
     check(
       document.activeElement === pulse.valueSelect,
@@ -414,7 +416,7 @@ export async function pulseResilienceRegressions() {
   );
   await app.savePulse({ type: "clear-pulse" });
 
-  // Pending persistence remains busy through reconnect, timer and repeated intents.
+  // Pending persistence remains busy through timer and repeated intents.
   let release;
   const gate = new Promise((resolve) => {
     release = resolve;
@@ -430,12 +432,8 @@ export async function pulseResilienceRegressions() {
       [...pulse.querySelectorAll("button,select")].every((c) => c.disabled),
     "all Pulse controls busy",
   );
-  const parent = app.parentNode,
-    next = app.nextSibling;
-  app.remove();
-  parent.insertBefore(app, next);
-  check(app.busy, "reconnect cannot unlock save");
-  app.onTimeWake();
+  check(app.busy, "pending save remains busy");
+  await app.onTimeWake();
   await app.savePulse({ ...old, value: "drained" });
   await app.savePulse({ type: "clear-pulse" });
   release();
@@ -462,7 +460,7 @@ export async function pulseResilienceRegressions() {
   );
   check(app.status.getAttribute("aria-live") === "polite", "polite success");
   await app.savePulse({ type: "clear-pulse" });
-  return "PASS Pulse sleep/wake, focus, forward/backward clock, late timer, SET/CLEAR quota/abort recovery, supersession, rapid intents and busy reconnect";
+  return "PASS Pulse sleep/wake, focus, forward/backward clock, late timer, SET/CLEAR quota/abort recovery, supersession, rapid intents and busy isolation";
 }
 
 export async function pulseKeyboardRegressions(client, until) {

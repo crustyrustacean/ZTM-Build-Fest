@@ -100,7 +100,7 @@ If an unrelated parent-repository file was modified accidentally, revert that ch
 
 # Current Development Stage
 
-Kin uses semantic versions. The current implementation/release is `v0.9.3` — Encrypted Event Sync Stabilization; the v0.9.x line ends at this encrypted-sync stabilization gate. The next planned development line is `v0.10.x` — Portable Core / Architectural Consolidation. Do not begin v1.0 implementation until the v0.10.x readiness criteria have been satisfied. Relay/identity state remains in-memory; no production certification is claimed. No automatic kin-main merge.
+Kin uses semantic versions. The current implementation is `v0.10.3` — Bounded Storage/Archive Hardening & Architecture Closure, following the published v0.10.0/v0.10.1 and root-lifecycle v0.10.2 releases. The user authorized annotated tags before updating existing PR #15 into `kin-development`, then a stop for human review. Preserve every published tag exactly. Root replacement follows [ROOT-ROTATION](docs/ROOT-ROTATION.md); archive recovery is intentionally local-only and KARC v1 remains supported. Do not begin v0.11 or v1.0 automatically, and do not manufacture v0.10.4 for housekeeping. Relay/identity state remains in-memory; no production certification, mobile readiness or independent audit is claimed. No automatic kin-main or kin-development merge. See [V0.10.0](docs/V0.10.0.md) for actual evidence and limitations.
 
 The pre-implementation releases are:
 
@@ -1005,7 +1005,10 @@ v0.6.0 — Since You Last Looked
 v0.7.0 — Routines
 v0.8.0 — Household Pairing
 v0.9.0 — Encrypted Sync
-v1.0.0 — Build Fest release
+v0.9.3 — Encrypted Event Sync Stabilization
+v0.10.x — Portable Core + Local Data Security
+v0.11.x — UX/UI Consolidation
+v1.0.0 — Stable Kin Platform
 ```
 
 This roadmap may evolve.
@@ -1098,6 +1101,10 @@ kin-v0.9.1
 kin-v0.9.2
 kin-v0.9.3
 kin-v0.10.0
+kin-v0.10.1
+kin-v0.10.2
+kin-v0.10.3
+kin-v0.11.0
 kin-v1.0.0
 ```
 

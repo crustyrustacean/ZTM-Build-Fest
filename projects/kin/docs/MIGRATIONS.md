@@ -1,8 +1,69 @@
 # Data Migrations
 
-**Status:** Current through v0.7.4 Routine Stale-Action Correctness; earlier version sections are historical contracts. See Pulse and v0.6.0 below.
+**Status:** v0.10.3 implements recoverable local-encryption migration, root replacement and bounded verification. v0.9.3's additive schema 1→2 migration remains supported as input; canonical bytes are not rewritten. Earlier version sections are historical.
+
+## v0.9.3 → v0.10 local protection
+
+Follow [V0.10.0](V0.10.0.md): establish/verify recovery and root wrappers first;
+persist a stable journal; exclude stale writers; stage all events, context, outbox,
+bindings and keys; decrypt/compare exact canonical bytes and perform complete Rust
+replay; replace each database atomically; remove legacy plaintext and capabilities;
+publish encrypted only after both databases agree. Key migration must include the
+signed successor transition for nonextractable legacy transport private keys.
+
+An interruption, tab closure, aborted transaction, quota error, key-generation
+failure, cancelled authentication or failed ciphertext verification preserves the
+legacy dataset or a verified replacement recoverable with the same wrappers.
+Restart resumes the journal and never silently creates another root. Cross-DB
+progress is recoverable, not one fictional atomic transaction. Schema upgrades
+only establish structure; asynchronous crypto and network work happen outside them.
+
+Implemented phases are absent/unconfigured, `preparing`, `cleanup-pending`, and
+`encrypted`. Event DB 3 adds `security_state`; key DB 4 adds a protected staging
+journal. Setup verifies an independent recovery wrapper before writing it. Web
+Locks serializes migration; source snapshots and lock epochs are checked again
+inside replacement transactions. Each staged value is decrypted and compared;
+Rust replays the entire recovered canonical corpus. Legacy AES and sealed epoch
+copies must agree (including fingerprint and authenticated test encryption)
+before either is replaced. The root and signed successor remain stable on retry.
+`cleanup-pending` cannot open a household; it resumes only key cleanup and final
+commit. Quota, transaction abort, changed sources, cancelled unlock, corrupt keys
+or lost capability fail without publishing a partial secure state.
+
+New security metadata starts with `configRevision: 0` and `lockEpoch: 0`.
+Compatibility reads treat an absent revision or epoch as zero. Wrapper updates
+use a transactional revision comparison; removing an unlock wrapper increments
+both the configuration revision and lock epoch atomically. This prevents a stale
+tab from restoring a removed credential through a later wrapper write. Migration
+replacement and final publication compare lock epochs again, so an interrupted
+setup cannot overwrite a newer lock with its earlier journal snapshot.
 
 ## Migration categories
+
+v0.10.3 retains canonical source bytes once and clones only metadata requiring
+mutation. Every 32-row protection batch decrypts and compares exact values and
+checks the durable security epoch before/after crypto. Legacy device migration
+checks between individual device/epoch operations as well. Final source CAS uses
+bounded native pages; full Rust replay still runs before atomic replacement.
+Native key/event replacement transactions abort on lock through completion.
+
+### v0.10.2 root replacement recovery
+
+Root rotation is encryption re-protection, not canonical event migration. Before
+event publication, original event/key rows remain intact and the journal retains
+one candidate root through its verified recovery wrapper. The candidate encrypts
+the old root for restart; old capabilities never wrap the candidate. Entering the
+new recovery key resumes the same operation after tab closure/reload/process-style
+restart. Every source/stage is compared exactly and full Rust replay repeats even
+when the journal records prior verification.
+
+After the atomic event/manifest switch, `root-cleanup` accepts only the candidate
+recovery path and resumes idempotent key replacement and stage cleanup. Normal
+household/sync access stays blocked until both databases agree. Quota/abort/peer
+lock preserve either the original corpus plus the exact candidate journal or the
+verified candidate corpus plus recoverable staged keys. No database schema bump,
+canonical rewrite or household sync-epoch rotation is involved. The full versioned
+contract is [ROOT-ROTATION](ROOT-ROTATION.md).
 
 - **Storage migration:** change IndexedDB schema, such as database schema 1 to 2 (stores, indexes, local record layout). This is distinct from an event payload change.
 - **Event/protocol migration:** decode a supported event or wire representation version into the current in-memory model. Persisted source event bytes remain immutable unless a separately reviewed, explicit export/restore conversion is required.

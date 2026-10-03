@@ -1,6 +1,6 @@
 # Security Policy
 
-**Current security status:** Kin v0.9.3 is an incubation prototype with passkey-authenticated household pairing and opt-in client-encrypted event sync. The same-origin Node service authorizes devices and relays opaque encrypted records, but its identity and relay state are memory-only. This release has not received an independent security audit or production hardening. Encryption does not protect against a compromised unlocked browser/runtime, and device revocation cannot erase data or keys already copied to that device. See [THREAT-MODEL](docs/THREAT-MODEL.md) and [SYNC](docs/SYNC.md) for the implemented boundary and limitations.
+**Current security status:** Kin v0.10.3 is an incubation prototype with encrypted local household storage, recovery/optional-PRF unlock, journalled root replacement, encrypted archives, passkey-authenticated pairing and client-encrypted sync. Replacing recovery protection establishes a fresh random root and confirmed recovery key, retires old wrappers, and preserves sync key identities. Locked startup does not replay household content or retain usable local/sync private keys. The same-origin Node identity/relay service remains memory-only. This release has not received an independent audit or production hardening. Encryption cannot protect a compromised unlocked runtime, origin, privileged extension or OS, and rotation cannot erase data, keys or archives already copied. See [THREAT-MODEL](docs/THREAT-MODEL.md), [CRYPTOGRAPHY](docs/CRYPTOGRAPHY.md) and [V0.10.0](docs/V0.10.0.md).
 
 ## Supported versions
 
@@ -16,6 +16,6 @@ Reports should include a concise impact description, affected version/commit, sa
 
 ## Scope and response
 
-Implemented security-sensitive areas include safe rendering, WASM protocol parsing and memory ownership, IndexedDB event handling, WebAuthn, device authorization, Web Crypto encryption/key wrapping, and sync authorization/relay. Report issues against behavior that actually exists; a documented future design is not a deployed attack surface. No durable relay, all-device recovery, or production service is provided.
+Implemented security-sensitive areas include safe rendering, WASM protocol/archive parsing and memory ownership, encrypted IndexedDB migration, recovery/PRF root wrapping, WebAuthn, device authorization, encrypted archive import, lock cancellation, static shell caching, and sync authorization/relay. Report issues against behavior that actually exists. Encrypted backup restores local history but does not recover the memory-only server identity. No durable relay or production service is provided.
 
 Maintainers will acknowledge and assess reports when available, coordinate a fix and disclosure where applicable, and avoid publishing sensitive details before affected users can reasonably respond. No response-time or remediation guarantee is made.

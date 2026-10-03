@@ -1,24 +1,42 @@
 # Persistent Contract Versioning
 
-**Status:** Current through v0.9.3; earlier version sections are historical contracts. See the v0.9.x compatibility record below.
+**Status:** Current through v0.10.3; earlier version sections preserve historical contracts.
 
 ## Independent version axes
 
 Kin version numbers describe product releases; they do not version every persistent or transport contract.
 
-| Version axis             | Example                   | Governs                                                                  |
-| ------------------------ | ------------------------- | ------------------------------------------------------------------------ |
-| Application version      | `v0.1.0`, `v0.2.0`        | A Kin product release, source snapshot, and namespaced Git tag.          |
-| Event schema version     | `event_version = 1`       | The payload/envelope interpretation for one persisted event kind.        |
-| ABI/protocol version     | `protocol_version = 1..8` | The byte-level JavaScript ↔ WASM request/result contract.                |
-| IndexedDB schema version | database `version = 2`    | Object stores, indexes, and local record structure managed by IndexedDB. |
-| Export format version    | `format_version = 1`      | The portable archive manifest and event-container representation.        |
+| Version axis | v0.10.3 read/write contract | Governs |
+| --- | --- | --- |
+| Application | `0.10.3` | Bounded storage/archive hardening and architecture closure |
+| Canonical event schema | Item add 1/2; other kinds 1 | Immutable event interpretation; original bytes retained |
+| Replay protocol | Reads v1–v8; writes local v7 / synchronized v8 | Request context and projection semantics |
+| Manual WASM ABI | Existing exports plus additive command/metadata/archive/import APIs | Host ownership and calls; new command packet v1 |
+| IndexedDB schema | Event DB 2→3; key DB 3→4 | Journalled upgrade to encrypted records |
+| Local envelope | v1 for original roots; v2 for rotated roots | v2 authenticates rootVersion in addition to purpose/routing |
+| Security manifest / rotation journal | Manifest v1/root 1; v2/root 2+; journal v1 | Monotonic root replacement, CAS and exact restart |
+| Portable archive | KARC v1; metadata/body version 1 | Bounded encrypted archive and complete import planning |
+| Sync envelope | v1 unchanged | Relay encryption/signature/provisioning contracts |
+| Device-key successor | v1 with monotonic generation, maximum 16 transitions | Signed replacement of legacy transport capabilities |
 
 These numbers evolve independently. An application release may keep the same event, protocol, storage, or export version; a contract may change between application versions. Never infer compatibility from equal version numbers or silently bump one axis as a proxy for another.
 
 The v0.2.0 implementation reads event schema 1 for all supported kinds and schema 2 for `ITEM_ADDED`; new instances write add schema 2 and other Item event schema 1. v0.3.0 additionally reads Handoff schema 1, supports protocols 1/2/3, and writes protocol 3. IndexedDB schema remains 1. Export format version 1 is a future design baseline only.
 
 ## Compatibility policy
+
+The table records implemented decoders and migrations, validated in [V0.10.0](V0.10.0.md). v0.10.1 preserves every v0.10.0 persistent format and requires no additional database migration.
+v0.10.2 keeps event/key DB versions 3/4 and stores versioned staging values in
+existing security stores. An unrotated root remains readable by v0.10.0/0.10.1;
+after explicit rotation those clients fail closed on manifest/local-envelope v2.
+KARC v1 framing, crypto and body remain supported, including old root-v1 archives.
+Archives made after rotation carry manifest v2 and require a reader supporting it.
+An additive ABI or storage change does not rewrite canonical history or imply a
+sync-protocol bump. v0.10.3 adds compact archive-framing ABI calls while retaining
+the original exports and all v0.10.2 persistent formats. v0.9 clients cannot open the upgraded local databases or unlock
+the protected records. Mixed old/new sync clients preserve relay-envelope format,
+but an old client cannot validate a new signed device-key successor and must be
+upgraded before trusting changed fingerprints. Do not downgrade persisted stores.
 
 Newer Kin versions should read older supported household data whenever reasonably possible. Each release must declare which event, protocol, storage, and export versions it can read and write. A version is supported only when a tested decoder/migration exists; compatibility must not be assumed from a version number alone.
 
@@ -48,7 +66,7 @@ current reducer/projection
 
 This separates durable history from evolving in-memory types and enables old history to be replayed. It has costs: old decoders remain maintenance obligations, normalization rules need tests, and an unsafe upgrader can still lose meaning. Only add an upgrader when a supported release requires it; retain original bytes and record its version/behavior.
 
-## Backward and forward guarantees
+## Backward and forward guarantees (through v0.9; v0.10 storage table above)
 
 Kin has published v0.1.x event history. v0.2.0 explicitly reads schema-v1 legacy item events, normalizes them in memory, and preserves their exact bytes; it writes schema-v2 `ITEM_ADDED` and schema-v1 lifecycle events. Protocols v1-v8 are supported. Local-only clients continue to write v7; synchronized clients use v8 for verified identity mappings and distributed replay. Protocols v1/v2 reject Handoff history rather than return lossy state. IndexedDB schema 2 adds only sync stores/context metadata; existing event rows and bytes are unchanged. A client with no decoder for a future event must preserve it and fail closed, not pretend it has derived complete household state.
 

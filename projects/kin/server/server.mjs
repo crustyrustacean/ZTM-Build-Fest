@@ -388,6 +388,13 @@ async function api(request, response, url, context) {
       syncService.onAccessChange(target.householdId, [target.id]);
     return;
   }
+  if (request.method === "POST" && url.pathname === "/api/sync/device-keys/successor") {
+    const auth = service.authorize(session);
+    const result = service.transitionSyncPublicKeys(session, body.transition);
+    if (!result.retried) syncService.onDeviceKeyTransition(auth.household.id, auth.device.id);
+    json(response, 200, result);
+    return;
+  }
   if (request.method === "POST" && url.pathname === "/api/sync/device-keys") {
     const auth = service.authorize(session);
     const keyedDevices = [...service.devices.values()].filter(
@@ -684,6 +691,8 @@ function serve(response, pathname) {
     ".js": "text/javascript; charset=utf-8",
     ".css": "text/css; charset=utf-8",
     ".wasm": "application/wasm",
+    ".webmanifest": "application/manifest+json",
+    ".svg": "image/svg+xml",
   };
   response.writeHead(200, {
     "Content-Type": types[extname(path)] ?? "application/octet-stream",

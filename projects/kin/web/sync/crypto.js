@@ -111,6 +111,19 @@ export async function restoreHouseholdEpochKey({ sealed, deviceKeys }) {
   }
 }
 
+// Rotation verifies the recoverable epoch secret, including its public routing
+// metadata and fingerprint, without replacing the household's transport key.
+export async function verifyStoredHouseholdEpoch({ record, deviceKeys }) {
+  if (record?.sealed?.householdId !== record.householdId || record?.sealed?.keyEpoch !== record.keyEpoch)
+    throw new SyncCryptoError("stored_key_mismatch", "The epoch metadata does not match its sealed key.");
+  const rawKey = await openSealedKey({ sealed: record.sealed, deviceKeys });
+  try {
+    if (rawKey.length !== 32 || await fingerprintKey(rawKey) !== record.fingerprint)
+      throw new SyncCryptoError("stored_key_mismatch", "The epoch fingerprint does not match its sealed key.");
+    return await crypto.subtle.importKey("raw", rawKey, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
+  } finally { rawKey.fill(0); }
+}
+
 export async function wrapEpochKey({
   rawKey,
   householdId,
@@ -448,6 +461,120 @@ export async function generateDeviceKeys() {
     signingPrivateKey: signing.privateKey,
     signingPublicKey: signing.publicKey,
   };
+}
+
+// Private JWKs exist only during generation/serialization and inside the unlocked
+// vault adapter. Runtime signing and agreement keys are always nonextractable.
+export async function generateProtectedDeviceKeys() {
+  const [agreement, signing] = await Promise.all([
+    crypto.subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, true, ["deriveBits"]),
+    crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]),
+  ]);
+  const serializedKeys = {
+    agreement: await crypto.subtle.exportKey("jwk", agreement.privateKey),
+    signing: await crypto.subtle.exportKey("jwk", signing.privateKey),
+  };
+  return { serializedKeys, keys: await importProtectedDeviceKeys(serializedKeys) };
+}
+
+export async function importProtectedDeviceKeys(serializedKeys) {
+  const publicJwk = (key, key_ops) => {
+    const { d, ...value } = key;
+    return { ...value, key_ops };
+  };
+  const [agreementPrivateKey, signingPrivateKey, agreementPublicKey, signingPublicKey] = await Promise.all([
+    crypto.subtle.importKey("jwk", serializedKeys.agreement, { name: "ECDH", namedCurve: "P-256" }, false, ["deriveBits"]),
+    crypto.subtle.importKey("jwk", serializedKeys.signing, { name: "ECDSA", namedCurve: "P-256" }, false, ["sign"]),
+    crypto.subtle.importKey("jwk", publicJwk(serializedKeys.agreement, []), { name: "ECDH", namedCurve: "P-256" }, true, []),
+    crypto.subtle.importKey("jwk", publicJwk(serializedKeys.signing, ["verify"]), { name: "ECDSA", namedCurve: "P-256" }, true, ["verify"]),
+  ]);
+  return { agreementPrivateKey, signingPrivateKey, agreementPublicKey, signingPublicKey };
+}
+
+export async function verifyLegacyHouseholdEpoch({ record, deviceKeys }) {
+  if (record?.sealed?.householdId !== record.householdId || record?.sealed?.keyEpoch !== record.keyEpoch)
+    throw new SyncCryptoError("stored_key_mismatch", "The legacy epoch metadata does not match its sealed key.");
+  const rawKey = await openSealedKey({ sealed: record.sealed, deviceKeys });
+  try {
+    if (await fingerprintKey(rawKey) !== record.fingerprint)
+      throw new SyncCryptoError("stored_key_mismatch", "The legacy epoch fingerprint does not match its sealed key.");
+    const restored = await crypto.subtle.importKey("raw", rawKey, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const sentinel = crypto.getRandomValues(new Uint8Array(32));
+    const params = { name: "AES-GCM", iv, additionalData: encoder.encode("kin.sync.legacy-key-verification.v1"), tagLength: 128 };
+    const [original, recovered] = await Promise.all([
+      crypto.subtle.encrypt(params, record.householdKey, sentinel), crypto.subtle.encrypt(params, restored, sentinel),
+    ]);
+    const bytes = new Uint8Array(original), other = new Uint8Array(recovered);
+    if (bytes.length !== other.length || bytes.some((value, index) => value !== other[index]))
+      throw new SyncCryptoError("stored_key_mismatch", "The legacy AES key differs from its recovery seal. Original keys were preserved.");
+  } finally { rawKey.fill(0); }
+}
+
+export async function resealHouseholdEpoch({ sealed, oldDeviceKeys, newDeviceKeys }) {
+  const rawKey = await openSealedKey({ sealed, deviceKeys: oldDeviceKeys });
+  try {
+    return await sealKeyBytes({ rawKey, householdId: sealed.householdId, keyEpoch: sealed.keyEpoch, deviceKeys: newDeviceKeys });
+  } finally { rawKey.fill(0); }
+}
+
+export const MAX_DEVICE_KEY_GENERATION = 16;
+export async function createDeviceKeyTransition({ householdId, memberId, deviceId, generation, oldFingerprint, publicKeys, signingKey, transitionId = randomIdHex() }) {
+  const value = {
+    version: 1, purpose: "kin.sync.device-key-successor.v1", householdId, memberId,
+    deviceId, generation, oldFingerprint, publicKeys,
+    fingerprint: await deviceKeyFingerprint(publicKeys), transitionId,
+  };
+  value.signature = toBase64Url(new Uint8Array(await crypto.subtle.sign(
+    { name: "ECDSA", hash: "SHA-256" }, signingKey, encoder.encode(stableJson(value)),
+  )));
+  return value;
+}
+
+export async function verifyDeviceKeyTransition({ transition, previous, device }) {
+  const t = transition;
+  if (!t || t.version !== 1 || t.purpose !== "kin.sync.device-key-successor.v1" ||
+      t.householdId !== device.householdId || t.memberId !== device.memberId || t.deviceId !== device.deviceId ||
+      t.oldFingerprint !== previous.fingerprint || t.generation !== previous.generation + 1 ||
+      t.generation > MAX_DEVICE_KEY_GENERATION || !/^[a-f0-9]{32}$/.test(t.transitionId) ||
+      await deviceKeyFingerprint(t.publicKeys) !== t.fingerprint || t.fingerprint === t.oldFingerprint)
+    throw new SyncCryptoError("device_transition_invalid", "A trusted device key transition is invalid.");
+  const { signature, ...unsigned } = t;
+  const keys = await importDevicePublicKeys(previous.publicKeys);
+  if (!await crypto.subtle.verify({ name: "ECDSA", hash: "SHA-256" }, keys.signing,
+      fromBase64Url(signature), encoder.encode(stableJson(unsigned))))
+    throw new SyncCryptoError("device_transition_invalid", "A trusted device key transition signature is invalid.");
+  return { publicKeys: t.publicKeys, fingerprint: t.fingerprint, generation: t.generation };
+}
+
+export async function verifiedDeviceKeyHistory(device) {
+  const transitions = device.keyTransitions ?? [];
+  const history = device.keyHistory ?? [{ publicKeys: device.publicKeys, fingerprint: device.fingerprint, generation: 0 }];
+  if (!Array.isArray(transitions) || transitions.length > MAX_DEVICE_KEY_GENERATION ||
+      !Array.isArray(history) || history.length !== transitions.length + 1 || history[0]?.generation !== 0 ||
+      await deviceKeyFingerprint(history[0].publicKeys) !== history[0].fingerprint)
+    throw new SyncCryptoError("device_transition_invalid", "The trusted device key history is invalid.");
+  let previous = history[0];
+  for (let i = 0; i < transitions.length; i++) {
+    previous = await verifyDeviceKeyTransition({ transition: transitions[i], previous, device });
+    if (stableJson(previous) !== stableJson(history[i + 1]))
+      throw new SyncCryptoError("device_transition_invalid", "The trusted device key history does not match its signed transition.");
+  }
+  if (previous.fingerprint !== device.fingerprint || stableJson(previous.publicKeys) !== stableJson(device.publicKeys))
+    throw new SyncCryptoError("device_transition_invalid", "The trusted device current key does not match its history.");
+  return history;
+}
+
+// Historic exact envelopes do not carry key generation. A verified bounded public
+// history preserves those bytes; only a signature mismatch advances to another key.
+export async function decryptWithDeviceHistory({ device, ...options }) {
+  const history = device.verifiedKeyHistory ?? await verifiedDeviceKeyHistory(device);
+  for (const entry of [...history].reverse()) {
+    const keys = await importDevicePublicKeys(entry.publicKeys);
+    try { return await decryptEvent({ ...options, signingKey: keys.signing }); }
+    catch (error) { if (error.code !== "event_signature_invalid") throw error; }
+  }
+  throw new SyncCryptoError("event_signature_invalid", "The received event could not be authenticated.");
 }
 
 export async function exportDevicePublicKeys(keys) {

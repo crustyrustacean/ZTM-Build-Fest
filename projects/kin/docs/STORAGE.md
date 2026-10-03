@@ -1,10 +1,87 @@
 # Local Event Storage
 
-**Status:** Current through v0.9.3. v0.1-v0.7 storage notes below are historical release records. Current database is schema 2, with unchanged canonical event bytes and additive sync stores.
+**Status:** v0.10.3 encrypted local storage. The event database is schema 3, key database schema 4, local envelopes v1 (original roots) and v2 (rotated roots). Canonical event bytes remain unchanged inside authenticated ciphertext. The v0.9.3 database description and earlier notes below record the migration source.
 
-The compose input keeps a best-effort in-progress text and classification draft in the current tab's `sessionStorage`, retaining the existing text key for legacy drafts. This transient data is not an event or household-state source of truth, is cleared only when the exact submitted draft succeeds or the user clears text, and is unavailable across tabs.
+All four household draft surfaces now retain text only in unlocked inputs. Reload/lock discards drafts, and startup removes historical sessionStorage draft keys before components mount. No household plaintext is written to localStorage, sessionStorage, Cache Storage, cookies, OPFS or debug persistence.
 
 ## Database
+
+### v0.10.2 root replacement
+
+Event DB 3 and key DB 4 retain their structures. Their existing `security_state`
+key/value stores hold versioned per-record rotation stages. The authoritative
+event singleton follows `encrypted` → `root-rotating` → `root-cleanup` →
+`encrypted`. Its version-1 journal binds one random rotation ID, vault identity,
+source/target root versions, source/candidate manifests and a candidate-protected
+source-root bridge. Progress checkpoints are durable; resume repeats verification.
+No source store is replaced before all event/key stages pass verification.
+
+The first CAS advances the lock epoch and fences normal event access; the key
+database also fences transactions before its source snapshot. Normal transactions
+compare root version as well as phase/vault/epoch. Wrapper updates retain revision
+CAS. Event replacement and the new manifest commit together; key replacement is
+idempotent and journalled, then final publication enables ordinary access. Locked
+or interrupted work cannot publish stale results. See [ROOT-ROTATION](ROOT-ROTATION.md).
+
+## v0.10 encrypted storage contract
+
+v0.10.3 pages large protected reads in 128-row native requests and bounds crypto
+concurrency to 32. The enclosing transaction preserves the original snapshot and
+serialized-write semantics. Local capability cancellation is checked between
+batches; prompt numbered peer-lock intent aborts long reads before the durable
+epoch write queues behind them. If notification is missed, the current read
+serializes before the epoch commit and every subsequent stale operation fails.
+Do not open an external epoch-read transaction from inside an event read that
+already holds the security store: a queued lock write could deadlock it.
+
+Migration retains one immutable canonical source, clones only metadata requiring
+mutation, decrypts/compares each replacement, and fully replays the verified
+canonical bytes. Final source comparisons use bounded pages. Restore's private
+authenticated snapshot can explicitly transfer ownership; public caller snapshots
+retain defensive copying. Final native migration/restore/rotation transactions
+abort on local lock. Complete plaintext results remain required at the bounded
+10,000-event/64 MiB Rust replay and KARC v1 interfaces.
+
+The [v0.10 contract](V0.10.0.md) defines the complete baseline inventory, minimal
+routing metadata, AES-GCM envelope/AAD, key hierarchy and transaction requirements.
+All event values, duplicate canonical outbox values, protected context and sync
+metadata require encryption. The schema version, envelope version and event
+protocol version remain independent. Canonical bytes remain authoritative and
+unchanged inside ciphertext; routing indexes must match authenticated content.
+
+Reads are unavailable without a live unlock capability. Writes must abort if that
+capability is revoked while Web Crypto is pending. Preserve serialized native
+IndexedDB transactions through explicit keepalive tracking; never await crypto
+without keeping the transaction active. Authentication failure aborts the whole
+operation. Unlocked plaintext is ephemeral. v0.10 removes household draft text
+from sessionStorage; lock clears drafts and projected content in all live tabs.
+
+Current protected stores retain only their key-path/index routing fields plus
+`protected_version: 1` and `protected_value`. The latter carries local-envelope
+version, vault ID, 32-byte salt, 12-byte nonce and ciphertext/tag (base64url).
+Everything else in the value is encrypted. The public `security_state` singleton
+holds format/root version, vault ID, recovery/PRF wrappers, verifier, migration
+phase, monotonic `lockEpoch`, and wrapper `configRevision`; no usable secret is stored there. A durable epoch
+check inside each event transaction prevents missed peer notifications from
+allowing stale reads or writes. Key operations and network requests also check the
+epoch. Lock aborts in-flight crypto/transactions and rejects stale adapters.
+
+Wrapper changes compare the caller's `configRevision` with the current singleton
+inside one write transaction. Successful changes increment that revision; removing
+a wrapper also increments `lockEpoch` in the same commit. A stale tab cannot
+overwrite newer wrappers or restore a removed unlock path. A failed candidate is
+discarded in favor of committed metadata, or its capability is locked when the
+configuration has changed. Adding a wrapper leaves event ciphertext unchanged.
+
+The key database stores encrypted private-key serializations and sealed epochs;
+runtime imported private/AES keys are nonextractable and never structured-cloned
+into persistent storage. A cross-database migration journal protects staged keys
+until verified event replacement and final key cleanup succeed. Migration requires
+Web Locks; an unsupported browser fails explicitly without deleting legacy data.
+
+The remaining schema description records the v0.9.3 migration source.
+
+## v0.9.3 database
 
 ```text
 database: kin

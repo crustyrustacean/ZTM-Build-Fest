@@ -1,24 +1,10 @@
 import { SyncKeyStore } from "../sync/key-store.js";
+import { getActiveVault } from "../security/local-vault.js";
 import {
   createDeviceAuthorizationCertificate,
   deviceKeyFingerprint,
 } from "../sync/crypto.js";
 
-const api = async (path, options = {}) => {
-  const response = await fetch(path, {
-    ...options,
-    headers: { "Content-Type": "application/json", ...(options.headers ?? {}) },
-  });
-  const value = await response
-    .json()
-    .catch(() => ({ message: "Kin could not read the server response." }));
-  if (!response.ok) {
-    const error = new Error(value.message);
-    error.code = value.error;
-    throw error;
-  }
-  return value;
-};
 
 const decode = (value) =>
   Uint8Array.from(
@@ -32,6 +18,7 @@ const encode = (value) =>
     .replace(/=+$/, "");
 const registrationOptions = (options) => ({
   ...options,
+  extensions: { ...(options.extensions ?? {}), prf: {} },
   challenge: decode(options.challenge),
   user: { ...options.user, id: decode(options.user.id) },
   excludeCredentials: (options.excludeCredentials ?? []).map((item) => ({
@@ -85,9 +72,17 @@ class KinHousehold extends HTMLElement {
     this.syncStatus = null;
     this.localFingerprint = null;
     this.syncKeyError = null;
+    this.connectionVault = null;
+    this.connectionGeneration = null;
+    this.connectionAbort = new AbortController();
   }
 
   connectedCallback() {
+    // A detached access controller cannot be reactivated by a later unlock.
+    // Kin mounts a new household component for each unlocked lifetime.
+    if (this.connectionAbort.signal.aborted) return;
+    this.connectionVault ??= getActiveVault();
+    this.connectionGeneration ??= this.connectionVault?.generation;
     this.className = "household-panel";
     if (!this.routeCodeCaptured) {
       this.routeCodeCaptured = true;
@@ -100,9 +95,58 @@ class KinHousehold extends HTMLElement {
     this.load();
   }
   disconnectedCallback() {
+    this.connectionAbort.abort();
     clearInterval(this.timer);
     clearTimeout(this.poll);
+    this.syncKeyStore?.close();
+    this.syncKeyStore = null;
+    this.identity = null;
+    this.pairing = null;
+    this.claim = null;
+    this.syncStatus = null;
   }
+  assertConnection() {
+    const vault = this.connectionVault;
+    if (!this.isConnected || this.connectionAbort.signal.aborted || !vault ||
+        getActiveVault() !== vault || vault.generation !== this.connectionGeneration)
+      throw new Error("This household access operation ended when Kin locked.");
+    vault.assertUnlocked();
+    return vault;
+  }
+
+  async openSyncKeyStore() {
+    this.assertConnection();
+    if (this.syncKeyStore) return this.syncKeyStore;
+    const store = await SyncKeyStore.open({ vault: this.connectionVault });
+    try { this.assertConnection(); }
+    catch (error) { store.close(); throw error; }
+    this.syncKeyStore = store;
+    return store;
+  }
+
+  async api(path, options = {}) {
+    const vault = this.assertConnection();
+    await vault.checkSecurityEpoch?.();
+    this.assertConnection();
+    const response = await fetch(path, {
+      ...options, signal: this.connectionAbort.signal,
+      headers: { "Content-Type": "application/json", ...(options.headers ?? {}) },
+    });
+    this.assertConnection();
+    await vault.checkSecurityEpoch?.();
+    this.assertConnection();
+    const value = await response.json().catch(() => ({ message: "Kin could not read the server response." }));
+    this.assertConnection();
+    await vault.checkSecurityEpoch?.();
+    this.assertConnection();
+    if (!response.ok) {
+      const error = new Error(value.message);
+      error.code = value.error;
+      throw error;
+    }
+    return value;
+  }
+
   set disabled(value) {
     this.toggleAttribute("data-disabled", Boolean(value));
     for (const control of this.querySelectorAll("button, input"))
@@ -114,7 +158,7 @@ class KinHousehold extends HTMLElement {
 
   async load() {
     try {
-      const status = await api("/api/status");
+      const status = await this.api("/api/status");
       this.identity = status.identity;
       this.claim = status.claim;
       if (this.identity) {
@@ -126,9 +170,9 @@ class KinHousehold extends HTMLElement {
           this.syncKeyError =
             "Secure device-key storage is unavailable here. Household information remains local, but device sync and new device pairing are unavailable.";
         }
-        this.syncStatus = await api("/api/sync/status");
+        this.syncStatus = await this.api("/api/sync/status");
       } else if (this.claim) {
-        this.syncKeyStore ??= await SyncKeyStore.open();
+        await this.openSyncKeyStore();
         this.localFingerprint =
           (await this.syncKeyStore.getDevice("pending"))?.fingerprint ?? null;
       }
@@ -194,6 +238,10 @@ class KinHousehold extends HTMLElement {
       return;
     }
     if (this.claim?.state === "Confirmed") {
+      if (!this.localFingerprint || this.claim.syncKeyFingerprint !== this.localFingerprint) {
+        this.message("This device key changed during security migration. Cancel this pairing and request a new invitation before activation.", true);
+        return;
+      }
       this.message(
         "Approval succeeded. Use your passkey once more to activate this device.",
       );
@@ -404,10 +452,10 @@ class KinHousehold extends HTMLElement {
 
   async register(purpose, values) {
     await this.run(async () => {
-      this.syncKeyStore ??= await SyncKeyStore.open();
+      await this.openSyncKeyStore();
       const pendingKeys = await this.syncKeyStore.getOrCreatePendingDevice();
       this.localFingerprint = pendingKeys.fingerprint;
-      const started = await api("/api/passkeys/register/options", {
+      const started = await this.api("/api/passkeys/register/options", {
         method: "POST",
         body: JSON.stringify({
           purpose,
@@ -417,8 +465,9 @@ class KinHousehold extends HTMLElement {
       });
       const credential = await navigator.credentials.create({
         publicKey: registrationOptions(started.publicKey),
+        signal: this.connectionAbort.signal,
       });
-      const registered = await api("/api/passkeys/register/finish", {
+      const registered = await this.api("/api/passkeys/register/finish", {
         method: "POST",
         body: JSON.stringify({
           flow: started.flow,
@@ -440,11 +489,12 @@ class KinHousehold extends HTMLElement {
   }
 
   async ensureSyncDeviceKey(identity) {
-    this.syncKeyStore ??= await SyncKeyStore.open();
+    this.assertConnection();
+    await this.openSyncKeyStore();
     const existing = await this.syncKeyStore.getDevice(identity.deviceId);
-    if (existing) return existing;
+    if (existing) return this.syncKeyStore.completePendingTransition(identity.deviceId, { signal: this.connectionAbort.signal });
     const pending = await this.syncKeyStore.getOrCreatePendingDevice();
-    await api("/api/sync/device-keys", {
+    await this.api("/api/sync/device-keys", {
       method: "POST",
       body: JSON.stringify({ publicKeys: pending.publicKeys }),
     });
@@ -457,27 +507,29 @@ class KinHousehold extends HTMLElement {
 
   async login() {
     await this.run(async () => {
-      const started = await api("/api/login/options", {
+      const started = await this.api("/api/login/options", {
         method: "POST",
         body: "{}",
       });
       const credential = await navigator.credentials.get({
         publicKey: authenticationOptions(started.publicKey),
+        signal: this.connectionAbort.signal,
       });
-      await api("/api/login/finish", {
+      await this.api("/api/login/finish", {
         method: "POST",
         body: JSON.stringify({
           flow: started.flow,
           credential: credentialJson(credential),
         }),
       });
-      location.href = "/";
+      history.replaceState(null, "", "/");
+      await this.load();
     });
   }
 
   async createPairing() {
     await this.run(async () => {
-      this.pairing = await api("/api/pairings", { method: "POST", body: "{}" });
+      this.pairing = await this.api("/api/pairings", { method: "POST", body: "{}" });
       if (
         !this.localFingerprint ||
         this.pairing.inviterKeyFingerprint !== this.localFingerprint
@@ -491,7 +543,7 @@ class KinHousehold extends HTMLElement {
 
   async createDevicePairing() {
     await this.run(async () => {
-      this.pairing = await api("/api/devices/pairings", {
+      this.pairing = await this.api("/api/devices/pairings", {
         method: "POST",
         body: "{}",
       });
@@ -508,8 +560,8 @@ class KinHousehold extends HTMLElement {
 
   async enableSync() {
     await this.run(async () => {
-      await api("/api/sync/enable", { method: "POST", body: "{}" });
-      this.syncStatus = await api("/api/sync/status");
+      await this.api("/api/sync/enable", { method: "POST", body: "{}" });
+      this.syncStatus = await this.api("/api/sync/status");
       this.render();
       this.dispatchEvent(
         new CustomEvent("kin:sync-enabled", {
@@ -539,7 +591,7 @@ class KinHousehold extends HTMLElement {
           "Compare the device fingerprint on both devices before approving.",
         );
       }
-      const started = await api(
+      const started = await this.api(
         `/api/pairings/${this.pairing.pairingId}/approve/options`,
         {
           method: "POST",
@@ -548,6 +600,7 @@ class KinHousehold extends HTMLElement {
       );
       const credential = await navigator.credentials.get({
         publicKey: authenticationOptions(started.publicKey),
+        signal: this.connectionAbort.signal,
       });
       const ownDevice = await this.syncKeyStore.getDevice(
         this.identity.deviceId,
@@ -568,7 +621,7 @@ class KinHousehold extends HTMLElement {
         publicKeys: this.pairing.syncPublicKeys,
         signingKey: ownDevice.keys.signingPrivateKey,
       });
-      this.pairing = await api(
+      this.pairing = await this.api(
         `/api/pairings/${this.pairing.pairingId}/approve/finish`,
         {
           method: "POST",
@@ -591,6 +644,8 @@ class KinHousehold extends HTMLElement {
   }
   async activateClaim() {
     await this.run(async () => {
+      if (!this.localFingerprint || this.claim?.syncKeyFingerprint !== this.localFingerprint)
+        throw new Error("This device key changed. Restart pairing before activating it.");
       if (
         !this.verifiedInviterFingerprint ||
         !this.claim?.inviterDeviceId ||
@@ -599,28 +654,29 @@ class KinHousehold extends HTMLElement {
         throw new Error(
           "Compare the approving device fingerprint on both devices before activation.",
         );
-      const started = await api("/api/claim/activate/options", {
+      const started = await this.api("/api/claim/activate/options", {
         method: "POST",
         body: "{}",
       });
       const credential = await navigator.credentials.get({
         publicKey: authenticationOptions(started.publicKey),
+        signal: this.connectionAbort.signal,
       });
-      const activated = await api("/api/claim/activate/finish", {
+      const activated = await this.api("/api/claim/activate/finish", {
         method: "POST",
         body: JSON.stringify({
           flow: started.flow,
           credential: credentialJson(credential),
         }),
       });
-      this.syncKeyStore ??= await SyncKeyStore.open();
+      await this.openSyncKeyStore();
       const bound = await this.syncKeyStore.bindPendingDevice({
         deviceId: activated.deviceId,
         householdId: activated.householdId,
         memberId: activated.memberId,
       });
       this.localFingerprint = bound.fingerprint;
-      const { devices } = await api("/api/sync/devices");
+      const { devices } = await this.api("/api/sync/devices");
       const inviter = devices.find(
         (device) => device.deviceId === this.claim.inviterDeviceId,
       );
@@ -645,7 +701,7 @@ class KinHousehold extends HTMLElement {
   }
   async revoke() {
     await this.run(async () => {
-      this.pairing = await api(`/api/pairings/${this.pairing.pairingId}`, {
+      this.pairing = await this.api(`/api/pairings/${this.pairing.pairingId}`, {
         method: "DELETE",
         body: "{}",
       });
@@ -687,11 +743,11 @@ class KinHousehold extends HTMLElement {
 
   async showDevices() {
     await this.run(async () => {
-      const { devices } = await api("/api/devices");
+      const { devices } = await this.api("/api/devices");
       let directoryDevices = [];
       if (!this.syncKeyError) {
-        this.syncKeyStore ??= await SyncKeyStore.open();
-        directoryDevices = (await api("/api/sync/devices")).devices;
+        await this.openSyncKeyStore();
+        directoryDevices = (await this.api("/api/sync/devices")).devices;
       }
       this.replaceChildren();
       const heading = document.createElement("h2");
@@ -775,7 +831,7 @@ class KinHousehold extends HTMLElement {
             this.makeButton(
               "Revoke device",
               async () => {
-                await api(`/api/devices/${device.id}`, {
+                await this.api(`/api/devices/${device.id}`, {
                   method: "DELETE",
                   body: "{}",
                 });
@@ -794,7 +850,7 @@ class KinHousehold extends HTMLElement {
   }
   async showHousehold() {
     await this.run(async () => {
-      const household = await api("/api/household");
+      const household = await this.api("/api/household");
       this.replaceChildren();
       const heading = document.createElement("h2");
       heading.textContent = "Household access";
@@ -833,14 +889,15 @@ class KinHousehold extends HTMLElement {
     )
       return;
     await this.run(async () => {
-      const started = await api("/api/household/membership/remove/options", {
+      const started = await this.api("/api/household/membership/remove/options", {
         method: "POST",
         body: JSON.stringify({ memberId }),
       });
       const credential = await navigator.credentials.get({
         publicKey: authenticationOptions(started.publicKey),
+        signal: this.connectionAbort.signal,
       });
-      await api("/api/household/membership/remove/finish", {
+      await this.api("/api/household/membership/remove/finish", {
         method: "POST",
         body: JSON.stringify({
           flow: started.flow,
@@ -858,22 +915,21 @@ class KinHousehold extends HTMLElement {
     )
       return;
     await this.run(async () => {
-      await api("/api/household/membership", { method: "DELETE", body: "{}" });
+      await this.api("/api/household/membership", { method: "DELETE", body: "{}" });
       location.href = "/";
     });
   }
   async logout() {
-    await this.run(async () => {
-      await api("/api/logout", { method: "POST", body: "{}" });
-      location.href = "/";
-    });
+    // Local lock is immediate and independent of network availability.
+    this.dispatchEvent(new CustomEvent("kin:lock", { bubbles: true, composed: true }));
+    await fetch("/api/logout", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }).catch(() => {});
   }
   pollPairing() {
     if (!["Pending", "Claimed"].includes(this.pairing?.state)) return;
     clearTimeout(this.poll);
     this.poll = setTimeout(async () => {
       try {
-        const latest = await api(`/api/pairings/${this.pairing.pairingId}`);
+        const latest = await this.api(`/api/pairings/${this.pairing.pairingId}`);
         const changed = latest.version !== this.pairing.version;
         this.pairing = { ...this.pairing, ...latest };
         if (changed) this.render();
@@ -887,7 +943,7 @@ class KinHousehold extends HTMLElement {
     clearTimeout(this.poll);
     this.poll = setTimeout(async () => {
       try {
-        this.claim = await api("/api/claim");
+        this.claim = await this.api("/api/claim");
         this.render();
         if (this.claim.state === "Claimed") this.schedulePoll();
       } catch (error) {
@@ -913,6 +969,7 @@ class KinHousehold extends HTMLElement {
 
   async run(action) {
     if (this.busy) return;
+    try { this.assertConnection(); } catch { return; }
     this.busy = true;
     this.setAttribute("aria-busy", "true");
     try {
@@ -929,6 +986,7 @@ class KinHousehold extends HTMLElement {
     }
   }
   renderError(error) {
+    if (!this.isConnected || this.connectionAbort.signal.aborted) return;
     this.message(
       error?.message || "Kin could not complete that request.",
       true,

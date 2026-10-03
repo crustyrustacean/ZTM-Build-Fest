@@ -1,6 +1,6 @@
 # JavaScript–WASM ABI
 
-**Status:** Current through v0.9.3. Protocols v1-v7 remain compatible; synchronized clients use additive protocol v8. Earlier version sections are historical contracts.
+**Status:** v0.10 development adds portable commands, metadata and archive operations. Canonical event schemas and replay protocols v1�v8 remain byte-compatible. Earlier version sections are historical contracts.
 
 ## Target and exports
 
@@ -192,3 +192,136 @@ size  field
 All IDs are opaque 16-byte values. Duplicate legacy tuple mappings, conflicting/ambiguous bindings, a target-household mismatch, missing binding for an event from a different household, truncated binding, nonzero reserved bytes, or more than 256 bindings fail closed. The JS caller supplies only bindings already verified by the encrypted/signature-checked control record; the ABI itself is not a cryptographic verifier. Event header/payload bytes and `canonical_bytes` are never rewritten.
 
 For v8 only, equal logical times are valid. Rust creates an owned copy and sorts that copy for household state reduction by `(logical_time, effective device_id bytewise, event_id bytewise)`. The decoded request retains input/local-arrival order; summary `through_event_id` and the Since You Last Looked cursor use that original order, not the reducer's sort. The v8 KINS result has the same 56-byte header and record layout as v7, with `version=8`. The KERR layout/statuses, 10,000-event bound, and 64 MiB request/result bounds remain unchanged.
+
+## v0.10 portable operations
+
+The dependency-free `kin` library remains both a native `rlib` and a WASM
+`cdylib`. `core::project`, `command::execute`, `codec::encode_event`,
+`codec::metadata`, `archive::decode`, and `archive::plan_import` are directly
+native-testable. No crate split, browser dependency or JSON dependency is needed.
+Browser authentication, randomness, time, Web Crypto, storage and networking stay
+outside Rust. Rust validation does not authenticate a caller; the application
+only gives an unlocked session access to its engine capability.
+
+The following exports use the same exact-live-allocation, status, result and
+error-buffer contract as `kin_apply_events`:
+
+| Export                         | Input                                          | Result                                                        |
+| ------------------------------ | ---------------------------------------------- | ------------------------------------------------------------- |
+| `kin_encode_command(ptr,len)`  | KCMD v1 intent                                 | Canonical event bytes                                         |
+| `kin_execute_command(ptr,len)` | Command length:u32, KCMD, KINE history/context | KCMT v1 event + metadata + projection                         |
+| `kin_event_metadata(ptr,len)`  | One complete canonical event                   | KMET v1 validated metadata                                    |
+| `kin_encode_archive(ptr,len)`  | Metadata length:u32, metadata, ciphertext      | KARC v1 archive                                               |
+| `kin_decode_archive(ptr,len)`  | Complete KARC v1 archive                       | Metadata length:u32, metadata, ciphertext                     |
+| `kin_plan_import(ptr,len)`     | Decrypted KINE history/context                 | KIMP v1 import plan                                           |
+| `kin_clear()`                  | No arguments                                   | No return value; releases retained allocations/results/errors |
+
+All operations are synchronous and bounded by the existing 64 MiB ABI limit.
+Every operation clears previous success/error results before validating its
+input. The host copies result bytes before another operation or memory growth.
+`kin_clear` releases intentionally retained buffers; it does not guarantee
+physical memory zeroization. `engine.dispose()` calls it, removes the shared
+codec capability when owned by that engine, and drops the instance reference.
+A disposed engine rejects replay and commands. Startup/lock ordering belongs to
+the security shell; Rust does not manufacture authentication from a boolean.
+
+### KCMD v1 intent transport
+
+This is an independent command transport, not the canonical event layout. JS
+writes these explicit capability/context fields; Rust selects event schemas,
+constructs canonical payloads and validates command semantics.
+
+| Offset | Width | Field                                                               |
+| ------ | ----- | ------------------------------------------------------------------- |
+| 0      | 4     | `KCMD`                                                              |
+| 4      | 2     | Command transport version = 1                                       |
+| 6      | 2     | Reserved zero                                                       |
+| 8      | 2     | Action code (1�17, corresponding to the documented domain actions)  |
+| 10     | 2     | Reserved zero                                                       |
+| 12     | 16    | Supplied event ID                                                   |
+| 28     | 16    | Authorized household ID                                             |
+| 44     | 16    | Authorized actor ID                                                 |
+| 60     | 16    | Authorized device ID                                                |
+| 76     | 8     | Explicit timestamp:i64                                              |
+| 84     | 8     | Explicit logical time:u64                                           |
+| 92     | 16    | Entity ID; zero for Pulse                                           |
+| 108    | 4     | Routine creation date/occurrence key; zero otherwise                |
+| 112    | 1     | Item classification, Pulse value or Routine cadence; zero otherwise |
+| 113    | 3     | Reserved zero                                                       |
+| 116    | 8     | Pulse expiration:i64; zero otherwise                                |
+| 124    | 4     | UTF-8 text length; zero for noncapture actions                      |
+| 128    | N     | Text, only for Item/Handoff/Talk/Routine creation                   |
+
+IDs and time are explicit browser capabilities. Capture commands use a supplied
+random entity ID. Noncapture commands use the referenced entity ID. All unused
+fields, reserved bytes, schema/enum/date/length values and strict UTF-8 are
+validated. The native `HouseholdCommand` separates household intent from browser
+identity/pairing operations. `execute` validates the existing corpus first,
+requires a new event ID and logical time greater than observed history, checks
+household context, rejects stale Routine occurrence intent, then rebuilds and
+serializes the complete candidate. Persistence occurs only in the adapter's
+successful transaction. Historic repeated completion facts retain prior replay
+semantics.
+
+KCMT v1 consists of `KCMT`, version:u16=1, reserved:u16=0,
+event-length:u32, metadata-length:u32, projection-length:u32, then the three
+buffers exactly. The projection is the existing KINS format for the request's
+protocol. One command crossing returns all information needed for persistence.
+
+### KMET v1 validated metadata
+
+The result is exactly 92 bytes: `KMET`, version:u16=1, reserved:u16=0,
+event/household/actor/device IDs (16 bytes each), timestamp:i64,
+logical-time:u64, event-version:u16 and event-kind:u16. It is generated by Rust
+after decoding the full canonical event. Browser storage/sync code consumes
+structured metadata and never reads canonical offsets. Metadata is derived and
+must be compared to authoritative decrypted bytes; it is not another source of
+truth. Existing `encode*Record` JS exports are compatibility adapters over
+`kin_encode_command` and require a loaded engine; they contain no event encoder.
+
+`kin_event_metadata_batch(ptr,len)` validates a complete batch in one crossing.
+Input KMDQ v1: magic, version:u16=1, reserved:u16=0, count:u32, then each
+record length:u32 and canonical bytes. Output KMDL v1 has the same prefix/count
+and exactly `count` consecutive 92-byte KMET records. Bounds remain 10,000 events
+and 64 MiB. An invalid record rejects the complete batch. The JS
+`eventMetadataBatch(records)` helper (also on the engine) returns metadata in
+input order; EventStore uses it before replay to avoid one crossing per row.
+
+### KARC v1 encrypted archive framing
+
+v0.10.3 adds two compact framing operations while retaining the original
+`kin_encode_archive` and `kin_decode_archive` exports and their byte layouts.
+`kin_archive_header(ptr,len)` accepts exactly two little-endian u32 lengths
+(metadata and ciphertext) and returns the validated 16-byte KARC v1 header.
+`kin_archive_layout(ptr,len)` accepts that header plus the actual complete archive
+buffer length:u32 (20 bytes total), validates the same bounds/version/reserved
+fields/exact total length, and returns the two lengths (8 bytes). Rust remains
+the framing authority; the browser copies opaque payload sections directly into
+or out of its own buffers without routing their contents through WASM. These
+operations do not authenticate ciphertext. The adapter returns detached copies
+when decoding, so callers cannot mutate an archive input during asynchronous
+authentication. Host ownership and ordinary ABI result lifetimes still apply.
+
+Header: `KARC`, archive-version:u16=1, reserved:u16=0,
+metadata-length:u32, ciphertext-length:u32, followed by exactly those two opaque
+sections. Metadata must contain 1�1,048,576 bytes; ciphertext at least a 16-byte
+AEAD tag; total archive size at most 64 MiB. Unknown versions, nonzero flags,
+overflow/excess lengths, truncation and trailing bytes fail closed. Fixed single
+sections cannot contain duplicate section identifiers. Browser cryptography
+owns authentication and encrypted-body interpretation; successful framing parse
+alone is not an integrity/authenticity claim. The archive adapter must authenticate
+or compare all consequential public metadata before import.
+
+After authenticating/decrypting the archive, `kin_plan_import` validates the
+entire event history using the existing KINE contract. Duplicate event IDs
+(including exact duplicates), conflicting identities, invalid state, unsupported
+versions and an overflowing next logical counter fail before a plan is returned.
+KIMP v1 is `KIMP`, version:u16=1, reserved:u16=0, event-count:u32,
+next-logical-time:u64, projection-length:u32, and the KINS projection. It performs
+no writes. The browser requires explicit restore approval and applies the
+verified replacement atomically; a plan does not authorize restoring device trust.
+
+Validation: native command/codec/archive tests, all historical protocol fixtures,
+and `web/wasm/portable-core.test.mjs` exercise all 17 command variants, full
+canonical metadata decoding, stale Routine rejection, archive/import corruption,
+and disposed-engine capability rejection through the real release WASM.

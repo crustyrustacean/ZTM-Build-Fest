@@ -1,8 +1,99 @@
-# v0.1.0 Testing Contract
+# Testing Contracts
 
-**Status:** Current through v0.9.3 Encrypted Sync stabilization. Earlier version sections are historical release gates; see the v0.9.3 gate below.
+**Status:** Current through v0.10.3. Earlier version sections are historical release gates. See [V0.10.0](V0.10.0.md) for milestone and patch counts, environment and measurements.
+
+## v0.10 security and portability gate
+
+Run from the repository root after building the current WASM artifact. Browser
+runners use isolated temporary profiles and synthetic text/credentials. They do
+not bypass production recovery, storage encryption or WebAuthn verification.
+
+```powershell
+cargo fmt --manifest-path projects/kin/Cargo.toml -- --check
+cargo clippy --manifest-path projects/kin/Cargo.toml --all-targets -- -D warnings
+cargo test --manifest-path projects/kin/Cargo.toml
+cargo build --manifest-path projects/kin/Cargo.toml --target wasm32-unknown-unknown --release
+Copy-Item projects/kin/target/wasm32-unknown-unknown/release/kin.wasm projects/kin/web/wasm/kin_engine.wasm
+node --test (rg --files projects/kin/server projects/kin/web -g '*.test.mjs')
+python projects/kin/scripts/check_version.py
+$kinBrowser = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
+node projects/kin/scripts/browser-regression.mjs $kinBrowser
+node projects/kin/scripts/security-storage-regression.mjs $kinBrowser
+node projects/kin/scripts/security-ui-regression.mjs $kinBrowser
+node projects/kin/scripts/passkey-regression.mjs $kinBrowser
+```
+
+The storage runner includes legacy-key migration checks. Optional `--performance`
+and `--maximum-payload` measure 10,000-event migration/unlock and encrypted archive
+round trips. The WebAuthn runner uses a CDP virtual authenticator supporting PRF,
+real browser ceremonies and the real server verifier; it is not physical hardware
+or cross-platform certification. Preserve prior feature suites when changing
+startup/draft expectations: security must not weaken domain, rollback or a11y checks.
+
+## v0.10.1 correctness regressions
+
+The same commands above include the patch checks. `security-operation-regression.mjs`
+(called by the security UI runner) holds an old recovery unlock across lock and a
+new unlock, then settles it both during and after the new operation. It also
+holds an authentication-error metadata read across re-unlock. Verify the live
+vault, lock control, busy state, disabled controls and feedback remain current,
+and the old root is disposed.
+
+The key-migration suite now delays fingerprint hashing for new, existing,
+mismatched, conflicting and concurrently proposed trusted pins. It checks input
+mutation during verification and locking before verification completes.
+
+`server/rotation-recovery.test.mjs` uses real cryptographic packages and service
+validation with controlled transport loss/expiry. It covers expired unaccepted
+proposals, accepted lost responses, subsequent access changes, recipient key
+succession/revocation, acceptance racing package refresh, competing proposals and
+mismatched acknowledgements. The storage runner also exercises pending-rotation
+compare-and-set and the retained rotation barrier in encrypted IndexedDB.
 
 ## Rust domain tests
+
+### v0.10.3 bounded storage and corruption gate
+
+`bounded-storage-regression.mjs` runs through the existing storage runner. It
+checks 270 sparse ordered records with native pages ≤128 and crypto concurrency
+≤32, duplicate routing rejection, decrypted index mismatch, cancellation between
+batches, durable peer locks during 70-event migration/restore, exact source
+retention and resume, lock after queued native restore writes, and duplicate
+archive rejection before encryption. `encrypted-idb.test.mjs` checks both root
+formats against wrong routing/AAD, unsupported versions, plaintext field leakage,
+truncation and modified tags. Existing wrapper, KARC metadata/ciphertext,
+canonical duplicate and malformed/version tests remain mandatory.
+
+The storage runner now also forcibly terminates and reopens its isolated browser
+profile at pre/post event-publication boundaries (four assertions), separately
+from its four document-reload assertions. Synthetic recovery keys stay only in
+the test host. The UI runner holds a real peer read while locking to verify that
+numbered intent aborts the native transaction before the durable lock can queue
+behind it. Existing same/current-epoch delayed-notification tests remain intact.
+
+The full release gate additionally runs both project build/launcher workflows,
+including PowerShell and POSIX shell HTTP/WASM smoke tests, native formatting and
+warnings-denied Clippy/tests, complete Node/real-WASM/server tests, all product,
+security and PRF browser runners, version/whitespace and Kin-only path checks.
+
+### v0.10.2 root lifecycle gate
+
+The established storage runner invokes `root-rotation-regression.mjs` and
+`root-key-rotation-regression.mjs`, including durable phase interruptions,
+quota/native abort, peer locks, stale manifest/root/capability rejection,
+foreign journals, exact canonical/context/sync/outbox retention, restored private
+keys/epoch secrets/pins, root 2→3, old copied wrapper isolation, and real document
+reload before/after event publication. Node vault tests exercise candidate
+generation failures, authenticated root versions and independent recovery roots.
+The UI runner invokes `root-rotation-ui-regression.mjs` for re-entry confirmation,
+replacement, cancellation, new-key resume, old-key rejection and offline recovery.
+
+Optional `--performance --maximum-payload` now measures 1,000 representative,
+10,000 short-text and 10,000 maximum-text events: migration, decrypt, Rust replay,
+archive export/restore, exact canonical roundtrips, archive and serialized
+encrypted-record bytes, origin storage estimates, and sampled Windows renderer
+working set where available. Sampling includes retained synthetic fixture memory;
+it is neither a precise database-file size nor a mobile measurement.
 
 Before v0.1.0 is considered complete, cover at least:
 
