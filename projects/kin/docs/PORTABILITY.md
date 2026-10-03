@@ -1,6 +1,6 @@
 # Portable Household Data
 
-**Status:** v0.10.3 implements encrypted `.kin` backup and restore. Rust owns `KARC` v1 framing, 64 MiB bounds, version validation and complete import planning. Browser crypto/files own authenticated encryption, file selection/download and explicit restore confirmation. Corrupt/unsupported archives never partially import. Earlier conceptual sections below are design history.
+**Status:** v0.10.3 implements encrypted `.kin` backup and restore for local household history. Rust owns `KARC` v1 framing, 64 MiB bounds, version validation and complete import planning. Browser crypto/files own authenticated encryption, file selection/download and explicit restore confirmation. Corrupt/unsupported archives never partially import. v0.11 separately adds SQLite service-database backup/restore; these two backup types protect different state. Earlier conceptual sections below are design history.
 
 ## Implemented archive boundary
 
@@ -34,7 +34,8 @@ blocked: canonical history from several authors cannot be uploaded as one new
 signer's history without an authenticated transport restore protocol. No server
 trust, cookies, provisioning entitlement or epoch access is restored. This is an
 explicit compatibility boundary, not a claim of same-household server recovery.
-The memory-only identity service still cannot reconstruct lost server identity.
+The v0.11 service database can preserve server identity and relay state when
+backed up separately; a local `.kin` archive cannot reconstruct that authority.
 
 ## Ownership principle
 

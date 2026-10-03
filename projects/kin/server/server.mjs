@@ -1,10 +1,23 @@
 import { createReadStream, existsSync, statSync } from "node:fs";
-import { extname, join, normalize, resolve } from "node:path";
+import { realpathSync } from "node:fs";
+import {
+  extname,
+  basename,
+  dirname,
+  isAbsolute,
+  join,
+  normalize,
+  relative,
+  resolve,
+  sep,
+} from "node:path";
+import { isIP } from "node:net";
 import { pathToFileURL } from "node:url";
 import { createServer } from "node:http";
 import { randomBytes } from "node:crypto";
 import { PairingError, PairingService } from "./pairing-service.mjs";
 import { EncryptedSyncService } from "./sync-service.mjs";
+import { DurableStore, DurableStoreError } from "./durable-store.mjs";
 import { WebAuthn } from "./webauthn.mjs";
 
 const webRoot = normalize(join(import.meta.dirname, "..", "web"));
@@ -17,16 +30,45 @@ export function createKinServer(options = {}) {
   const origin =
     options.origin ?? process.env.KIN_ORIGIN ?? `http://localhost:${port}`;
   assertSecureOrigin(host, origin);
-  const service = options.service ?? new PairingService();
+  const configuredDataDirectory =
+    options.dataDirectory ??
+    process.env.KIN_DATA_DIR ??
+    join(import.meta.dirname, "..", ".kin-data");
+  const databasePath = resolve(
+    options.databasePath ??
+      process.env.KIN_DATABASE_PATH ??
+      join(configuredDataDirectory, "kin.sqlite"),
+  );
+  assertOutsideWebRoot(databasePath);
+  const store =
+    options.store === false
+      ? null
+      : (options.store ??
+        new DurableStore(databasePath, {
+          acquireProcessLock: options.acquireProcessLock,
+        }));
+  const service =
+    options.service ?? new PairingService({ now: options.now, store });
+  if (options.service && store && !service.store) {
+    service.store = store;
+    for (const householdId of service.households.keys())
+      store.saveIdentityHousehold(householdId, service);
+  }
   const syncService =
     options.syncService ??
-    new EncryptedSyncService(service, { now: options.now });
+    new EncryptedSyncService(service, { now: options.now, store });
+  if (options.syncService && store && !syncService.store) {
+    syncService.store = store;
+    for (const [householdId, state] of syncService.households)
+      store.saveSyncState(householdId, state, service);
+  }
   const webauthn =
     options.webauthn ??
     new WebAuthn({ rpId: new URL(origin).hostname, origin, now: options.now });
   const context = {
     service,
     syncService,
+    store,
     webauthn,
     flows: new Map(),
     now: options.now ?? (() => Date.now()),
@@ -35,9 +77,24 @@ export function createKinServer(options = {}) {
     origin,
   };
   const server = createServer(async (request, response) => {
+    const requestId = randomBytes(12).toString("hex");
+    response.setHeader("X-Request-ID", requestId);
     try {
       setHeaders(response);
       const url = new URL(request.url, origin);
+      if (request.method === "GET" && url.pathname === "/health") {
+        json(response, 200, { status: "ok" });
+        return;
+      }
+      if (request.method === "GET" && url.pathname === "/readiness") {
+        try {
+          store?.health();
+          json(response, 200, { ready: true });
+        } catch {
+          json(response, 503, { ready: false });
+        }
+        return;
+      }
       if (url.pathname.startsWith("/api/")) {
         if (request.headers.origin && request.headers.origin !== origin)
           throw new PairingError(
@@ -45,6 +102,7 @@ export function createKinServer(options = {}) {
             "The request origin was rejected.",
             403,
           );
+        store?.assertAvailable();
         await api(request, response, url, context);
         return;
       }
@@ -65,11 +123,24 @@ export function createKinServer(options = {}) {
       const safe =
         error instanceof PairingError
           ? error
-          : new PairingError(
-              "server_error",
-              "Kin could not complete that request.",
-              500,
-            );
+          : error instanceof DurableStoreError || store?.failed
+            ? new PairingError(
+                "durable_store_unavailable",
+                "Kin's durable service is unavailable. Restart the service before retrying.",
+                503,
+              )
+            : new PairingError(
+                "server_error",
+                "Kin could not complete that request.",
+                500,
+              );
+      console.error(
+        JSON.stringify({
+          event: "request_failed",
+          requestId,
+          outcome: safe.code,
+        }),
+      );
       json(response, safe.status, { error: safe.code, message: safe.message });
     }
   });
@@ -78,6 +149,7 @@ export function createKinServer(options = {}) {
     service,
     syncService,
     webauthn,
+    store,
     flows: context.flows,
     origin,
   };
@@ -87,30 +159,95 @@ if (
   process.argv[1] &&
   pathToFileURL(resolve(process.argv[1])).href === import.meta.url
 ) {
-  const port = Number(process.env.KIN_PORT ?? 8000);
-  const host = process.env.KIN_HOST ?? "127.0.0.1";
-  const origin = process.env.KIN_ORIGIN ?? `http://localhost:${port}`;
-  const { server } = createKinServer({ port, host, origin });
-  server.listen(port, host, () => console.log(`Kin is available at ${origin}`));
+  let application;
+  try {
+    const port = Number(process.env.KIN_PORT ?? 8000);
+    const host = process.env.KIN_HOST ?? "127.0.0.1";
+    const origin = process.env.KIN_ORIGIN ?? `http://localhost:${port}`;
+    application = createKinServer({
+      port,
+      host,
+      origin,
+      acquireProcessLock: true,
+    });
+    application.server.on("error", () => {
+      console.error(JSON.stringify({ event: "startup_failed", outcome: "listen_failed" }));
+      application.store?.close();
+      process.exitCode = 1;
+    });
+    application.server.listen(port, host, () => {
+      console.log(JSON.stringify({ event: "service_ready", origin }));
+    });
+    installShutdown(application);
+  } catch {
+    console.error(
+      JSON.stringify({ event: "startup_failed", outcome: "configuration_or_storage" }),
+    );
+    process.exitCode = 1;
+  }
 }
 
 function assertSecureOrigin(host, origin) {
-  const external = new URL(origin);
+  let external;
+  try {
+    external = new URL(origin);
+  } catch {
+    throw new Error("Kin requires a valid configured origin.");
+  }
   const loopback = (value) =>
     value === "localhost" ||
     value.endsWith(".localhost") ||
     value === "::1" ||
     value === "[::1]" ||
-    /^127(?:\.\d{1,3}){3}$/.test(value);
+    (isIP(value) === 4 && value.split(".")[0] === "127");
   if (!loopback(host))
     throw new Error(
       "Kin's built-in server must bind to loopback; use a trusted TLS proxy for external access.",
     );
-  if (!loopback(external.hostname) && external.protocol !== "https:") {
+  if (
+    !["http:", "https:"].includes(external.protocol) ||
+    external.username ||
+    external.password ||
+    external.search ||
+    external.hash ||
+    (external.pathname !== "/" && external.pathname !== "")
+  )
+    throw new Error("Kin requires a valid origin without credentials or a path.");
+  if (external.protocol !== "https:" && !loopback(external.hostname)) {
     throw new Error(
       "Kin requires an HTTPS origin outside loopback development.",
     );
   }
+}
+
+function assertOutsideWebRoot(databasePath) {
+  const dataDirectory = dirname(databasePath);
+  try {
+    const resolvedDirectory = realpathSync(dataDirectory);
+    const resolvedPath = existsSync(databasePath)
+      ? realpathSync(databasePath)
+      : resolve(resolvedDirectory, basename(databasePath));
+    const relativePath = relative(webRoot, resolvedPath);
+    if (isInsideWebRoot(relativePath))
+      throw new Error("Kin durable data must be outside the static web root.");
+  } catch (error) {
+    if (error.code === "ENOENT") {
+      const relativePath = relative(webRoot, databasePath);
+      if (isInsideWebRoot(relativePath))
+        throw new Error("Kin durable data must be outside the static web root.");
+      return;
+    }
+    throw error;
+  }
+}
+
+function isInsideWebRoot(relativePath) {
+  return (
+    relativePath === "" ||
+    (!isAbsolute(relativePath) &&
+      relativePath !== ".." &&
+      !relativePath.startsWith(`..${sep}`))
+  );
 }
 
 async function api(request, response, url, context) {
@@ -214,6 +351,13 @@ async function api(request, response, url, context) {
       rateKey: request.socket.remoteAddress ?? "unknown",
     });
     cookie(response, "kin_claim", result.claimToken, secureCookies);
+    cookie(
+      response,
+      "kin_device",
+      result.deviceToken,
+      secureCookies,
+      31_536_000,
+    );
     json(response, 200, omitToken(result));
     return;
   }
@@ -304,18 +448,21 @@ async function api(request, response, url, context) {
       body.credential?.id,
     );
     webauthn.verifyAuthentication(body.credential, body.flow, credential);
-    const approved = service.approvePairing(
-      session,
-      flow.pairingId,
-      flow.expectedVersion,
-      body.deviceCertificate,
-    );
-    const pairing = service.pairings.get(flow.pairingId);
-    const device = service.devices.get(pairing?.confirmedDeviceId);
-    if (device?.syncPublicKeys && device.syncHistoryFromEpoch == null)
-      syncService.onDeviceAdded(auth.household.id, device.id, {
-        historyFromEpoch: pairing.purpose === "device" ? 1 : undefined,
-      });
+    const approved = withTransaction(context, () => {
+      const result = service.approvePairing(
+        session,
+        flow.pairingId,
+        flow.expectedVersion,
+        body.deviceCertificate,
+      );
+      const pairing = service.pairings.get(flow.pairingId);
+      const device = service.devices.get(pairing?.confirmedDeviceId);
+      if (device?.syncPublicKeys && device.syncHistoryFromEpoch == null)
+        syncService.onDeviceAdded(auth.household.id, device.id, {
+          historyFromEpoch: pairing.purpose === "device" ? 1 : undefined,
+        });
+      return result;
+    });
     json(response, 200, approved);
     return;
   }
@@ -383,15 +530,23 @@ async function api(request, response, url, context) {
   if (request.method === "DELETE" && deviceMatch) {
     const target = service.devices.get(deviceMatch[1]);
     const alreadyRevoked = Boolean(target?.revokedAt);
-    json(response, 200, service.revokeDevice(session, deviceMatch[1]));
-    if (target && !alreadyRevoked)
-      syncService.onAccessChange(target.householdId, [target.id]);
+    const result = withTransaction(context, () => {
+      const revoked = service.revokeDevice(session, deviceMatch[1]);
+      if (target && !alreadyRevoked)
+        syncService.onAccessChange(target.householdId, [target.id]);
+      return revoked;
+    });
+    json(response, 200, result);
     return;
   }
   if (request.method === "POST" && url.pathname === "/api/sync/device-keys/successor") {
     const auth = service.authorize(session);
-    const result = service.transitionSyncPublicKeys(session, body.transition);
-    if (!result.retried) syncService.onDeviceKeyTransition(auth.household.id, auth.device.id);
+    const result = withTransaction(context, () => {
+      const transition = service.transitionSyncPublicKeys(session, body.transition);
+      if (!transition.retried)
+        syncService.onDeviceKeyTransition(auth.household.id, auth.device.id);
+      return transition;
+    });
     json(response, 200, result);
     return;
   }
@@ -403,11 +558,14 @@ async function api(request, response, url, context) {
         !device.revokedAt &&
         device.syncPublicKeys,
     ).length;
-    const result = service.registerSyncPublicKeys(session, body.publicKeys);
-    if (result.registered && keyedDevices > 0)
-      syncService.onDeviceAdded(auth.household.id, auth.device.id, {
-        historyFromEpoch: 1,
-      });
+    const result = withTransaction(context, () => {
+      const registered = service.registerSyncPublicKeys(session, body.publicKeys);
+      if (registered.registered && keyedDevices > 0)
+        syncService.onDeviceAdded(auth.household.id, auth.device.id, {
+          historyFromEpoch: 1,
+        });
+      return registered;
+    });
     json(response, 200, result);
     return;
   }
@@ -536,12 +694,15 @@ async function api(request, response, url, context) {
     const excludedDevices = [...service.devices.values()]
       .filter((device) => device.memberId === flow.targetMemberId)
       .map((device) => device.id);
-    const result = service.removeOtherAdult(
-      session,
-      flow.targetMemberId,
-      auth.member.id,
-    );
-    syncService.onAccessChange(auth.household.id, excludedDevices);
+    const result = withTransaction(context, () => {
+      const removed = service.removeOtherAdult(
+        session,
+        flow.targetMemberId,
+        auth.member.id,
+      );
+      syncService.onAccessChange(auth.household.id, excludedDevices);
+      return removed;
+    });
     json(response, 200, result);
     return;
   }
@@ -559,13 +720,45 @@ async function api(request, response, url, context) {
     const excludedDevices = [...service.devices.values()]
       .filter((device) => device.memberId === auth.member.id)
       .map((device) => device.id);
-    const result = service.leaveHousehold(session);
-    syncService.onAccessChange(auth.household.id, excludedDevices);
+    const result = withTransaction(context, () => {
+      const removed = service.leaveHousehold(session);
+      syncService.onAccessChange(auth.household.id, excludedDevices);
+      return removed;
+    });
     clearCookie(response, "kin_session", secureCookies);
     json(response, 200, result);
     return;
   }
   throw new PairingError("not_found", "That endpoint is unavailable.", 404);
+}
+
+function withTransaction(context, operation) {
+  return context.store ? context.store.transaction(operation) : operation();
+}
+
+function installShutdown({ server, store }) {
+  let shuttingDown = false;
+  const shutdown = (signal) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    console.log(JSON.stringify({ event: "shutdown_started", signal }));
+    const timeout = setTimeout(() => {
+      console.error(JSON.stringify({ event: "shutdown_timeout" }));
+      store?.close();
+      process.exitCode = 1;
+    }, 30_000);
+    timeout.unref();
+    server.close((error) => {
+      clearTimeout(timeout);
+      if (error) {
+        console.error(JSON.stringify({ event: "shutdown_failed" }));
+        process.exitCode = 1;
+      }
+      store?.close();
+    });
+  };
+  process.once("SIGINT", () => shutdown("SIGINT"));
+  process.once("SIGTERM", () => shutdown("SIGTERM"));
 }
 
 function createFlow(value, context) {

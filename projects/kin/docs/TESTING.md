@@ -1,6 +1,30 @@
 # Testing Contracts
 
-**Status:** Current through v0.10.3. Earlier version sections are historical release gates. See [V0.10.0](V0.10.0.md) for milestone and patch counts, environment and measurements.
+**Status:** v0.11.3 durable-service implementation candidate; awaiting human review. Earlier version sections are historical release gates. See [V0.10.0](V0.10.0.md) for prior milestone and patch evidence and [V0.11.0](V0.11.0.md) for the current service contract.
+
+## v0.11 durable-service gate
+
+Install the locked native dependency once, then run the service suite from the
+repository root:
+
+```powershell
+npm ci --prefix projects/kin
+npm run test:server --prefix projects/kin
+```
+
+The suite includes file-backed migration rollback and unsupported-schema tests,
+corrupt relay-data fail-closed checks, competing stale-cursor writers, online
+backup and verified offline restore, exclusive process/maintenance locks, and
+a spawned HTTP service restart. The restart test verifies fresh passkey login
+using a persisted trusted-device verifier, durable acknowledgement, exact
+ciphertext recovery, idempotent retry/conflict behavior, and device-sequence
+continuity. Use synthetic credentials and events only.
+
+The production smoke process also takes an exclusive service lock. A test or
+operator restoring a database must stop that process first. The lock is
+intentionally left behind after an unclean exit; verify process state before
+manual cleanup. See [DEVELOPMENT](DEVELOPMENT.md) for backup/restore commands
+and limitations.
 
 ## v0.10 security and portability gate
 
@@ -22,6 +46,10 @@ node projects/kin/scripts/security-storage-regression.mjs $kinBrowser
 node projects/kin/scripts/security-ui-regression.mjs $kinBrowser
 node projects/kin/scripts/passkey-regression.mjs $kinBrowser
 ```
+
+The version check keeps the published Kin release anchors separate from an
+unreleased durable-service package candidate; server-only work does not imply
+a Rust/WASM product-version bump.
 
 The storage runner includes legacy-key migration checks. Optional `--performance`
 and `--maximum-payload` measure 10,000-event migration/unlock and encrypted archive

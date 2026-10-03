@@ -55,14 +55,22 @@ export class PairingService {
     now = () => Date.now(),
     secret = randomBytes(32),
     maxRateBuckets = MAX_RATE_BUCKETS,
+    store,
   } = {}) {
     this.now = now;
     this.secret = secret;
     this.maxRateBuckets = maxRateBuckets;
-    this.households = new Map();
-    this.members = new Map();
-    this.credentials = new Map();
-    this.devices = new Map();
+    this.store = store;
+    const identity = store?.loadIdentity();
+    this.households = identity?.households ?? new Map();
+    this.members = identity?.members ?? new Map();
+    this.credentials = identity?.credentials ?? new Map();
+    this.devices = identity?.devices ?? new Map();
+    this.deviceTokens = new Map(
+      [...this.devices.values()]
+        .filter((device) => device.tokenHash)
+        .map((device) => [device.tokenHash, device.id]),
+    );
     this.pairings = new Map();
     this.codeIndex = new Map();
     this.sessions = new Map();
@@ -78,7 +86,12 @@ export class PairingService {
   }
 
   audit(type, details = {}) {
-    this.events.push({ type, at: this.now(), ...details });
+    this.events.push({ type, at: this.now(), ...details, persisted: false });
+    if (this.events.length > 10_000) this.events.shift();
+  }
+
+  persistHousehold(householdId) {
+    this.store?.saveIdentityHousehold(householdId, this);
   }
 
   addCredential(memberId, credential) {
@@ -134,6 +147,7 @@ export class PairingService {
     this.devices.set(deviceId, device);
     const deviceToken = this.issueDeviceToken(device);
     this.audit("device_trusted", { householdId, memberId, deviceId });
+    this.persistHousehold(householdId);
     return {
       ...this.issueSession(memberId, deviceId),
       deviceToken,
@@ -160,6 +174,7 @@ export class PairingService {
   }
 
   authorize(sessionToken, { requireTrusted = true } = {}) {
+    this.store?.assertAvailable();
     this.pruneSessions();
     const session = this.sessions.get(hash(String(sessionToken ?? "")));
     if (!session)
@@ -187,15 +202,16 @@ export class PairingService {
 
   issueDeviceToken(device) {
     const value = token();
+    if (device.tokenHash) this.deviceTokens.delete(device.tokenHash);
     device.tokenHash = hash(value);
+    this.deviceTokens.set(device.tokenHash, device.id);
     return value;
   }
 
   trustedDevice(deviceToken) {
+    this.store?.assertAvailable();
     const tokenHash = hash(String(deviceToken ?? ""));
-    const device = [...this.devices.values()].find(
-      (value) => value.tokenHash === tokenHash,
-    );
+    const device = this.devices.get(this.deviceTokens.get(tokenHash));
     if (!device)
       throw new PairingError(
         "device_not_trusted",
@@ -232,13 +248,15 @@ export class PairingService {
         "That passkey could not be verified.",
         401,
       );
-    return {
+    const result = {
       ...this.issueSession(member.id, device.id),
       deviceToken: this.issueDeviceToken(device),
       householdId: member.householdId,
       memberId: member.id,
       deviceId: device.id,
     };
+    this.persistHousehold(member.householdId);
+    return result;
   }
 
   credentialForAuthenticatedMember(sessionToken, credentialId) {
@@ -469,6 +487,7 @@ export class PairingService {
       throw genericCodeError();
     }
     const claimToken = token();
+    const deviceToken = token();
     const claimedAt = this.now();
     pairing.expiresAt = claimedAt + CLAIM_TTL_MS;
     pairing.claimant = {
@@ -478,6 +497,8 @@ export class PairingService {
       deviceId: id(),
       ...(syncPublicKeys ? validateSyncPublicKeys(syncPublicKeys) : {}),
       tokenHash: hash(claimToken),
+      deviceToken,
+      deviceTokenHash: hash(deviceToken),
       claimedAt,
     };
     pairing.state = "Claimed";
@@ -492,6 +513,7 @@ export class PairingService {
       pairingId: pairing.id,
       purpose: pairing.purpose ?? "adult",
       state: pairing.state,
+      deviceToken,
       expiresAt: pairing.expiresAt,
       version: pairing.version,
     };
@@ -570,6 +592,7 @@ export class PairingService {
         label: pairing.claimant.deviceLabel,
         trustedAt: this.now(),
         revokedAt: null,
+        tokenHash: pairing.claimant.deviceTokenHash,
         ...(pairing.claimant.syncPublicKeys
           ? {
               syncPublicKeys: pairing.claimant.syncPublicKeys,
@@ -578,6 +601,7 @@ export class PairingService {
             }
           : {}),
       });
+      this.deviceTokens.set(pairing.claimant.deviceTokenHash, deviceId);
       household.version += 1;
       pairing.confirmedMemberId = existingMember.id;
       pairing.confirmedDeviceId = deviceId;
@@ -597,6 +621,7 @@ export class PairingService {
         memberId: existingMember.id,
         deviceId,
       });
+      this.persistHousehold(household.id);
       return this.pairingView(pairing);
     }
     if (this.activeMemberCount(household) >= 2)
@@ -627,6 +652,7 @@ export class PairingService {
       label: pairing.claimant.deviceLabel,
       trustedAt: this.now(),
       revokedAt: null,
+      tokenHash: pairing.claimant.deviceTokenHash,
       ...(pairing.claimant.syncPublicKeys
         ? {
             syncPublicKeys: pairing.claimant.syncPublicKeys,
@@ -635,6 +661,7 @@ export class PairingService {
           }
         : {}),
     });
+    this.deviceTokens.set(pairing.claimant.deviceTokenHash, deviceId);
     household.members.add(memberId);
     household.version += 1;
     pairing.confirmedMemberId = memberId;
@@ -655,6 +682,7 @@ export class PairingService {
       memberId,
       deviceId,
     });
+    this.persistHousehold(household.id);
     return this.pairingView(pairing);
   }
 
@@ -747,16 +775,18 @@ export class PairingService {
       );
     this.claimTokens.delete(pairing.claimant.tokenHash);
     const device = this.devices.get(pairing.confirmedDeviceId);
-    return {
+    const result = {
       ...this.issueSession(
         pairing.confirmedMemberId,
         pairing.confirmedDeviceId,
       ),
-      deviceToken: this.issueDeviceToken(device),
+      deviceToken: pairing.claimant.deviceToken,
       householdId: pairing.householdId,
       memberId: pairing.confirmedMemberId,
       deviceId: pairing.confirmedDeviceId,
     };
+    this.persistHousehold(pairing.householdId);
+    return result;
   }
 
   logout(sessionToken) {
@@ -846,6 +876,7 @@ export class PairingService {
       return { fingerprint: device.syncKeyFingerprint, registered: false };
     }
     Object.assign(device, keyRecord);
+    this.persistHousehold(device.householdId);
     return { fingerprint: device.syncKeyFingerprint, registered: true };
   }
 
@@ -879,6 +910,7 @@ export class PairingService {
     device.syncKeyTransitions = [...transitions, structuredClone(t)];
     device.syncKeyGeneration = t.generation;
     Object.assign(device, next);
+    this.persistHousehold(household.id);
     return { fingerprint: device.syncKeyFingerprint, generation: t.generation, retried: false };
   }
 
@@ -965,6 +997,7 @@ export class PairingService {
       memberId,
       actorId,
     });
+    this.persistHousehold(household.id);
     return { memberId, removed: true };
   }
 
@@ -990,6 +1023,7 @@ export class PairingService {
     for (const [sessionHash, activeSession] of this.sessions)
       if (activeSession.deviceId === device.id)
         this.sessions.delete(sessionHash);
+    this.persistHousehold(household.id);
     return { id: device.id, revokedAt: device.revokedAt };
   }
 }

@@ -1,6 +1,6 @@
 # Development Workflow
 
-**Status:** Current through v0.10.0 Portable Core + Local Data Security; earlier version sections are historical contracts.
+**Status:** v0.11.3 durable-service implementation candidate; awaiting human review. Earlier version sections remain historical contracts.
 
 ## Build and run
 
@@ -26,6 +26,7 @@ build the Rust/WASM module using the project-local manifest
 From the repository root in PowerShell:
 
 ```powershell
+npm ci --prefix projects/kin
 ./projects/kin/run.ps1
 ```
 
@@ -41,10 +42,10 @@ Windows developers should be able to use PowerShell and standard Rust tooling. m
 
 - Rust toolchain (`rustup`, `cargo`) and the `wasm32-unknown-unknown` target
 - A modern secure-context browser with WebAssembly, Web Crypto, IndexedDB, Web Locks, BroadcastChannel, service workers and the platform APIs in [IMPLEMENTATION](IMPLEMENTATION.md)
-- Node.js 22 or later for the same-origin application/API server and built-in tests
+- Node.js 22 or later and npm for the same-origin application/API server and built-in tests; the locked `better-sqlite3` dependency is a native addon
 - Python 3.11 or later for version checks and launcher smoke tests; it is not needed to serve the app
 
-No npm dependency tree or framework runtime is planned. If static serving later requires a helper, prefer a minimal cross-platform option with a clear security/update story.
+The current implementation has been exercised on Windows with Node 22.12. Other operating-system and runtime/architecture combinations remain unverified; do not infer support from the npm package's availability.
 
 ## Browser capabilities
 
@@ -53,6 +54,24 @@ The application requires WebAssembly, ES modules, Custom Elements, IndexedDB, We
 ## Development data
 
 Use synthetic household text only. Never copy private family messages, health details, credentials, or real household history into test fixtures, screenshots, bug reports, or logs. Local test data can be removed through the browser's site-data controls for the local origin. Kin does not include a reset command that could accidentally remove household data.
+
+The service database defaults to `projects/kin/.kin-data/kin.sqlite`, outside
+the static web root. `KIN_DATA_DIR` or `KIN_DATABASE_PATH` can select another
+location. The production server holds an exclusive adjacent
+`.service.lock`; graceful shutdown releases it, while a crash leaves a stale
+lock that must only be removed after confirming no service process remains.
+Backups are sensitive and must be stored outside the static web root:
+
+```powershell
+npm run backup -- C:\private\kin-backups\kin.sqlite
+npm run restore -- C:\private\kin-backups\kin.sqlite
+```
+
+Restore requires the service to be stopped, verifies the source, and preserves
+the replaced database/WAL sidecars as a `.pre-restore-...` copy. A database
+backup can roll identity and authorization state backward (including revocation
+and key epochs); it is not a rollback-proof recovery mechanism. Keep service
+backups separate from local encrypted browser archives.
 
 ## v0.5.0 Pulse
 

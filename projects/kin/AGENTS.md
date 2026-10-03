@@ -100,7 +100,7 @@ If an unrelated parent-repository file was modified accidentally, revert that ch
 
 # Current Development Stage
 
-Kin uses semantic versions. The current implementation is `v0.10.3` — Bounded Storage/Archive Hardening & Architecture Closure, following the published v0.10.0/v0.10.1 and root-lifecycle v0.10.2 releases. The user authorized annotated tags before updating existing PR #15 into `kin-development`, then a stop for human review. Preserve every published tag exactly. Root replacement follows [ROOT-ROTATION](docs/ROOT-ROTATION.md); archive recovery is intentionally local-only and KARC v1 remains supported. The forward roadmap is v0.11 durable service/deployment, v0.12 data lifecycle/deletion, v0.13 recovery/continuity, v0.14 UX/UI consolidation, then v1.0 stability. These lines are planned, not implemented; do not begin any automatically or manufacture v0.10.4 for housekeeping. Relay/identity state remains in-memory; no production certification, mobile readiness or independent audit is claimed. No automatic kin-main or kin-development merge. See [V0.10.0](docs/V0.10.0.md) for actual evidence and limitations.
+Kin's last published release is `v0.10.3` — Bounded Storage/Archive Hardening & Architecture Closure. The `v0.11.3` Durable Service & Deployment implementation candidate is committed and tagged `kin-v0.11.3` for human review; the tag is not a published release. Preserve every published tag exactly. Root replacement follows [ROOT-ROTATION](docs/ROOT-ROTATION.md); archive recovery remains intentionally local-only and KARC v1 remains supported. Do not begin v0.12 or create/publish further release commits/tags without explicit authorization. The forward roadmap is v0.12 data lifecycle/deletion, v0.13 recovery/continuity, v0.14 UX/UI consolidation, then v1.0 stability. No production certification, mobile readiness or independent audit is claimed. No automatic kin-main or kin-development merge. See [V0.10.0](docs/V0.10.0.md) and [V0.11.0](docs/V0.11.0.md) for actual evidence and limitations.
 
 The pre-implementation releases are:
 
@@ -1007,7 +1007,7 @@ v0.8.0 — Household Pairing
 v0.9.0 — Encrypted Sync
 v0.9.3 — Encrypted Event Sync Stabilization
 v0.10.x — Portable Core + Local Security
-v0.11.x — Durable Service & Deployment (planned)
+v0.11.x — Durable Service & Deployment (implementation candidate; awaiting human review)
 v0.12.x — Data Lifecycle, Retention & Deletion (planned)
 v0.13.x — Recovery & Household Continuity (planned)
 v0.14.x — UX/UI Consolidation (planned)

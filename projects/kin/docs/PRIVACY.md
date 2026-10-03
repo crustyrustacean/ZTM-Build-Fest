@@ -1,6 +1,6 @@
 # Privacy
 
-**Status:** Current through v0.10.3. Local protected content is encrypted after verified migration. Sync is optional and uploads client-encrypted canonical event envelopes. The service receives no plaintext household event payloads or content keys, but it sees routing and traffic metadata; no anonymity or zero-knowledge claim is made.
+**Status:** v0.11.3 implementation candidate; awaiting human review. Local protected content is encrypted after verified migration. Sync is optional and uploads client-encrypted canonical event envelopes. The durable service receives no plaintext household event payloads or content keys, but it sees and persists routing and traffic metadata; no anonymity or zero-knowledge claim is made.
 
 v0.10 encrypts local canonical events, duplicated outbox content, protected metadata
 and private sync key material. Household drafts remain in unlocked memory only;
@@ -68,7 +68,19 @@ The browser encrypts the exact canonical event bytes and signs envelopes with a 
 
 The service still sees household/member/device/session IDs, event IDs, per-device sequences, key epochs, cursors, ciphertext sizes, event counts/timing, provisioning participants, revocation timing, IP addresses, and connection patterns. It can infer which devices share a household and when they synchronize. Encryption does not make traffic anonymous.
 
-The relay and identity service are process-memory only. Restart can lose server-side ciphertext/state, and acknowledgements are not durable. Local event bytes and cached exact envelopes remain on devices that hold them. New/replacement adults do not receive pre-join epoch keys in v0.9; missing history may be unavailable. All trusted-device/key loss can make content unrecoverable. See the [Threat Model](THREAT-MODEL.md).
+The v0.11 implementation candidate stores identity, credential-verification
+metadata, trusted-device authorization, opaque relay ciphertext, cursors,
+provisioning coordination and bounded security audit entries in SQLite.
+Successful relay acknowledgements follow a committed SQLite transaction;
+recipient delivery/read, backup existence and hardware-level persistence are
+not guaranteed. Sessions, WebAuthn ceremonies, unclaimed pairings and
+rate-limit windows are process-local and reset on restart. Local event bytes
+and cached exact envelopes remain on devices that hold them. Service backups
+contain sensitive routing metadata and encrypted envelopes, and a stale restore
+can roll back revocations or key epochs. New/replacement adults do not receive
+pre-join epoch keys in v0.9; missing history may be unavailable. All
+trusted-device/key loss can make content unrecoverable. See [V0.11.0](V0.11.0.md)
+and the [Threat Model](THREAT-MODEL.md).
 
 The planning design for these boundaries is documented in [Identity](IDENTITY.md), [Pairing](PAIRING.md), [Synchronization](SYNC.md), [Cryptography](CRYPTOGRAPHY.md), and the [Threat Model](THREAT-MODEL.md). These documents specify intended properties and open decisions; they do not establish implemented security guarantees.
 

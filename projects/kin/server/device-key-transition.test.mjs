@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { PairingService } from './pairing-service.mjs';
 import { EncryptedSyncService } from './sync-service.mjs';
+import { DurableStore } from './durable-store.mjs';
 import {
   generateDeviceKeys, generateProtectedDeviceKeys, exportDevicePublicKeys, deviceKeyFingerprint,
   createDeviceKeyTransition, verifiedDeviceKeyHistory, decryptWithDeviceHistory,
@@ -95,7 +96,11 @@ import { createKinServer } from './server.mjs';
 
 test('HTTP key successor authenticates and applies idempotently without dropping device identity', async () => {
   const f = await fixture();
-  const app = createKinServer({ service: f.service, syncService: f.sync });
+  const app = createKinServer({
+    service: f.service,
+    syncService: f.sync,
+    store: new DurableStore(':memory:'),
+  });
   await new Promise(resolve => app.server.listen(0, '127.0.0.1', resolve));
   const url = `http://127.0.0.1:${app.server.address().port}/api/sync/device-keys/successor`;
   try {
@@ -111,7 +116,10 @@ test('HTTP key successor authenticates and applies idempotently without dropping
     const authorized = f.service.authorize(f.adult.sessionToken);
     assert.equal(authorized.device.id, f.adult.deviceId);
     assert.equal(authorized.member.id, f.adult.memberId);
-  } finally { await new Promise(resolve => app.server.close(resolve)); }
+  } finally {
+    await new Promise(resolve => app.server.close(resolve));
+    app.store.close();
+  }
 });
 import { SyncCoordinator } from '../web/sync/sync-coordinator.js';
 import { provisionSealedEpochKey, unwrapEpochKey } from '../web/sync/crypto.js';

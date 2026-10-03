@@ -1,14 +1,15 @@
 # Persistent Contract Versioning
 
-**Status:** Current through v0.10.3; earlier version sections preserve historical contracts.
+**Status:** v0.11.3 implementation candidate; awaiting human review. Earlier version sections preserve historical contracts.
 
 ## Independent version axes
 
 Kin version numbers describe product releases; they do not version every persistent or transport contract.
 
-| Version axis | v0.10.3 read/write contract | Governs |
+| Version axis | Current published v0.10.3 / v0.11 candidate | Governs |
 | --- | --- | --- |
-| Application | `0.10.3` | Bounded storage/archive hardening and architecture closure |
+| Application | Last published `0.10.3`; candidate `0.11.3` | Durable service/deployment; does not bump client or domain formats |
+| Server database schema | `1` (`PRAGMA user_version`) | SQLite identity, authorization, opaque relay and coordination records |
 | Canonical event schema | Item add 1/2; other kinds 1 | Immutable event interpretation; original bytes retained |
 | Replay protocol | Reads v1–v8; writes local v7 / synchronized v8 | Request context and projection semantics |
 | Manual WASM ABI | Existing exports plus additive command/metadata/archive/import APIs | Host ownership and calls; new command packet v1 |

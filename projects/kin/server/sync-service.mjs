@@ -28,9 +28,10 @@ const GRANT_TTL_MS = 10 * 60_000;
 const MAX_CURSOR = 100_000_000;
 
 export class EncryptedSyncService {
-  constructor(pairingService, { now = () => Date.now() } = {}) {
+  constructor(pairingService, { now = () => Date.now(), store } = {}) {
     this.pairingService = pairingService;
     this.now = now;
+    this.store = store;
     this.households = new Map();
     this.rateBuckets = new Map();
   }
@@ -45,8 +46,8 @@ export class EncryptedSyncService {
       pendingEpoch: state.rotationPending ? state.currentEpoch + 1 : null,
       lastRotationProposalId: state.lastRotation?.proposalId ?? null,
       latestCursor: encodeCursor(state.nextSequence - 1),
-      eventCount: state.records.length,
-      acceptance: "process-local",
+      eventCount: state.eventCount,
+      acceptance: this.store ? "durable" : "process-local",
     };
   }
 
@@ -74,6 +75,7 @@ export class EncryptedSyncService {
     const state = this.state(auth.household.id);
     state.enabled = true;
     auth.device.syncProvisionedEpochs ??= [state.currentEpoch];
+    this.persistState(auth.household.id, state);
     return { enabled: true };
   }
 
@@ -112,7 +114,9 @@ export class EncryptedSyncService {
           413,
         );
       const existing =
-        state.byEventId.get(envelope.eventId) ?? seen.get(envelope.eventId);
+        state.byEventId.get(envelope.eventId) ??
+        this.store?.findEvent(auth.household.id, envelope.eventId) ??
+        seen.get(envelope.eventId);
       if (existing) {
         if (existing.canonical !== canonical)
           throw new PairingError(
@@ -129,7 +133,13 @@ export class EncryptedSyncService {
           "This device must synchronize its earlier events first.",
           409,
         );
-      if (state.records.length + staged.length >= MAX_HOUSEHOLD_EVENTS)
+      if (
+        (this.store
+          ? this.store.eventCount(auth.household.id)
+          : state.eventCount) +
+          staged.length >=
+        MAX_HOUSEHOLD_EVENTS
+      )
         throw new PairingError(
           "sync_limit",
           "This household reached its sync limit.",
@@ -145,16 +155,27 @@ export class EncryptedSyncService {
       nextDeviceSequence.set(auth.device.id, envelope.deviceSequence);
     }
 
-    for (const record of staged) {
-      state.records.push(record);
-      state.byEventId.set(record.envelope.eventId, record);
+    if (this.store && staged.length) {
+      this.store.commitEvents(
+        auth.household.id,
+        state.nextSequence,
+        auth.device.id,
+        state.deviceSequence.get(auth.device.id) ?? 0,
+        staged,
+      );
     }
+    if (!this.store)
+      for (const record of staged) {
+        state.records.push(record);
+        state.byEventId.set(record.envelope.eventId, record);
+      }
     state.nextSequence += staged.length;
     state.deviceSequence = nextDeviceSequence;
+    state.eventCount += staged.length;
     return {
       accepted: envelopes.length,
       latestCursor: encodeCursor(state.nextSequence - 1),
-      durable: false,
+      durable: Boolean(this.store),
     };
   }
 
@@ -173,6 +194,13 @@ export class EncryptedSyncService {
         "sync_cursor_invalid",
         "Kin could not continue from that sync position.",
         400,
+      );
+    if (this.store)
+      return this.store.readEvents(
+        auth.household.id,
+        cursor,
+        limit,
+        auth.device.syncHistoryFromEpoch ?? 1,
       );
     const scanned = state.records
       .filter((record) => record.sequence > cursor)
@@ -231,7 +259,8 @@ export class EncryptedSyncService {
       );
     for (const [eventId, binding] of staged)
       state.bindings.set(eventId, binding);
-    return { accepted: envelopes.length, durable: false };
+    this.persistState(auth.household.id, state);
+    return { accepted: envelopes.length, durable: Boolean(this.store) };
   }
 
   pullBindings(sessionToken, cursorValue = "") {
@@ -347,6 +376,7 @@ export class EncryptedSyncService {
     };
     state.grants.set(grant.grantId, grant);
     state.grantRequests.set(requestKey, grant.grantId);
+    this.persistState(auth.household.id, state);
     return {
       ...publicGrant(grant),
       recipientPublicKeys: structuredClone(recipient.syncPublicKeys),
@@ -379,13 +409,17 @@ export class EncryptedSyncService {
       );
     grant.package ??= structuredClone(keyPackage);
     grant.canonicalPackage ??= canonicalPackage;
-    return { accepted: true, grantId, durable: false };
+    this.persistState(auth.household.id, state);
+    return { accepted: true, grantId, durable: Boolean(this.store) };
   }
 
   pendingProvisioning(sessionToken) {
     const auth = this.authorize(sessionToken);
     const state = this.state(auth.household.id);
+    const grantCount = state.grants.size;
     this.pruneGrants(state);
+    if (state.grants.size !== grantCount)
+      this.persistState(auth.household.id, state);
     return [...state.grants.values()]
       .filter(
         (grant) =>
@@ -421,6 +455,7 @@ export class EncryptedSyncService {
     if (!device.syncProvisionedEpochs.includes(grant.keyEpoch))
       device.syncProvisionedEpochs.push(grant.keyEpoch);
     device.syncProvisionedEpochs.sort((left, right) => left - right);
+    this.persistState(auth.household.id, this.state(auth.household.id));
     return { acknowledged: true, grantId };
   }
 
@@ -523,6 +558,7 @@ export class EncryptedSyncService {
         keyEpoch: nextEpoch,
       });
     }
+    this.persistState(auth.household.id, state);
     return {
       currentEpoch: nextEpoch,
       rotationPending: false,
@@ -541,6 +577,7 @@ export class EncryptedSyncService {
       for (const [request, grantId] of state.grantRequests)
         if (grantId === id) state.grantRequests.delete(request);
     }
+    this.persistState(householdId, state);
   }
 
   onAccessChange(householdId, excludedDeviceIds = []) {
@@ -558,6 +595,7 @@ export class EncryptedSyncService {
           if (requestedGrantId === grantId)
             state.grantRequests.delete(requestKey);
       }
+    this.persistState(householdId, state);
     return state.currentEpoch + 1;
   }
 
@@ -604,24 +642,32 @@ export class EncryptedSyncService {
   }
 
   state(householdId) {
+    this.store?.assertAvailable();
     let state = this.households.get(householdId);
     if (!state) {
-      state = {
-        currentEpoch: 1,
-        enabled: false,
-        rotationPending: false,
-        nextSequence: 1,
-        records: [],
-        byEventId: new Map(),
-        deviceSequence: new Map(),
-        grants: new Map(),
-        bindings: new Map(),
-        lastRotation: null,
-        grantRequests: new Map(),
-      };
+      state = this.store
+        ? this.store.loadSyncState(householdId)
+        : {
+            currentEpoch: 1,
+            enabled: false,
+            rotationPending: false,
+            nextSequence: 1,
+            records: [],
+            eventCount: 0,
+            byEventId: new Map(),
+            deviceSequence: new Map(),
+            grants: new Map(),
+            bindings: new Map(),
+            lastRotation: null,
+            grantRequests: new Map(),
+          };
       this.households.set(householdId, state);
     }
     return state;
+  }
+
+  persistState(householdId, state) {
+    this.store?.saveSyncState(householdId, state, this.pairingService);
   }
 
   pruneGrants(state) {

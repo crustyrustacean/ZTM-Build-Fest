@@ -2,6 +2,48 @@
 
 This file records completed Kin releases. The `v0.0.x` releases are planning and documentation milestones; they do not represent implemented application features. The first implementation milestone remains `v0.1.0`.
 
+## Unreleased — v0.11.0–v0.11.3 Durable Service & Deployment candidate
+
+The four-version implementation candidate is complete, committed and tagged
+`kin-v0.11.3` for human review. It is not a published release.
+
+### v0.11.0 — Durable Identity & Relay Foundation
+
+Introduces SQLite server schema v1 and durable household identity, membership,
+credential, trusted-device, authorization, sync-coordination and opaque relay
+state. Event success is reported only after the transaction commits. Bounded
+indexed reads and persisted relay/device sequences preserve opaque envelopes,
+idempotency and cursor behavior across restarts.
+
+### v0.11.1 — Transaction & Interruption Correctness
+
+Makes migration transactional and fail-closed on interruption or unsupported
+newer schemas. Adds on-disk rollback/corruption checks, transaction boundaries
+for cross-service mutations and stale-writer compare-and-commit checks.
+
+### v0.11.2 — Operations & Recovery
+
+Adds readiness, graceful shutdown and an exclusive single-process service lock.
+Adds `npm run backup` using SQLite's online backup API and `npm run restore`
+with source validation, exclusive maintenance locking and offline replacement;
+preserves the replaced database and any WAL sidecars.
+
+### v0.11.3 — Privacy & Durable-Service Hardening
+
+Hardens persistent record validation, bounded reads, corruption behavior,
+error/log output, process restart behavior and backup/rollback documentation.
+Tests cover migration interruption, newer-schema rejection, corrupt relay
+data, stale-writer conflicts, backup/restore, lock exclusion and a spawned HTTP
+server restart that reauthenticates and recovers accepted ciphertext and
+sequence state. On Windows x64/Node 22.12 the full Node suite passed 157 tests
+after `npm ci`, including all 83 server tests; the Rust, WASM, browser,
+security-storage, security-UI, virtual-authenticator and version-consistency
+gates also passed. npm reported zero vulnerabilities but warned that the
+`better-sqlite3` install script is not covered by `allowScripts`; the installed
+native binding loaded successfully. Linux/macOS and launch-workflow validation,
+an independent security audit and production certification are not claimed.
+Restoring an old backup can roll back revocation or key epochs.
+
 ## [0.10.3] — Bounded Storage/Archive Hardening & Architecture Closure
 
 Page protected reads and bound decryption concurrency, remove redundant migration

@@ -12,6 +12,7 @@ import {
   TERMINAL_PAIRING_RETENTION_MS,
 } from "./pairing-service.mjs";
 import { createKinServer } from "./server.mjs";
+import { DurableStore } from "./durable-store.mjs";
 import { CHALLENGE_TTL_MS, WebAuthn } from "./webauthn.mjs";
 import {
   createDeviceAuthorizationCertificate,
@@ -116,8 +117,10 @@ async function startTestServer({
   maxFlows,
 } = {}) {
   const webauthn = testWebAuthn();
+  const store = new DurableStore(":memory:");
   const application = createKinServer({
     service,
+    store,
     webauthn,
     now,
     origin,
@@ -136,7 +139,7 @@ async function startTestServer({
         application.server.close((error) =>
           error ? reject(error) : resolve(),
         ),
-      ),
+      ).finally(() => application.store?.close()),
   };
 }
 

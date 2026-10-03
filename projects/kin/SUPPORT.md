@@ -1,6 +1,6 @@
 # Support
 
-Kin v0.9.3 is an incubation prototype with passkey-authenticated pairing and optional encrypted cross-device event sync. Its same-origin identity and relay service is memory-only. There is no staffed runtime support channel or guaranteed response time.
+Kin's last published release is v0.10.3, an incubation prototype with passkey-authenticated pairing and optional encrypted cross-device event sync. An unreleased v0.11.3 durable-service implementation candidate is awaiting human review. There is no staffed runtime support channel or guaranteed response time.
 
 ## Questions and proposals
 

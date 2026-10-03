@@ -1,6 +1,6 @@
 # Synchronization Design
 
-**Status:** Implemented through v0.10.3 for the local incubation service. Existing encrypted envelopes and v8 canonical replay remain compatible. The local outbox, sync state, epoch secrets and private device keys are encrypted at rest and unavailable while locked. Signed device-key successors preserve verification history and repair entitled post-join epoch grants. The relay and identity service remain in-memory; acknowledgements are process-local, not durable. The planned v0.11 line defines restart-safe durability without changing the service into a household source of truth.
+**Status:** v0.11.3 implementation candidate; awaiting human review. Existing encrypted envelopes and v8 canonical replay remain compatible. The local outbox, sync state, epoch secrets and private device keys are encrypted at rest and unavailable while locked. Signed device-key successors preserve verification history and repair entitled post-join epoch grants. The candidate stores identity, authorization and opaque relay state in SQLite and acknowledges an event only after commit; the service remains a relay, not a household source of truth.
 
 ## Intended direction
 
@@ -36,10 +36,13 @@ transition is accepted before pairing or sync, even if sync itself is disabled.
 Local offline migration can finish while that network transition remains pending.
 
 Archive restore is explicitly local-only and cannot silently rejoin sync; see
-[PORTABILITY](PORTABILITY.md). Relay restart still loses server-side state. Member
-removal/device revocation still reserves future sync key epochs and cannot erase
-prior plaintext/keys. Local recovery possession is a separate authorized path;
-removing a server member does not magically revoke a copied recovery key/root.
+[PORTABILITY](PORTABILITY.md). A separate verified service-database backup is
+required to recover server authority. Sessions and unfinished pairing/login
+flows expire on restart; a trusted device must reauthenticate with its passkey.
+Member removal/device revocation still reserves future sync key epochs and
+cannot erase prior plaintext/keys. Local recovery possession is a separate
+authorized path; removing a server member does not magically revoke a copied
+recovery key/root.
 
 ## v0.10.1 interrupted rotation recovery
 
@@ -111,7 +114,7 @@ The service must not receive plaintext household event payloads or household con
 - Local event persistence succeeds before an event is considered locally accepted.
 - Upload is at-least-once; clients must tolerate repeated delivery.
 - Exact event duplicates are idempotent under the v0.0.4 event contract.
-- Acknowledgement means this relay process accepted ciphertext, not durable storage and not that another member read or agreed with it. Restart may lose accepted relay records.
+- Acknowledgement in the v0.11 candidate means the transaction committing ciphertext and its relay/device sequence returned successfully; it does not mean that another member received/read/agreed with it, that a backup exists, or that hardware/filesystem failure is impossible.
 - A device may remain offline indefinitely; later synchronization must not rely on wall-clock timestamps as ordering authority.
 - Authorization is checked on every sync operation. Revoked-device queued events are rejected unless an explicit, reviewed recovery procedure says otherwise.
 - A client unable to decrypt or interpret an event must preserve it and surface a recoverable compatibility error; it must not silently drop it.
