@@ -18,6 +18,7 @@ class KinSecurity extends HTMLElement {
     this.manifest = null;
     this.busy = false;
     this.operation = 0;
+    this.operationAbort = new AbortController();
     this.onUnlocked = null;
     this.onLockRequested = null;
   }
@@ -157,7 +158,8 @@ class KinSecurity extends HTMLElement {
 
   async unlockPasskey(wrapper) {
     const operation = this.operation;
-    const { secret } = await authenticatePrf(wrapper);
+    const signal = this.operationAbort.signal;
+    const { secret } = await authenticatePrf(wrapper, { signal });
     try {
       await this.closest("kin-app")?.lockBarrier;
       if (operation !== this.operation) throw new Error("Unlock was cancelled.");
@@ -200,7 +202,9 @@ class KinSecurity extends HTMLElement {
 
   async addPasskey() {
     const vault = getActiveVault();
-    const { secret, credentialId, prfSalt } = await authenticatePrf();
+    const { secret, credentialId, prfSalt } = await authenticatePrf(null, {
+      signal: this.operationAbort.signal,
+    });
     try {
       const manifest = await vault.addCredentialWrapper(secret, { credentialId, prfSalt });
       await EventStore.updateSecurityManifest(manifest, vault);
@@ -254,6 +258,8 @@ class KinSecurity extends HTMLElement {
 
   locked() {
     this.operation++;
+    this.operationAbort.abort();
+    this.operationAbort = new AbortController();
     this.phase = "locked";
     this.busy = false;
     clearLegacyDrafts();

@@ -6,7 +6,7 @@ This file records completed Kin releases. The `v0.0.x` releases are planning and
 
 Implemented and validated on the v0.10 development branch; publication/tagging is pending approval. Startup now requires recovery or verified PRF unlock before loading protected history. A random local root encrypts complete event/context/outbox values and private sync material; independent credential wrappers avoid corpus re-encryption. Revision checks and a durable lock epoch prevent stale-tab wrapper resurrection and protected writes after lock. Drafts are memory-only.
 
-Post-gate lifecycle review fixed a focus/visibility race in the brief interval between attaching an unlocked vault and binding its durable store epoch. Wake checks now wait for the encrypted store, and epoch-bearing peer notifications distinguish a newer revocation from a delayed notification delivered after a valid re-unlock.
+Post-gate lifecycle review fixed a focus/visibility race in the brief interval between attaching an unlocked vault and binding its durable store epoch. Wake checks now wait for the encrypted store, epoch-bearing peer notifications distinguish a newer revocation from a delayed notification delivered after a valid re-unlock, and lock aborts in-flight PRF WebAuthn/server requests.
 
 Migration preserves legacy data until exact-byte decryption and full Rust replay verify the replacement. Nonextractable legacy transport keys authorize encrypted successor keys through a signed, idempotent transition; original canonical events and relay envelopes retain their identity. Rust now owns all 17 household command encoders, command validation, canonical metadata extraction, bounded archive framing and import planning through the existing dependency-free manual ABI.
 

@@ -35,13 +35,17 @@ async function fixture(action, { supported = true, accepted = true } = {}) {
 
 test("PRF requires UV and server verification and never transmits its secret", async () => {
   await fixture(async ({ result, calls, request }) => {
-    const value = await authenticatePrf();
+    const controller = new AbortController();
+    const value = await authenticatePrf(null, { signal: controller.signal });
     assert.equal(request().publicKey.userVerification, "required");
     assert.equal(request().publicKey.extensions.prf.eval.first.length, 32);
     assert.equal(value.secret.length, 32);
     assert.equal(value.secret[0], 42);
     assert.ok(result.every((byte) => byte === 0));
     assert.equal(calls.length, 2);
+    assert.equal(calls[0].options.signal, controller.signal);
+    assert.equal(calls[1].options.signal, controller.signal);
+    assert.equal(request().signal, controller.signal);
     assert.ok(!calls[1].options.body.includes(toBase64Url(value.secret)));
     assert.equal(JSON.parse(calls[1].options.body).credential.id, "AQID");
     value.secret.fill(0);
