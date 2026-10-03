@@ -1,6 +1,6 @@
 # Identity and Trusted Devices
 
-**Status:** Current through v0.8.7. Household/member identity, passkey credentials, member-bound approvals, trusted-device-bound sessions and reauthentication, membership removal, and eager revoked-device session invalidation are implemented by the same-origin in-memory service. Encrypted sync and content-key management remain future work.
+**Status:** Current through v0.8.8. Household/member identity, passkey credentials, member-bound approvals, trusted-device-bound sessions and reauthentication, membership removal, active-member capacity, and eager revoked-device session invalidation are implemented by the same-origin in-memory service. Encrypted sync and content-key management remain future work.
 
 ## Separate identities
 
@@ -30,7 +30,7 @@ Events carry household, actor/member, and originating device IDs as specified in
 
 Membership is an explicit relation between a household and a member, not inferred from possession of a device or from event authorship. Conceptual states are invited, active, and removed. Creation, acceptance, and removal must be explicit, attributable events with defined authorization before implementation. Removal blocks future household access but cannot retract data already learned or copied.
 
-The planned first shared household has two adult members. Kin does not infer family relationships, rank members, or assign contribution scores. A member may have multiple devices and credentials; removing one device must not silently remove the member.
+The planned first shared household has exactly two active adult-member slots. Removed members remain historically represented but inactive and do not consume a slot, allowing the remaining adult to pair a replacement. Kin does not infer family relationships, rank members, or assign contribution scores. A member may have multiple devices and credentials; removing one device must not silently remove the member.
 
 ## Passkey direction
 

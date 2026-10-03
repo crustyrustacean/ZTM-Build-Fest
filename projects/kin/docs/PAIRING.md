@@ -1,6 +1,6 @@
 # Pairing and Device Enrollment
 
-**Status:** Current through v0.8.7. Manual pairing codes/invitation URLs, passkey identity and reauthentication, member-bound approval/activation, trusted-device session invalidation, terminal-claim cleanup, and fresh-auth member removal are implemented. QR, key exchange, encrypted sync, and durable service storage are not implemented.
+**Status:** Current through v0.8.8. Manual pairing codes/invitation URLs, passkey identity and reauthentication, member-bound approval/activation, active-member capacity, trusted-device session invalidation, terminal-claim cleanup, and fresh-auth member removal are implemented. QR, key exchange, encrypted sync, and durable service storage are not implemented.
 
 ## Distinct operations
 
@@ -49,6 +49,8 @@ The pairing invitation must not itself be a durable login credential or contain 
 - Show the inviter and invitee which household and member/device are being added, and require clear confirmation from both.
 
 The v0.8.6 implementation uses a ten-minute Pending invitation and starts a separate fifteen-minute approval window after a successful claim. It validates a code before returning WebAuthn registration options. Cryptographic key exchange, household content encryption, and sync remain future work; see [V0.8.0](V0.8.0.md).
+
+Household capacity is derived from active membership records at both invitation creation and final approval. An inactive historical member does not consume one of the two active-adult slots, but remains stored; a full household cannot create an invitation or approve an in-flight claim.
 
 ## Add a device for an existing member
 

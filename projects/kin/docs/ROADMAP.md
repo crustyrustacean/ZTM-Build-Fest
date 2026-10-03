@@ -1,6 +1,6 @@
 # Roadmap
 
-Current release: `v0.8.7 — Pairing Security and State Hygiene`. This maintenance patch binds approval credentials, eagerly invalidates revoked-device sessions, prunes ephemeral state, and hardens malformed WebAuthn handling without new product scope. The v0.8.x line remains at its product-feedback gate before encrypted sync work.
+Current release: `v0.8.8 — Active-Member Slot Correctness`. Household capacity now counts active memberships rather than retained historical member records. After an adult leaves or is removed, the remaining adult may pair a replacement while the inactive historical membership remains retained. Pairing creation and final approval both enforce the two-active-adult limit. The v0.8.x line remains at its product-feedback gate before encrypted sync work.
 
 ## Planning releases
 
@@ -186,7 +186,7 @@ Reject stale same-period completion/reopen commands before persistence, add mult
 
 ### `v0.8.0` — Household Pairing
 
-Completed through v0.8.7: one household with exactly two adult members, manual pairing codes/invitation URLs, passkeys, member-bound approval and activation, trusted-device controls and session invalidation, reauthentication, protected membership removal, terminal-claim cleanup, and bounded authentication flows. QR is deferred. Household content sync remains unimplemented. The implementation record is [V0.8.0](V0.8.0.md).
+Completed through v0.8.8: one household with exactly two active adult-member slots, manual pairing codes/invitation URLs, passkeys, member-bound approval and activation, trusted-device controls and session invalidation, reauthentication, protected membership removal, replacement after removal or leave with historical membership retention, terminal-claim cleanup, and bounded authentication flows. QR is deferred. Household content sync remains unimplemented. The implementation record is [V0.8.0](V0.8.0.md).
 
 ### `v0.9.0` — Encrypted Sync
 
@@ -198,4 +198,4 @@ Focus on polish, reliability, accessibility, mobile UX, privacy documentation, o
 
 ## Scope discipline
 
-Each roadmap item is future work unless explicitly marked as completed. Authentication, passkeys, pairing, and trusted-device authorization are implemented through v0.8.7; encryption and synchronization remain unimplemented. Releases through `v0.0.12` were documentation-only; v0.1.0 is the first coded release. Handoff is implemented in v0.3.0; Talk in v0.4.0; Pulse in v0.5.0; Since You Last Looked in v0.6.0; Routines in v0.7.0.
+Each roadmap item is future work unless explicitly marked as completed. Authentication, passkeys, pairing, and trusted-device authorization are implemented through v0.8.8; encryption and synchronization remain unimplemented. Releases through `v0.0.12` were documentation-only; v0.1.0 is the first coded release. Handoff is implemented in v0.3.0; Talk in v0.4.0; Pulse in v0.5.0; Since You Last Looked in v0.6.0; Routines in v0.7.0.

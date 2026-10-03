@@ -1,6 +1,6 @@
 # Development Workflow
 
-**Status:** Current through v0.8.7 Pairing Security and State Hygiene; earlier version sections are historical contracts.
+**Status:** Current through v0.8.8 Active-Member Slot Correctness; earlier version sections are historical contracts.
 
 ## Build and run
 

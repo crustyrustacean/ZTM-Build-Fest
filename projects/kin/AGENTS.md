@@ -100,7 +100,7 @@ If an unrelated parent-repository file was modified accidentally, revert that ch
 
 # Current Development Stage
 
-Kin uses semantic versions. Current release: `v0.8.7` — Pairing Security and State Hygiene. This patch binds approval credentials to the authenticated adult, eagerly invalidates revoked-device sessions, prunes expired ephemeral state, and hardens malformed WebAuthn handling without adding product scope. The v0.8.x line remains at its feedback gate. Do not begin v0.9.x without explicit approval. No automatic kin-main merge.
+Kin uses semantic versions. Current release: `v0.8.8` — Active-Member Slot Correctness. Household capacity is derived from active memberships, so a remaining adult may pair a replacement after an adult leaves or is removed while Kin retains the inactive historical membership record. Pairing creation and final approval both enforce the two-active-adult limit. The v0.8.x line remains at its feedback gate. Do not begin v0.9.x without explicit approval. No automatic kin-main merge.
 
 The pre-implementation releases are:
 
@@ -1092,6 +1092,7 @@ kin-v0.8.4
 kin-v0.8.5
 kin-v0.8.6
 kin-v0.8.7
+kin-v0.8.8
 kin-v1.0.0
 ```
 

@@ -246,10 +246,16 @@ export class PairingService {
     return credential;
   }
 
+  activeMemberCount(household) {
+    return [...household.members].filter(
+      (memberId) => this.members.get(memberId)?.active === true,
+    ).length;
+  }
+
   createPairing(sessionToken) {
     const { member, household } = this.authorize(sessionToken);
     this.prunePairingCapabilities();
-    if (household.members.size >= 2)
+    if (this.activeMemberCount(household) >= 2)
       throw new PairingError(
         "household_full",
         "This household already has two adult members.",
@@ -425,7 +431,7 @@ export class PairingService {
         "The pairing request changed. Review its latest status.",
         409,
       );
-    if (household.members.size >= 2)
+    if (this.activeMemberCount(household) >= 2)
       throw new PairingError(
         "household_full",
         "This household already has two adult members.",

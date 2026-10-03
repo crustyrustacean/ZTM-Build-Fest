@@ -2,6 +2,10 @@
 
 This file records completed Kin releases. The `v0.0.x` releases are planning and documentation milestones; they do not represent implemented application features. The first implementation milestone remains `v0.1.0`.
 
+## [0.8.8] — Active-Member Slot Correctness
+
+Count active memberships rather than retained historical member records when enforcing household capacity. After an adult leaves or is removed, the remaining adult can pair a replacement while the inactive historical membership remains stored. Invitation creation and final approval both enforce the two-active-adult limit, and a full-household approval fails before creating any member, device, credential, session, or confirmed pairing state.
+
 ## [0.8.7] — Pairing Security and State Hygiene
 
 Bind pairing approval assertions to the authenticated adult's credential, eagerly remove every session for a revoked device, lazily prune expired sessions and terminal pairing capabilities, and normalize malformed WebAuthn/CBOR/COSE input into controlled verification failures. Clarify realistic signature-counter semantics and retain fresh-session behavior without adding product scope.

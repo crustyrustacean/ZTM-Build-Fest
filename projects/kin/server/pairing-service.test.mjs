@@ -1264,6 +1264,126 @@ test("membership removal revokes every target device and active session", () => 
   assert.equal(service.events.at(-1).type, "membership_removed");
 });
 
+test("a removed adult remains historical while a replacement joins", () => {
+  const { service, adult } = setup();
+  const invitation = service.createPairing(adult.sessionToken);
+  const claim = service.claimPairing({
+    code: invitation.code,
+    credential: credential("b"),
+    deviceLabel: "B",
+  });
+  service.approvePairing(adult.sessionToken, invitation.pairingId, claim.version);
+  const joined = service.activateClaim(claim.claimToken);
+
+  service.removeOtherAdult(adult.sessionToken, joined.memberId, adult.memberId);
+  const household = service.households.get(adult.householdId);
+  assert.equal(household.members.has(joined.memberId), true);
+  assert.equal(service.members.get(joined.memberId).active, false);
+  assert.equal(service.activeMemberCount(household), 1);
+
+  const replacementInvitation = service.createPairing(adult.sessionToken);
+  const replacementClaim = service.claimPairing({
+    code: replacementInvitation.code,
+    credential: credential("c"),
+    deviceLabel: "C",
+  });
+  service.approvePairing(
+    adult.sessionToken,
+    replacementInvitation.pairingId,
+    replacementClaim.version,
+  );
+  service.activateClaim(replacementClaim.claimToken);
+
+  assert.equal(household.members.size, 3);
+  assert.equal(service.activeMemberCount(household), 2);
+  assert.equal(service.members.get(joined.memberId).active, false);
+});
+
+test("an adult who leaves remains historical while a replacement joins", () => {
+  const { service, adult } = setup();
+  const invitation = service.createPairing(adult.sessionToken);
+  const claim = service.claimPairing({
+    code: invitation.code,
+    credential: credential("b"),
+    deviceLabel: "B",
+  });
+  service.approvePairing(adult.sessionToken, invitation.pairingId, claim.version);
+  const joined = service.activateClaim(claim.claimToken);
+
+  service.leaveHousehold(joined.sessionToken);
+  const household = service.households.get(adult.householdId);
+  assert.equal(household.members.has(joined.memberId), true);
+  assert.equal(service.members.get(joined.memberId).active, false);
+  assert.ok(service.devices.get(joined.deviceId).revokedAt);
+  assert.equal(service.activeMemberCount(household), 1);
+
+  const replacementInvitation = service.createPairing(adult.sessionToken);
+  const replacementClaim = service.claimPairing({
+    code: replacementInvitation.code,
+    credential: credential("c-after-leave"),
+    deviceLabel: "C",
+  });
+  service.approvePairing(
+    adult.sessionToken,
+    replacementInvitation.pairingId,
+    replacementClaim.version,
+  );
+  service.activateClaim(replacementClaim.claimToken);
+  assert.equal(service.activeMemberCount(household), 2);
+  assert.equal(service.members.get(joined.memberId).active, false);
+});
+
+test("approval rejects a newly full household without partial mutation", () => {
+  const { service, adult } = setup();
+  const invitation = service.createPairing(adult.sessionToken);
+  const claim = service.claimPairing({
+    code: invitation.code,
+    credential: credential("pending-third"),
+    deviceLabel: "Pending third",
+  });
+  const household = service.households.get(adult.householdId);
+  const occupyingMemberId = "occupying-member";
+  household.members.add(occupyingMemberId);
+  service.members.set(occupyingMemberId, {
+    id: occupyingMemberId,
+    householdId: household.id,
+    active: true,
+    credentials: new Set(),
+  });
+
+  const before = {
+    members: service.members.size,
+    devices: service.devices.size,
+    credentials: service.credentials.size,
+    householdVersion: household.version,
+    pairingVersion: service.pairings.get(invitation.pairingId).version,
+    sessions: service.sessions.size,
+  };
+  assert.throws(
+    () =>
+      service.approvePairing(
+        adult.sessionToken,
+        invitation.pairingId,
+        claim.version,
+      ),
+    (error) => error.code === "household_full",
+  );
+  assert.deepEqual(
+    {
+      members: service.members.size,
+      devices: service.devices.size,
+      credentials: service.credentials.size,
+      householdVersion: household.version,
+      pairingVersion: service.pairings.get(invitation.pairingId).version,
+      sessions: service.sessions.size,
+    },
+    before,
+  );
+  assert.equal(service.pairings.get(invitation.pairingId).state, "Claimed");
+  assert.equal(service.credentials.has("credential-pending-third"), false);
+  assert.equal(service.activeMemberCount(household), 2);
+});
+
 test("the last adult cannot leave, while a joined adult can leave without removing the household", () => {
   const { service, adult } = setup();
   assert.throws(

@@ -1,6 +1,6 @@
 # Threat Model
 
-**Status:** Current through v0.8.7. The local incubation service implements pairing, member-bound passkey approval, trusted-device-bound reauthentication, eager revoked-device session invalidation, fresh-auth membership removal, and bounded short-lived authorization flows. Malformed WebAuthn input fails closed through controlled verification errors. Content encryption and sync remain future work. Auth cookies add `Secure` when the configured `KIN_ORIGIN` is HTTPS; TLS deployments must set that trusted external origin explicitly. The service does not trust forwarded-protocol headers. This document guides design; it is not a security audit or guarantee.
+**Status:** Current through v0.8.8. The local incubation service implements pairing, member-bound passkey approval, trusted-device-bound reauthentication, eager revoked-device session invalidation, fresh-auth membership removal, and bounded short-lived authorization flows. Malformed WebAuthn input fails closed through controlled verification errors. Content encryption and sync remain future work. Auth cookies add `Secure` when the configured `KIN_ORIGIN` is HTTPS; TLS deployments must set that trusted external origin explicitly. The service does not trust forwarded-protocol headers. This document guides design; it is not a security audit or guarantee.
 
 ## Assets and boundaries
 
