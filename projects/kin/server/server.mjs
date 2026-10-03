@@ -75,8 +75,22 @@ async function api(request, response, url) {
   }
   if (request.method === "GET" && url.pathname === "/api/claim") {
     const result = service.pairingForClaim(claimToken);
-    if (result.sessionToken) { cookie(response, "kin_session", result.sessionToken); clearCookie(response, "kin_claim"); }
+    json(response, 200, result); return;
+  }
+  if (request.method === "POST" && url.pathname === "/api/claim/activate/options") {
+    const credential = service.claimCredential(claimToken); const flow = randomBytes(18).toString("base64url");
+    flows.set(flow, { purpose: "activate", claimToken, expiresAt: Date.now() + 120_000 });
+    json(response, 200, { flow, publicKey: webauthn.authenticationOptions(flow, [credential.id]) }); return;
+  }
+  if (request.method === "POST" && url.pathname === "/api/claim/activate/finish") {
+    const flow = consumeFlow(body.flow);
+    if (flow.purpose !== "activate" || flow.claimToken !== claimToken) throw badRequest();
+    webauthn.verifyAuthentication(body.credential, body.flow, service.claimCredential(claimToken));
+    const result = service.activateClaim(claimToken); cookie(response, "kin_session", result.sessionToken); clearCookie(response, "kin_claim");
     json(response, 200, omitToken(result)); return;
+  }
+  if (request.method === "POST" && url.pathname === "/api/logout") {
+    service.logout(session); clearCookie(response, "kin_session"); json(response, 200, { loggedOut: true }); return;
   }
   if (request.method === "GET" && url.pathname === "/api/devices") { json(response, 200, { devices: service.listDevices(session) }); return; }
   const deviceMatch = url.pathname.match(/^\/api\/devices\/([a-f0-9]{32})$/);

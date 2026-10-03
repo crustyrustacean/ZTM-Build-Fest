@@ -42,10 +42,23 @@ test("duplicate claims, stale approval, full households, and revoked devices fai
   const confirmed = service.approvePairing(adult.sessionToken, invitation.pairingId, claim.version);
   const joined = service.pairingForClaim(claim.claimToken);
   assert.equal(joined.state, "Confirmed");
+  const activated = service.activateClaim(claim.claimToken);
   assert.equal(service.listDevices(adult.sessionToken).length, 2);
-  service.revokeDevice(adult.sessionToken, confirmed.pairingId === "never" ? "" : joined.deviceId);
-  assert.throws(() => service.authorize(joined.sessionToken), error => error.code === "device_not_trusted");
+  service.revokeDevice(adult.sessionToken, confirmed.pairingId === "never" ? "" : activated.deviceId);
+  assert.throws(() => service.authorize(activated.sessionToken), error => error.code === "device_not_trusted");
   assert.throws(() => service.createPairing(adult.sessionToken), error => error.code === "household_full");
+});
+
+test("approval does not create a joining session until passkey activation", () => {
+  const { service, adult } = setup();
+  const invitation = service.createPairing(adult.sessionToken);
+  const claim = service.claimPairing({ code: invitation.code, credential: credential("b"), deviceLabel: "B" });
+  service.approvePairing(adult.sessionToken, invitation.pairingId, claim.version);
+  assert.equal(service.pairingForClaim(claim.claimToken).sessionToken, undefined);
+  assert.equal(service.claimCredential(claim.claimToken).id, "credential-b");
+  const activated = service.activateClaim(claim.claimToken);
+  assert.equal(service.authorize(activated.sessionToken).member.id, activated.memberId);
+  assert.throws(() => service.activateClaim(claim.claimToken), error => error.code === "claim_not_confirmed");
 });
 
 test("approval versus revocation resolves once without partial membership", () => {
@@ -62,4 +75,22 @@ test("rate limits repeated invalid guesses without recording secrets", () => {
   for (let index = 0; index < 12; index += 1) assert.throws(() => service.claimPairing({ code: `BAD-${index}`, credential: credential(index), deviceLabel: "B", rateKey: "one" }), error => error.code === "invalid_code");
   assert.throws(() => service.claimPairing({ code: "LAST", credential: credential("last"), deviceLabel: "B", rateKey: "one" }), error => error.code === "rate_limited");
   assert.equal(JSON.stringify(service.events).includes("BAD"), false);
+});
+
+test("new invitations revoke older live sessions and approval uses server time", () => {
+  const { service, adult, advance } = setup();
+  const first = service.createPairing(adult.sessionToken);
+  const second = service.createPairing(adult.sessionToken);
+  assert.equal(service.pairingForAdult(adult.sessionToken, first.pairingId).state, "Revoked");
+  const claim = service.claimPairing({ code: second.code, credential: credential("b"), deviceLabel: "B" });
+  advance(10 * 60_000 + 1);
+  assert.throws(() => service.approvePairing(adult.sessionToken, second.pairingId, claim.version), error => error.code === "pairing_expired");
+  assert.equal(service.households.get(adult.householdId).members.size, 1);
+});
+
+test("logout invalidates only the session and preserves device trust", () => {
+  const { service, adult } = setup();
+  service.logout(adult.sessionToken);
+  assert.throws(() => service.authorize(adult.sessionToken), error => error.code === "authentication_required");
+  assert.equal(service.devices.get(adult.deviceId).revokedAt, null);
 });

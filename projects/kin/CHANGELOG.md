@@ -2,6 +2,10 @@
 
 This file records completed Kin releases. The `v0.0.x` releases are planning and documentation milestones; they do not represent implemented application features. The first implementation milestone remains `v0.1.0`.
 
+## [0.8.1] — Pairing Hardening and Failure Recovery
+
+Separate membership approval from joining-device activation: after atomic approval, the joining adult must prove continued possession of the enrolled passkey before receiving a session. Lost-passkey, response-loss, duplicate approval, revoke/approve, server-time expiry, simultaneous invitation, replay, logout, and device-revocation paths fail closed or retry idempotently. Logout invalidates a session without conflating it with device trust.
+
 ## [0.8.0] — Household Pairing Foundation
 
 Add the first two-adult household identity model, passkey registration and approval, a ten-minute single-use human-readable pairing code, `/pair` manual entry and invitation links, explicit Pending/Claimed/Confirmed/Expired/Revoked states, server-side attempt/rate limits, atomic membership confirmation, trusted-device inspection/revocation, privacy-safe audit events, and lifecycle tests. The same-origin service stores only a keyed code verifier and never logs codes. Existing local event protocol v1–v7 and IndexedDB schema 1 remain unchanged.

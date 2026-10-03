@@ -100,7 +100,7 @@ If an unrelated parent-repository file was modified accidentally, revert that ch
 
 # Current Development Stage
 
-Kin uses semantic versions. Current release: `v0.8.0` — Household Pairing Foundation. It introduces the two-adult household identity and pairing protocol while preserving local event protocols v1–v7 and IndexedDB schema 1. The v0.8.x line must continue through correctness, security/accessibility, and polish milestones before user evaluation. No automatic kin-main merge or push.
+Kin uses semantic versions. Current release: `v0.8.1` — Pairing Hardening and Failure Recovery. The joining device must prove its enrolled passkey after approval before receiving a session. The v0.8.x line continues through security/accessibility and polish milestones before user evaluation. No automatic kin-main merge or push.
 
 The pre-implementation releases are:
 

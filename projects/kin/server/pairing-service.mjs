@@ -191,12 +191,24 @@ export class PairingService {
     const pairing = this.pairings.get(this.claimTokens.get(hash(String(claimToken ?? ""))));
     if (!pairing) throw new PairingError("claim_unavailable", "This pairing request is unavailable.", 404);
     const view = this.pairingView(pairing);
-    if (pairing.state === "Confirmed") {
-      const issued = this.issueSession(pairing.confirmedMemberId, pairing.confirmedDeviceId);
-      this.claimTokens.delete(pairing.claimant.tokenHash);
-      return { ...view, ...issued, householdId: pairing.householdId, memberId: pairing.confirmedMemberId, deviceId: pairing.confirmedDeviceId };
-    }
     return view;
+  }
+
+  claimCredential(claimToken) {
+    const pairing = this.pairings.get(this.claimTokens.get(hash(String(claimToken ?? ""))));
+    if (!pairing || this.state(pairing) !== "Confirmed") throw new PairingError("claim_not_confirmed", "Approval is still required.", 409);
+    return this.credentials.get(pairing.claimant.credential.id);
+  }
+
+  activateClaim(claimToken) {
+    const pairing = this.pairings.get(this.claimTokens.get(hash(String(claimToken ?? ""))));
+    if (!pairing || this.state(pairing) !== "Confirmed") throw new PairingError("claim_not_confirmed", "Approval is still required.", 409);
+    this.claimTokens.delete(pairing.claimant.tokenHash);
+    return { ...this.issueSession(pairing.confirmedMemberId, pairing.confirmedDeviceId), householdId: pairing.householdId, memberId: pairing.confirmedMemberId, deviceId: pairing.confirmedDeviceId };
+  }
+
+  logout(sessionToken) {
+    this.sessions.delete(hash(String(sessionToken ?? "")));
   }
 
   pairingView(pairing) {

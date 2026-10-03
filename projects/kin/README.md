@@ -2,7 +2,7 @@
 
 > A private, lightweight household coordination app for the little things families need to know, remember, hand off, or discuss.
 
-**Current status: `v0.8.0` — Household Pairing Foundation.** Kin can establish a two-adult household through a short-lived, single-use pairing code, passkey-backed identities, and explicit approval by the existing adult. Pairing, membership, credentials, sessions, and trusted devices are separate server-side concepts. Existing local coordination remains available and its protocol v1–v7 bytes and IndexedDB schema 1 are unchanged; encrypted event sync is not included.
+**Current status: `v0.8.1` — Pairing Hardening and Failure Recovery.** Kin can establish a two-adult household through a short-lived, single-use pairing code, passkey-backed identities, and explicit approval by the existing adult. Joining-device activation now requires a post-approval passkey assertion, so approval cannot silently authorize a browser that has lost its credential. Pairing, membership, credentials, sessions, and trusted devices remain separate server-side concepts.
 
 ## The problem
 
@@ -65,6 +65,7 @@ The intended technical direction is Rust compiled to WebAssembly, native Web Com
 - `v0.7.3` — Routine Hardening & Polish (`kin-v0.7.3`)
 - `v0.7.4` — Routine Stale-Action Correctness (`kin-v0.7.4`)
 - `v0.8.0` — Household Pairing Foundation (`kin-v0.8.0`)
+- `v0.8.1` — Pairing Hardening and Failure Recovery (`kin-v0.8.1`)
 - See the [changelog](CHANGELOG.md) for the completed release history.
 
 ## Install, build, and run
