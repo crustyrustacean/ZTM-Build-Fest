@@ -2,7 +2,19 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
 
-import { encodePulseSetRecord, encodePulseClearedRecord, encodeTalkAddedRecord, encodeTalkResolvedRecord, encodeTalkReopenedRecord, encodeTalkArchivedRecord, encodeAddedRecord, encodeHandoffAddedRecord, encodeHandoffAcknowledgedRecord, encodeHandoffArchivedRecord, loadKinEngine } from "./kin-engine.js";
+import {
+  encodePulseSetRecord,
+  encodePulseClearedRecord,
+  encodeTalkAddedRecord,
+  encodeTalkResolvedRecord,
+  encodeTalkReopenedRecord,
+  encodeTalkArchivedRecord,
+  encodeAddedRecord,
+  encodeHandoffAddedRecord,
+  encodeHandoffAcknowledgedRecord,
+  encodeHandoffArchivedRecord,
+  loadKinEngine,
+} from "./kin-engine.js";
 
 const zeroId = new Uint8Array(16);
 
@@ -87,7 +99,20 @@ function legacyRecord(kind, sequence) {
 
 function expectedState(version, status = null, classification = 0) {
   const bytes = new Uint8Array(status === null ? 12 : 64);
-  bytes.set([75, 73, 78, 83, version, 0, 0, 0, status === null ? 0 : 1, 0, 0, 0]);
+  bytes.set([
+    75,
+    73,
+    78,
+    83,
+    version,
+    0,
+    0,
+    0,
+    status === null ? 0 : 1,
+    0,
+    0,
+    0,
+  ]);
   if (status !== null) {
     bytes.fill(0x11, 12, 28);
     bytes.fill(0xbb, 28, 44);
@@ -100,6 +125,16 @@ function expectedState(version, status = null, classification = 0) {
   return bytes;
 }
 
+function emptyV6State() {
+  return {
+    items: [],
+    handoffs: [],
+    talks: [],
+    pulses: [],
+    summary: { entries: [], totalCount: 0, throughEventId: null },
+  };
+}
+
 async function rawEngine() {
   const { instance } = await WebAssembly.instantiate(
     await readFile(new URL("./kin_engine.wasm", import.meta.url)),
@@ -107,11 +142,14 @@ async function rawEngine() {
   );
   const abi = instance.exports;
   return (version, records, expectedStatus = 0, asOf = 0) => {
-    const headerSize = version === 5 ? 20 : 12;
-    const request = new Uint8Array(headerSize + records.reduce((size, row) => size + row.length, 0));
+    const headerSize = version === 6 ? 40 : version === 5 ? 20 : 12;
+    const request = new Uint8Array(
+      headerSize + records.reduce((size, row) => size + row.length, 0),
+    );
     request.set([75, 73, 78, 69, version, 0, 0, 0]);
     new DataView(request.buffer).setUint32(8, records.length, true);
-    if (version === 5) new DataView(request.buffer).setBigInt64(12, BigInt(asOf), true);
+    if (version === 5 || version === 6)
+      new DataView(request.buffer).setBigInt64(12, BigInt(asOf), true);
     let offset = headerSize;
     for (const record of records) {
       request.set(record, offset);
@@ -121,7 +159,10 @@ async function rawEngine() {
     assert.notEqual(pointer, 0);
     try {
       new Uint8Array(abi.memory.buffer, pointer, request.length).set(request);
-      assert.equal(abi.kin_apply_events(pointer, request.length), expectedStatus);
+      assert.equal(
+        abi.kin_apply_events(pointer, request.length),
+        expectedStatus,
+      );
       const success = expectedStatus === 0;
       assert.equal(success ? abi.kin_error_ptr() : abi.kin_result_ptr(), 0);
       assert.equal(success ? abi.kin_error_len() : abi.kin_result_len(), 0);
@@ -131,8 +172,14 @@ async function rawEngine() {
         success ? abi.kin_result_len() : abi.kin_error_len(),
       ).slice();
       if (!success) {
-        assert.deepEqual(result.subarray(0, 8), new Uint8Array([75, 69, 82, 82, 1, 0, expectedStatus, 0]));
-        assert.equal(result.length, 12 + new DataView(result.buffer).getUint32(8, true));
+        assert.deepEqual(
+          result.subarray(0, 8),
+          new Uint8Array([75, 69, 82, 82, 1, 0, expectedStatus, 0]),
+        );
+        assert.equal(
+          result.length,
+          12 + new DataView(result.buffer).getUint32(8, true),
+        );
       }
       return result;
     } finally {
@@ -145,7 +192,10 @@ test("real WASM ABI preserves exact v1 empty, active and completed results", asy
   const apply = await rawEngine();
   assert.deepEqual(apply(1, []), expectedState(1));
   assert.deepEqual(apply(1, [legacyRecord(1, 1)]), expectedState(1, 0));
-  assert.deepEqual(apply(1, [legacyRecord(1, 1), legacyRecord(2, 2)]), expectedState(1, 1));
+  assert.deepEqual(
+    apply(1, [legacyRecord(1, 1), legacyRecord(2, 2)]),
+    expectedState(1, 1),
+  );
 });
 
 test("real WASM ABI emits exact v2 classification and lifecycle layouts", async () => {
@@ -160,10 +210,19 @@ test("real WASM ABI emits exact v2 classification and lifecycle layouts", async 
   view.setUint32(108, 4, true);
   need.set([77, 105, 108, 107], 112);
   assert.deepEqual(apply(2, []), expectedState(2));
-  for (const [added, classification] of [[legacy, 0], [need, 1]]) {
+  for (const [added, classification] of [
+    [legacy, 0],
+    [need, 1],
+  ]) {
     assert.deepEqual(apply(2, [added]), expectedState(2, 0, classification));
-    assert.deepEqual(apply(2, [added, legacyRecord(2, 2)]), expectedState(2, 1, classification));
-    assert.deepEqual(apply(2, [added, legacyRecord(4, 2)]), expectedState(2, 2, classification));
+    assert.deepEqual(
+      apply(2, [added, legacyRecord(2, 2)]),
+      expectedState(2, 1, classification),
+    );
+    assert.deepEqual(
+      apply(2, [added, legacyRecord(4, 2)]),
+      expectedState(2, 2, classification),
+    );
   }
   apply(1, [need], 3);
   apply(1, [legacy, legacyRecord(4, 2)], 3);
@@ -172,7 +231,10 @@ test("real WASM ABI emits exact v2 classification and lifecycle layouts", async 
 test("real WASM ABI clears stale result and error buffers across versions", async () => {
   const apply = await rawEngine();
   for (let iteration = 0; iteration < 8; iteration++) {
-    assert.deepEqual(apply(1, [legacyRecord(1, 1), legacyRecord(2, 2)]), expectedState(1, 1));
+    assert.deepEqual(
+      apply(1, [legacyRecord(1, 1), legacyRecord(2, 2)]),
+      expectedState(1, 1),
+    );
     apply(99, [], 3);
     assert.deepEqual(apply(2, []), expectedState(2));
     apply(1, [legacyRecord(4, 2)], 3);
@@ -184,7 +246,7 @@ test("real WASM ABI clears stale result and error buffers across versions", asyn
 test("bridge decodes real v1 and v2 completed results as Today, not Need", async (context) => {
   const instantiate = WebAssembly.instantiate;
   let requestedVersion = 1;
-  // The browser writes v5 only. A test transport shim requests v1 from the
+  // The browser writes v6 only. A test transport shim requests v1 from the
   // real encoder so the bridge's historical decoder is exercised as well.
   context.mock.method(WebAssembly, "instantiate", async (...args) => {
     const { instance } = await instantiate(...args);
@@ -194,7 +256,11 @@ test("bridge decodes real v1 and v2 completed results as Today, not Need", async
         exports: {
           ...abi,
           kin_apply_events(pointer, length) {
-            new DataView(abi.memory.buffer).setUint16(pointer + 4, requestedVersion, true);
+            new DataView(abi.memory.buffer).setUint16(
+              pointer + 4,
+              requestedVersion,
+              true,
+            );
             return applyLegacy(abi, pointer, length);
           },
         },
@@ -202,34 +268,58 @@ test("bridge decodes real v1 and v2 completed results as Today, not Need", async
     };
   });
   const wasm = await readFile(new URL("./kin_engine.wasm", import.meta.url));
-  const engine = await loadKinEngine(`data:application/wasm;base64,${wasm.toString("base64")}`);
+  const engine = await loadKinEngine(
+    `data:application/wasm;base64,${wasm.toString("base64")}`,
+  );
   for (requestedVersion of [1, 2]) {
-    assert.deepEqual(engine.applyEvents([], 0), { items: [], handoffs: [], talks: [], pulses: [] });
+    assert.deepEqual(engine.applyEvents([], 0), {
+      items: [],
+      handoffs: [],
+      talks: [],
+      pulses: [],
+    });
     for (const completed of [false, true]) {
       const records = [legacyRecord(1, 1)];
       if (completed) records.push(legacyRecord(2, 2));
-      assert.deepEqual(engine.applyEvents(records, 0).items, [{
-        itemId: "11".repeat(16),
-        createdBy: "bb".repeat(16),
-        createdAt: 1,
-        classification: "today",
-        status: completed ? "completed" : "active",
-        text: "Milk",
-      }]);
+      assert.deepEqual(engine.applyEvents(records, 0).items, [
+        {
+          itemId: "11".repeat(16),
+          createdBy: "bb".repeat(16),
+          createdAt: 1,
+          classification: "today",
+          status: completed ? "completed" : "active",
+          text: "Milk",
+        },
+      ]);
     }
   }
 });
 
 function handoff(sequence, kind = 5, text = "Dishwasher running") {
-  const identity = { eventId: new Uint8Array(16).fill(sequence), householdId: new Uint8Array(16).fill(0xaa),
-    actorId: new Uint8Array(16).fill(0xbb), deviceId: new Uint8Array(16).fill(0xcc),
-    timestamp: sequence, logicalTime: sequence, handoffId: new Uint8Array(16).fill(0x22), text };
-  return (kind === 5 ? encodeHandoffAddedRecord : kind === 6 ? encodeHandoffAcknowledgedRecord : encodeHandoffArchivedRecord)(identity);
+  const identity = {
+    eventId: new Uint8Array(16).fill(sequence),
+    householdId: new Uint8Array(16).fill(0xaa),
+    actorId: new Uint8Array(16).fill(0xbb),
+    deviceId: new Uint8Array(16).fill(0xcc),
+    timestamp: sequence,
+    logicalTime: sequence,
+    handoffId: new Uint8Array(16).fill(0x22),
+    text,
+  };
+  return (
+    kind === 5
+      ? encodeHandoffAddedRecord
+      : kind === 6
+        ? encodeHandoffAcknowledgedRecord
+        : encodeHandoffArchivedRecord
+  )(identity);
 }
 
 test("protocol v3 mixed replay preserves legacy bytes and Handoff lifecycle", async () => {
   const wasm = await readFile(new URL("./kin_engine.wasm", import.meta.url));
-  const engine = await loadKinEngine(`data:application/wasm;base64,${wasm.toString("base64")}`);
+  const engine = await loadKinEngine(
+    `data:application/wasm;base64,${wasm.toString("base64")}`,
+  );
   const legacy = legacyRecord(1, 1);
   const snapshot = legacy.slice();
   const records = [legacy, handoff(2)];
@@ -239,388 +329,1027 @@ test("protocol v3 mixed replay preserves legacy bytes and Handoff lifecycle", as
   assert.equal(state.handoffs[0].createdBy, "bb".repeat(16));
   assert.equal(state.handoffs[0].createdAt, 2);
   records.push(handoff(3, 6));
-  assert.equal(engine.applyEvents(records, 0).handoffs[0].status, "acknowledged");
+  assert.equal(
+    engine.applyEvents(records, 0).handoffs[0].status,
+    "acknowledged",
+  );
   records.push(handoff(4, 7));
   assert.equal(engine.applyEvents(records, 0).handoffs[0].status, "archived");
-  assert.throws(() => engine.applyEvents([...records,handoff(5,6)], 0), error => error.code === 4);
-  assert.deepEqual(legacy,snapshot);
+  assert.throws(
+    () => engine.applyEvents([...records, handoff(5, 6)], 0),
+    (error) => error.code === 4,
+  );
+  assert.deepEqual(legacy, snapshot);
   const apply = await rawEngine();
-  for (const version of [1,2]) apply(version,[handoff(1)],3);
-  assert.deepEqual(apply(3,[]),new Uint8Array([75,73,78,83,3,0,0,0,0,0,0,0,0,0,0,0]));
+  for (const version of [1, 2]) apply(version, [handoff(1)], 3);
+  assert.deepEqual(
+    apply(3, []),
+    new Uint8Array([75, 73, 78, 83, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+  );
 });
 
 test("Handoff text encoder preserves Unicode and enforces byte bounds", () => {
   const text = "\uFEFF" + "🥛".repeat(1023) + "x";
   const record = handoff(1, 5, text);
-  assert.equal(new TextDecoder("utf-8", { ignoreBOM: true }).decode(record.subarray(108)), text);
+  assert.equal(
+    new TextDecoder("utf-8", { ignoreBOM: true }).decode(record.subarray(108)),
+    text,
+  );
   assert.equal(record.length, 108 + 4096);
   assert.throws(() => handoff(1, 5, text + "x"), /4096/);
   assert.throws(() => handoff(1, 5, "\uD800"), /valid Unicode/);
 });
 
-test("bridge rejects malformed Handoff result fields and recovers", async context => {
+test("bridge rejects malformed Handoff result fields and recovers", async (context) => {
   const instantiate = WebAssembly.instantiate;
   let mutate = () => {};
   context.mock.method(WebAssembly, "instantiate", async (...args) => {
     const { instance } = await instantiate(...args);
     const abi = instance.exports;
-    return { instance: { exports: { ...abi, kin_apply_events(pointer, length) {
-      new DataView(abi.memory.buffer).setUint16(pointer + 4, 3, true);
-      const status = applyLegacy(abi, pointer, length);
-      if (status === 0) mutate(new Uint8Array(abi.memory.buffer, abi.kin_result_ptr(), abi.kin_result_len()));
-      return status;
-    } } } };
+    return {
+      instance: {
+        exports: {
+          ...abi,
+          kin_apply_events(pointer, length) {
+            new DataView(abi.memory.buffer).setUint16(pointer + 4, 3, true);
+            const status = applyLegacy(abi, pointer, length);
+            if (status === 0)
+              mutate(
+                new Uint8Array(
+                  abi.memory.buffer,
+                  abi.kin_result_ptr(),
+                  abi.kin_result_len(),
+                ),
+              );
+            return status;
+          },
+        },
+      },
+    };
   });
   const wasm = await readFile(new URL("./kin_engine.wasm", import.meta.url));
-  const engine = await loadKinEngine(`data:application/wasm;base64,${wasm.toString("base64")}`);
+  const engine = await loadKinEngine(
+    `data:application/wasm;base64,${wasm.toString("base64")}`,
+  );
   for (const mutation of [
-    bytes => bytes[56] = 3,
-    ...[57,58,59].map(offset => bytes => bytes[offset] = 1),
-    bytes => new DataView(bytes.buffer,bytes.byteOffset).setUint32(60,0,true),
-    bytes => new DataView(bytes.buffer,bytes.byteOffset).setUint32(60,0xffffffff,true),
-    bytes => new DataView(bytes.buffer,bytes.byteOffset).setUint32(12,10001,true),
-    bytes => bytes[64] = 255,
-    bytes => new DataView(bytes.buffer,bytes.byteOffset).setBigInt64(48,1n<<62n,true),
+    (bytes) => (bytes[56] = 3),
+    ...[57, 58, 59].map((offset) => (bytes) => (bytes[offset] = 1)),
+    (bytes) =>
+      new DataView(bytes.buffer, bytes.byteOffset).setUint32(60, 0, true),
+    (bytes) =>
+      new DataView(bytes.buffer, bytes.byteOffset).setUint32(
+        60,
+        0xffffffff,
+        true,
+      ),
+    (bytes) =>
+      new DataView(bytes.buffer, bytes.byteOffset).setUint32(12, 10001, true),
+    (bytes) => (bytes[64] = 255),
+    (bytes) =>
+      new DataView(bytes.buffer, bytes.byteOffset).setBigInt64(
+        48,
+        1n << 62n,
+        true,
+      ),
   ]) {
     mutate = mutation;
-    assert.throws(() => engine.applyEvents([handoff(1)], 0), error => error.code === 6);
+    assert.throws(
+      () => engine.applyEvents([handoff(1)], 0),
+      (error) => error.code === 6,
+    );
     mutate = () => {};
-    assert.equal(engine.applyEvents([handoff(1)], 0).handoffs[0].text, "Dishwasher running");
+    assert.equal(
+      engine.applyEvents([handoff(1)], 0).handoffs[0].text,
+      "Dishwasher running",
+    );
   }
 });
 
-test("bridge fails closed at every truncated Handoff result boundary", async context => {
+test("bridge fails closed at every truncated Handoff result boundary", async (context) => {
   const instantiate = WebAssembly.instantiate;
   let resultLength;
   context.mock.method(WebAssembly, "instantiate", async (...args) => {
     const { instance } = await instantiate(...args);
     const abi = instance.exports;
-    return { instance: { exports: { ...abi,
-      kin_apply_events(pointer,length) {
-        new DataView(abi.memory.buffer).setUint16(pointer+4,3,true);
-        return applyLegacy(abi, pointer,length);
-      }, kin_result_len: () => resultLength ?? abi.kin_result_len() } } };
+    return {
+      instance: {
+        exports: {
+          ...abi,
+          kin_apply_events(pointer, length) {
+            new DataView(abi.memory.buffer).setUint16(pointer + 4, 3, true);
+            return applyLegacy(abi, pointer, length);
+          },
+          kin_result_len: () => resultLength ?? abi.kin_result_len(),
+        },
+      },
+    };
   });
   const wasm = await readFile(new URL("./kin_engine.wasm", import.meta.url));
-  const engine = await loadKinEngine(`data:application/wasm;base64,${wasm.toString("base64")}`);
-  for (resultLength = 0; resultLength < 16+48+18; resultLength++) {
-    assert.throws(() => engine.applyEvents([handoff(1)], 0), error => error.code === 6);
+  const engine = await loadKinEngine(
+    `data:application/wasm;base64,${wasm.toString("base64")}`,
+  );
+  for (resultLength = 0; resultLength < 16 + 48 + 18; resultLength++) {
+    assert.throws(
+      () => engine.applyEvents([handoff(1)], 0),
+      (error) => error.code === 6,
+    );
   }
-  resultLength = 16+48+18+1;
-  assert.throws(() => engine.applyEvents([handoff(1)], 0), error => error.code === 6);
+  resultLength = 16 + 48 + 18 + 1;
+  assert.throws(
+    () => engine.applyEvents([handoff(1)], 0),
+    (error) => error.code === 6,
+  );
   resultLength = undefined;
-  assert.equal(engine.applyEvents([handoff(1)], 0).handoffs.length,1);
+  assert.equal(engine.applyEvents([handoff(1)], 0).handoffs.length, 1);
 });
 
-test("large Handoff replay grows WASM memory and preserves independent repeated results", async context => {
+test("large Handoff replay grows WASM memory and preserves independent repeated results", async (context) => {
   const instantiate = WebAssembly.instantiate;
   let memory;
-  context.mock.method(WebAssembly,"instantiate",async(...args)=>{
-    const result=await instantiate(...args); memory=result.instance.exports.memory; return result;
+  context.mock.method(WebAssembly, "instantiate", async (...args) => {
+    const result = await instantiate(...args);
+    memory = result.instance.exports.memory;
+    return result;
   });
   const wasm = await readFile(new URL("./kin_engine.wasm", import.meta.url));
-  const engine = await loadKinEngine(`data:application/wasm;base64,${wasm.toString("base64")}`);
+  const engine = await loadKinEngine(
+    `data:application/wasm;base64,${wasm.toString("base64")}`,
+  );
   const initial = memory.buffer.byteLength;
-  const id = number => { const bytes=new Uint8Array(16); new DataView(bytes.buffer).setUint32(0,number,true); return bytes; };
-  const records=Array.from({length:10000},(_,index)=>encodeHandoffAddedRecord({
-    eventId:id(index+1), handoffId:id(index+1), householdId:zeroId, actorId:zeroId, deviceId:zeroId,
-    timestamp:index,logicalTime:index+1,text:index<1000 ? "x".repeat(4096) : "x",
-  }));
-  const state=engine.applyEvents(records, 0);
-  assert.ok(memory.buffer.byteLength>initial,"real memory growth occurred");
-  assert.equal(state.handoffs.length,10000);
-  assert.equal(state.handoffs[999].text.length,4096);
-  for(let iteration=0;iteration<4;iteration++) {
-    const bad=handoff(1);new DataView(bad.buffer).setUint16(2,99,true);
-    assert.throws(()=>engine.applyEvents([bad], 0),error=>error.code===3);
-    assert.deepEqual(engine.applyEvents([], 0),{items:[],handoffs:[],talks:[],pulses:[]});
-    assert.deepEqual(engine.applyEvents(records, 0),state);
+  const id = (number) => {
+    const bytes = new Uint8Array(16);
+    new DataView(bytes.buffer).setUint32(0, number, true);
+    return bytes;
+  };
+  const records = Array.from({ length: 10000 }, (_, index) =>
+    encodeHandoffAddedRecord({
+      eventId: id(index + 1),
+      handoffId: id(index + 1),
+      householdId: zeroId,
+      actorId: zeroId,
+      deviceId: zeroId,
+      timestamp: index,
+      logicalTime: index + 1,
+      text: index < 1000 ? "x".repeat(4096) : "x",
+    }),
+  );
+  const state = engine.applyEvents(records, 0);
+  assert.ok(memory.buffer.byteLength > initial, "real memory growth occurred");
+  assert.equal(state.handoffs.length, 10000);
+  assert.equal(state.handoffs[999].text.length, 4096);
+  for (let iteration = 0; iteration < 4; iteration++) {
+    const bad = handoff(1);
+    new DataView(bad.buffer).setUint16(2, 99, true);
+    assert.throws(
+      () => engine.applyEvents([bad], 0),
+      (error) => error.code === 3,
+    );
+    assert.deepEqual(engine.applyEvents([], 0), emptyV6State());
+    assert.deepEqual(engine.applyEvents(records, 0), state);
   }
-  assert.equal(state.handoffs[0].text.length,4096,"host-owned result survives later calls");
-  assert.throws(()=>engine.applyEvents([...records,records[0]], 0),error=>error.code===5);
+  assert.equal(
+    state.handoffs[0].text.length,
+    4096,
+    "host-owned result survives later calls",
+  );
+  assert.throws(
+    () => engine.applyEvents([...records, records[0]], 0),
+    (error) => error.code === 5,
+  );
 });
 
 function talk(sequence, kind = 8, text = "Weekend plans") {
-  const values = {eventId:new Uint8Array(16).fill(sequence),householdId:new Uint8Array(16).fill(0xaa),
-    actorId:new Uint8Array(16).fill(0xbb),deviceId:new Uint8Array(16).fill(0xcc),
-    timestamp:sequence,logicalTime:sequence,talkId:new Uint8Array(16).fill(0x33),text};
-  return ({8:encodeTalkAddedRecord,9:encodeTalkResolvedRecord,10:encodeTalkReopenedRecord,11:encodeTalkArchivedRecord})[kind](values);
+  const values = {
+    eventId: new Uint8Array(16).fill(sequence),
+    householdId: new Uint8Array(16).fill(0xaa),
+    actorId: new Uint8Array(16).fill(0xbb),
+    deviceId: new Uint8Array(16).fill(0xcc),
+    timestamp: sequence,
+    logicalTime: sequence,
+    talkId: new Uint8Array(16).fill(0x33),
+    text,
+  };
+  return {
+    8: encodeTalkAddedRecord,
+    9: encodeTalkResolvedRecord,
+    10: encodeTalkReopenedRecord,
+    11: encodeTalkArchivedRecord,
+  }[kind](values);
 }
 
 test("Talk real WASM mixed replay, lifecycle and legacy compatibility", async () => {
   const wasm = await readFile(new URL("./kin_engine.wasm", import.meta.url));
-  const engine = await loadKinEngine(`data:application/wasm;base64,${wasm.toString("base64")}`);
-  const records = [legacyRecord(1,1),handoff(2),talk(3)];
-  const originals = records.map(row=>row.slice());
-  assert.equal(engine.applyEvents(records, 0).talks[0].status,"open");
-  for (const [kind,status] of [[9,"resolved"],[10,"open"],[11,"archived"]]) {
-    records.push(talk(records.length+1,kind));
-    const state=engine.applyEvents(records, 0);
-    assert.equal(state.talks[0].status,status);
-    assert.equal(state.items.length,1);assert.equal(state.handoffs.length,1);
+  const engine = await loadKinEngine(
+    `data:application/wasm;base64,${wasm.toString("base64")}`,
+  );
+  const records = [legacyRecord(1, 1), handoff(2), talk(3)];
+  const originals = records.map((row) => row.slice());
+  assert.equal(engine.applyEvents(records, 0).talks[0].status, "open");
+  for (const [kind, status] of [
+    [9, "resolved"],
+    [10, "open"],
+    [11, "archived"],
+  ]) {
+    records.push(talk(records.length + 1, kind));
+    const state = engine.applyEvents(records, 0);
+    assert.equal(state.talks[0].status, status);
+    assert.equal(state.items.length, 1);
+    assert.equal(state.handoffs.length, 1);
   }
-  assert.deepEqual(records.slice(0,3),originals);
-  assert.throws(()=>engine.applyEvents([...records,talk(7,10)], 0),error=>error.code===4);
-  const apply=await rawEngine();
-  for (const version of [1,2,3]) for (const kind of [8,9,10,11]) apply(version,[talk(1,kind)],3);
-  assert.deepEqual(apply(4,[]),new Uint8Array([75,73,78,83,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]));
+  assert.deepEqual(records.slice(0, 3), originals);
+  assert.throws(
+    () => engine.applyEvents([...records, talk(7, 10)], 0),
+    (error) => error.code === 4,
+  );
+  const apply = await rawEngine();
+  for (const version of [1, 2, 3])
+    for (const kind of [8, 9, 10, 11]) apply(version, [talk(1, kind)], 3);
+  assert.deepEqual(
+    apply(4, []),
+    new Uint8Array([
+      75, 73, 78, 83, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    ]),
+  );
 });
 
 test("Talk payload codes, schemas, Unicode and byte limits", () => {
-  const text="\uFEFF"+"\u{1f95b}".repeat(1023)+"x";
-  for (const kind of [8,9,10,11]) {
-    const row=talk(1,kind,text),view=new DataView(row.buffer);
-    assert.equal(view.getUint16(0,true),1);assert.equal(view.getUint16(2,true),kind);
-    assert.equal(row.length,kind===8?108+4096:104);
+  const text = "\uFEFF" + "\u{1f95b}".repeat(1023) + "x";
+  for (const kind of [8, 9, 10, 11]) {
+    const row = talk(1, kind, text),
+      view = new DataView(row.buffer);
+    assert.equal(view.getUint16(0, true), 1);
+    assert.equal(view.getUint16(2, true), kind);
+    assert.equal(row.length, kind === 8 ? 108 + 4096 : 104);
   }
-  assert.throws(()=>talk(1,8,text+"x"),/4096/);
-  assert.throws(()=>talk(1,8,"\uD800"),/valid Unicode/);
+  assert.throws(() => talk(1, 8, text + "x"), /4096/);
+  assert.throws(() => talk(1, 8, "\uD800"), /valid Unicode/);
 });
 
-test("v4 rejects malformed Talk records, headers and combined counts", async context => {
-  const instantiate=WebAssembly.instantiate;let mutate=()=>{};
-  context.mock.method(WebAssembly,"instantiate",async (...args)=>{
-    const {instance}=await instantiate(...args);const abi=instance.exports;
-    return {instance:{exports:{...abi,kin_apply_events(pointer,length){
-      new DataView(abi.memory.buffer).setUint16(pointer+4,4,true);
-      const status=applyLegacy(abi, pointer,length);
-      if(status===0)mutate(new Uint8Array(abi.memory.buffer,abi.kin_result_ptr(),abi.kin_result_len()));
-      return status;
-    }}}};
+test("v4 rejects malformed Talk records, headers and combined counts", async (context) => {
+  const instantiate = WebAssembly.instantiate;
+  let mutate = () => {};
+  context.mock.method(WebAssembly, "instantiate", async (...args) => {
+    const { instance } = await instantiate(...args);
+    const abi = instance.exports;
+    return {
+      instance: {
+        exports: {
+          ...abi,
+          kin_apply_events(pointer, length) {
+            new DataView(abi.memory.buffer).setUint16(pointer + 4, 4, true);
+            const status = applyLegacy(abi, pointer, length);
+            if (status === 0)
+              mutate(
+                new Uint8Array(
+                  abi.memory.buffer,
+                  abi.kin_result_ptr(),
+                  abi.kin_result_len(),
+                ),
+              );
+            return status;
+          },
+        },
+      },
+    };
   });
-  const wasm=await readFile(new URL("./kin_engine.wasm",import.meta.url));
-  const engine=await loadKinEngine(`data:application/wasm;base64,${wasm.toString("base64")}`);
-  const mutations=[bytes=>bytes[0]=0,bytes=>bytes[4]=99,bytes=>bytes[6]=1,bytes=>bytes[7]=1,
-    bytes=>bytes[60]=3,...[61,62,63].map(offset=>bytes=>bytes[offset]=1),bytes=>bytes[68]=255,
-    bytes=>new DataView(bytes.buffer,bytes.byteOffset).setBigInt64(52,2n**60n,true),
-    ...[0,4097,0xffffffff].map(length=>bytes=>new DataView(bytes.buffer,bytes.byteOffset).setUint32(64,length,true)),
-    ...[8,12,16].map(offset=>bytes=>new DataView(bytes.buffer,bytes.byteOffset).setUint32(offset,0xffffffff,true)),
-    bytes=>{const v=new DataView(bytes.buffer,bytes.byteOffset);v.setUint32(8,3333,true);v.setUint32(12,3333,true);v.setUint32(16,3335,true);}];
-  for(mutate of mutations) assert.throws(()=>engine.applyEvents([talk(1)], 0),error=>error.code===6);
-  mutate=()=>{};assert.equal(engine.applyEvents([talk(1)], 0).talks[0].text,"Weekend plans");
+  const wasm = await readFile(new URL("./kin_engine.wasm", import.meta.url));
+  const engine = await loadKinEngine(
+    `data:application/wasm;base64,${wasm.toString("base64")}`,
+  );
+  const mutations = [
+    (bytes) => (bytes[0] = 0),
+    (bytes) => (bytes[4] = 99),
+    (bytes) => (bytes[6] = 1),
+    (bytes) => (bytes[7] = 1),
+    (bytes) => (bytes[60] = 3),
+    ...[61, 62, 63].map((offset) => (bytes) => (bytes[offset] = 1)),
+    (bytes) => (bytes[68] = 255),
+    (bytes) =>
+      new DataView(bytes.buffer, bytes.byteOffset).setBigInt64(
+        52,
+        2n ** 60n,
+        true,
+      ),
+    ...[0, 4097, 0xffffffff].map(
+      (length) => (bytes) =>
+        new DataView(bytes.buffer, bytes.byteOffset).setUint32(
+          64,
+          length,
+          true,
+        ),
+    ),
+    ...[8, 12, 16].map(
+      (offset) => (bytes) =>
+        new DataView(bytes.buffer, bytes.byteOffset).setUint32(
+          offset,
+          0xffffffff,
+          true,
+        ),
+    ),
+    (bytes) => {
+      const v = new DataView(bytes.buffer, bytes.byteOffset);
+      v.setUint32(8, 3333, true);
+      v.setUint32(12, 3333, true);
+      v.setUint32(16, 3335, true);
+    },
+  ];
+  for (mutate of mutations)
+    assert.throws(
+      () => engine.applyEvents([talk(1)], 0),
+      (error) => error.code === 6,
+    );
+  mutate = () => {};
+  assert.equal(engine.applyEvents([talk(1)], 0).talks[0].text, "Weekend plans");
 });
 
-test("exact pre-Talk event writer bytes and v3 result remain unchanged",async()=>{
-  const old=legacyRecord(1,1);
-  const identity={eventId:new Uint8Array(16).fill(1),householdId:new Uint8Array(16).fill(0xaa),
-    actorId:new Uint8Array(16).fill(0xbb),deviceId:new Uint8Array(16).fill(0xcc),timestamp:1,logicalTime:1};
-  const expected=new Uint8Array(116);expected.set(old.subarray(0,88));expected[0]=2;expected[84]=28;
-  expected.fill(0x11,88,104);expected[104]=1;expected[108]=4;expected.set([77,105,108,107],112);
-  assert.deepEqual(encodeAddedRecord({...identity,itemId:new Uint8Array(16).fill(0x11),text:"Milk"}),expected);
-  for(const kind of [5,6,7]) {
-    const fixture=legacyRecord(kind===5?1:2,1);fixture[2]=kind;fixture.fill(0x22,88,104);
-    assert.deepEqual(handoff(1,kind,"Milk"),fixture);
+test("exact pre-Talk event writer bytes and v3 result remain unchanged", async () => {
+  const old = legacyRecord(1, 1);
+  const identity = {
+    eventId: new Uint8Array(16).fill(1),
+    householdId: new Uint8Array(16).fill(0xaa),
+    actorId: new Uint8Array(16).fill(0xbb),
+    deviceId: new Uint8Array(16).fill(0xcc),
+    timestamp: 1,
+    logicalTime: 1,
+  };
+  const expected = new Uint8Array(116);
+  expected.set(old.subarray(0, 88));
+  expected[0] = 2;
+  expected[84] = 28;
+  expected.fill(0x11, 88, 104);
+  expected[104] = 1;
+  expected[108] = 4;
+  expected.set([77, 105, 108, 107], 112);
+  assert.deepEqual(
+    encodeAddedRecord({
+      ...identity,
+      itemId: new Uint8Array(16).fill(0x11),
+      text: "Milk",
+    }),
+    expected,
+  );
+  for (const kind of [5, 6, 7]) {
+    const fixture = legacyRecord(kind === 5 ? 1 : 2, 1);
+    fixture[2] = kind;
+    fixture.fill(0x22, 88, 104);
+    assert.deepEqual(handoff(1, kind, "Milk"), fixture);
   }
-  const apply=await rawEngine();
-  const expectedV3=new Uint8Array(68);expectedV3.set([75,73,78,83,3,0,0,0,0,0,0,0,1,0,0,0]);
-  expectedV3.fill(0x22,16,32);expectedV3.fill(0xbb,32,48);expectedV3[48]=1;expectedV3[60]=4;expectedV3.set([77,105,108,107],64);
-  assert.deepEqual(apply(3,[handoff(1,5,"Milk")]),expectedV3);
+  const apply = await rawEngine();
+  const expectedV3 = new Uint8Array(68);
+  expectedV3.set([75, 73, 78, 83, 3, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0]);
+  expectedV3.fill(0x22, 16, 32);
+  expectedV3.fill(0xbb, 32, 48);
+  expectedV3[48] = 1;
+  expectedV3[60] = 4;
+  expectedV3.set([77, 105, 108, 107], 64);
+  assert.deepEqual(apply(3, [handoff(1, 5, "Milk")]), expectedV3);
 });
 
-test("bridge fails closed at every truncated Talk result boundary", async context => {
+test("bridge fails closed at every truncated Talk result boundary", async (context) => {
   const instantiate = WebAssembly.instantiate;
   let resultLength;
   context.mock.method(WebAssembly, "instantiate", async (...args) => {
     const { instance } = await instantiate(...args);
     const abi = instance.exports;
-    return { instance: { exports: { ...abi,
-      kin_apply_events(pointer,length) {
-        new DataView(abi.memory.buffer).setUint16(pointer+4,4,true);
-        return applyLegacy(abi, pointer,length);
-      }, kin_result_len: () => resultLength ?? abi.kin_result_len() } } };
+    return {
+      instance: {
+        exports: {
+          ...abi,
+          kin_apply_events(pointer, length) {
+            new DataView(abi.memory.buffer).setUint16(pointer + 4, 4, true);
+            return applyLegacy(abi, pointer, length);
+          },
+          kin_result_len: () => resultLength ?? abi.kin_result_len(),
+        },
+      },
+    };
   });
   const wasm = await readFile(new URL("./kin_engine.wasm", import.meta.url));
-  const engine = await loadKinEngine(`data:application/wasm;base64,${wasm.toString("base64")}`);
-  for (resultLength = 0; resultLength < 20+48+13; resultLength++) {
-    assert.throws(() => engine.applyEvents([talk(1)], 0), error => error.code === 6);
+  const engine = await loadKinEngine(
+    `data:application/wasm;base64,${wasm.toString("base64")}`,
+  );
+  for (resultLength = 0; resultLength < 20 + 48 + 13; resultLength++) {
+    assert.throws(
+      () => engine.applyEvents([talk(1)], 0),
+      (error) => error.code === 6,
+    );
   }
-  resultLength = 20+48+13+1;
-  assert.throws(() => engine.applyEvents([talk(1)], 0), error => error.code === 6);
+  resultLength = 20 + 48 + 13 + 1;
+  assert.throws(
+    () => engine.applyEvents([talk(1)], 0),
+    (error) => error.code === 6,
+  );
   resultLength = undefined;
-  assert.equal(engine.applyEvents([talk(1)], 0).talks.length,1);
+  assert.equal(engine.applyEvents([talk(1)], 0).talks.length, 1);
 });
 
-test("large Talk replay grows WASM memory and preserves independent repeated results", async context => {
+test("large Talk replay grows WASM memory and preserves independent repeated results", async (context) => {
   const instantiate = WebAssembly.instantiate;
   let memory;
-  context.mock.method(WebAssembly,"instantiate",async(...args)=>{
-    const result=await instantiate(...args); memory=result.instance.exports.memory; return result;
+  context.mock.method(WebAssembly, "instantiate", async (...args) => {
+    const result = await instantiate(...args);
+    memory = result.instance.exports.memory;
+    return result;
   });
   const wasm = await readFile(new URL("./kin_engine.wasm", import.meta.url));
-  const engine = await loadKinEngine(`data:application/wasm;base64,${wasm.toString("base64")}`);
+  const engine = await loadKinEngine(
+    `data:application/wasm;base64,${wasm.toString("base64")}`,
+  );
   const initial = memory.buffer.byteLength;
-  const id = number => { const bytes=new Uint8Array(16); new DataView(bytes.buffer).setUint32(0,number,true); return bytes; };
-  const records=Array.from({length:10000},(_,index)=>encodeTalkAddedRecord({
-    eventId:id(index+1), talkId:id(index+1), householdId:zeroId, actorId:zeroId, deviceId:zeroId,
-    timestamp:index,logicalTime:index+1,text:index<1000 ? "x".repeat(4096) : "x",
-  }));
-  const state=engine.applyEvents(records, 0);
-  assert.ok(memory.buffer.byteLength>initial,"real memory growth occurred");
-  assert.equal(state.talks.length,10000);
-  assert.equal(state.talks[999].text.length,4096);
-  for(let iteration=0;iteration<4;iteration++) {
-    const bad=talk(1);new DataView(bad.buffer).setUint16(2,99,true);
-    assert.throws(()=>engine.applyEvents([bad], 0),error=>error.code===3);
-    assert.deepEqual(engine.applyEvents([], 0),{items:[],handoffs:[],talks:[],pulses:[]});
-    assert.deepEqual(engine.applyEvents(records, 0),state);
+  const id = (number) => {
+    const bytes = new Uint8Array(16);
+    new DataView(bytes.buffer).setUint32(0, number, true);
+    return bytes;
+  };
+  const records = Array.from({ length: 10000 }, (_, index) =>
+    encodeTalkAddedRecord({
+      eventId: id(index + 1),
+      talkId: id(index + 1),
+      householdId: zeroId,
+      actorId: zeroId,
+      deviceId: zeroId,
+      timestamp: index,
+      logicalTime: index + 1,
+      text: index < 1000 ? "x".repeat(4096) : "x",
+    }),
+  );
+  const state = engine.applyEvents(records, 0);
+  assert.ok(memory.buffer.byteLength > initial, "real memory growth occurred");
+  assert.equal(state.talks.length, 10000);
+  assert.equal(state.talks[999].text.length, 4096);
+  for (let iteration = 0; iteration < 4; iteration++) {
+    const bad = talk(1);
+    new DataView(bad.buffer).setUint16(2, 99, true);
+    assert.throws(
+      () => engine.applyEvents([bad], 0),
+      (error) => error.code === 3,
+    );
+    assert.deepEqual(engine.applyEvents([], 0), emptyV6State());
+    assert.deepEqual(engine.applyEvents(records, 0), state);
   }
-  assert.equal(state.talks[0].text.length,4096,"host-owned result survives later calls");
-  assert.throws(()=>engine.applyEvents([...records,records[0]], 0),error=>error.code===5);
+  assert.equal(
+    state.talks[0].text.length,
+    4096,
+    "host-owned result survives later calls",
+  );
+  assert.throws(
+    () => engine.applyEvents([...records, records[0]], 0),
+    (error) => error.code === 5,
+  );
 });
 
-// Strip only the new explicit-time field when exercising unchanged legacy decoders.
+// Adapt the v6 request header to each historical request layout for compatibility tests.
 function applyLegacy(abi, pointer, length) {
   const bytes = new Uint8Array(abi.memory.buffer, pointer, length);
-  bytes.copyWithin(12, 20);
-  return abi.kin_apply_events(pointer, length - 8);
+  const version = new DataView(
+    bytes.buffer,
+    bytes.byteOffset,
+    bytes.byteLength,
+  ).getUint16(4, true);
+  const headerLength = version >= 5 ? 20 : 12;
+  bytes.copyWithin(headerLength, 40);
+  return abi.kin_apply_events(pointer, length - (40 - headerLength));
 }
 
-function pulseRecord(sequence, value = "drained", expiresAt = 2000, actor = 0xbb) {
-  const identity = { eventId: new Uint8Array(16).fill(sequence), householdId: new Uint8Array(16).fill(0xaa),
-    actorId: new Uint8Array(16).fill(actor), deviceId: new Uint8Array(16).fill(0xcc), timestamp: 1000, logicalTime: sequence };
-  return value === null ? encodePulseClearedRecord(identity) : encodePulseSetRecord({ ...identity, value, expiresAt });
+function pulseRecord(
+  sequence,
+  value = "drained",
+  expiresAt = 2000,
+  actor = 0xbb,
+) {
+  const identity = {
+    eventId: new Uint8Array(16).fill(sequence),
+    householdId: new Uint8Array(16).fill(0xaa),
+    actorId: new Uint8Array(16).fill(actor),
+    deviceId: new Uint8Array(16).fill(0xcc),
+    timestamp: 1000,
+    logicalTime: sequence,
+  };
+  return value === null
+    ? encodePulseClearedRecord(identity)
+    : encodePulseSetRecord({ ...identity, value, expiresAt });
 }
 
 async function pulseEngine() {
   const wasm = await readFile(new URL("./kin_engine.wasm", import.meta.url));
-  return loadKinEngine(`data:application/wasm;base64,${wasm.toString("base64")}`);
+  return loadKinEngine(
+    `data:application/wasm;base64,${wasm.toString("base64")}`,
+  );
 }
 
 test("Pulse real WASM explicit-time boundary, replacement, actors and clear", async () => {
   const engine = await pulseEngine();
   const records = [pulseRecord(1)];
-  for (const time of [1999,2000,2001,1000]) {
-    assert.equal(engine.applyEvents(records,time).pulses[0].status,time<2000?"active":"expired");
+  for (const time of [1999, 2000, 2001, 1000]) {
+    assert.equal(
+      engine.applyEvents(records, time).pulses[0].status,
+      time < 2000 ? "active" : "expired",
+    );
   }
-  records.push(pulseRecord(2,"good",3000,0xaa),pulseRecord(3,"need-quiet",4000));
-  assert.deepEqual(engine.applyEvents(records,2000).pulses.map(p=>p.value),["good","need-quiet"]);
-  records.push(pulseRecord(4,null),pulseRecord(5,null));
-  assert.equal(engine.applyEvents(records,2000).pulses.length,1);
-  records.push(pulseRecord(6,"okay",5000));
-  assert.equal(engine.applyEvents(records,2000).pulses[1].value,"okay");
-  assert.throws(()=>engine.applyEvents(records),error=>error.code===2);
-  for(const time of [NaN,Infinity,0.5,8640000000000001]) assert.throws(()=>engine.applyEvents(records,time),error=>error.code===2);
+  records.push(
+    pulseRecord(2, "good", 3000, 0xaa),
+    pulseRecord(3, "need-quiet", 4000),
+  );
+  assert.deepEqual(
+    engine.applyEvents(records, 2000).pulses.map((p) => p.value),
+    ["good", "need-quiet"],
+  );
+  records.push(pulseRecord(4, null), pulseRecord(5, null));
+  assert.equal(engine.applyEvents(records, 2000).pulses.length, 1);
+  records.push(pulseRecord(6, "okay", 5000));
+  assert.equal(engine.applyEvents(records, 2000).pulses[1].value, "okay");
+  assert.throws(
+    () => engine.applyEvents(records),
+    (error) => error.code === 2,
+  );
+  for (const time of [NaN, Infinity, 0.5, 8640000000000001])
+    assert.throws(
+      () => engine.applyEvents(records, time),
+      (error) => error.code === 2,
+    );
 });
 
-test("Pulse encoding is fixed and legacy protocols reject both kinds",async()=>{
-  const set=pulseRecord(1,"need-quiet");
-  assert.equal(set.length,104);assert.deepEqual([...set.subarray(88,96)],[4,0,0,0,0,0,0,0]);
-  assert.equal(new DataView(set.buffer).getBigInt64(96,true),2000n);
-  const clear=pulseRecord(2,null);assert.equal(clear.length,88);assert.equal(clear[2],13);
-  const apply=await rawEngine();
-  for(const version of [1,2,3,4]) for(const row of [set,clear]) apply(version,[row],3);
-  assert.throws(()=>pulseRecord(1,"custom"),error=>error.code===2);
+test("Pulse encoding is fixed and legacy protocols reject both kinds", async () => {
+  const set = pulseRecord(1, "need-quiet");
+  assert.equal(set.length, 104);
+  assert.deepEqual([...set.subarray(88, 96)], [4, 0, 0, 0, 0, 0, 0, 0]);
+  assert.equal(new DataView(set.buffer).getBigInt64(96, true), 2000n);
+  const clear = pulseRecord(2, null);
+  assert.equal(clear.length, 88);
+  assert.equal(clear[2], 13);
+  const apply = await rawEngine();
+  for (const version of [1, 2, 3, 4])
+    for (const row of [set, clear]) apply(version, [row], 3);
+  assert.throws(
+    () => pulseRecord(1, "custom"),
+    (error) => error.code === 2,
+  );
 });
 
-
-test("v5 exact request/result time fields and immutable v4 Talk bytes",async()=>{
-  const apply=await rawEngine();
-  const expected=new Uint8Array(64);expected.set([75,73,78,83,5,0,0,0]);expected[20]=1;
-  expected.fill(0xbb,24,40);const view=new DataView(expected.buffer);
-  view.setBigInt64(40,1000n,true);view.setBigInt64(48,2000n,true);expected[56]=2;
-  assert.deepEqual(apply(5,[pulseRecord(1)],0,1999),expected);
-  expected[57]=1;assert.deepEqual(apply(5,[pulseRecord(1)],0,2000),expected);
-  const v4=apply(4,[talk(1)]),v5=apply(5,[talk(1)],0,2000);
-  assert.deepEqual(v5.subarray(24),v4.subarray(20));
-  for(const time of [-(2n**63n),8640000000000001n,2n**63n-1n])apply(5,[],2,time);
+test("v5 exact request/result time fields and immutable v4 Talk bytes", async () => {
+  const apply = await rawEngine();
+  const expected = new Uint8Array(64);
+  expected.set([75, 73, 78, 83, 5, 0, 0, 0]);
+  expected[20] = 1;
+  expected.fill(0xbb, 24, 40);
+  const view = new DataView(expected.buffer);
+  view.setBigInt64(40, 1000n, true);
+  view.setBigInt64(48, 2000n, true);
+  expected[56] = 2;
+  assert.deepEqual(apply(5, [pulseRecord(1)], 0, 1999), expected);
+  expected[57] = 1;
+  assert.deepEqual(apply(5, [pulseRecord(1)], 0, 2000), expected);
+  const v4 = apply(4, [talk(1)]),
+    v5 = apply(5, [talk(1)], 0, 2000);
+  assert.deepEqual(v5.subarray(24), v4.subarray(20));
+  for (const time of [-(2n ** 63n), 8640000000000001n, 2n ** 63n - 1n])
+    apply(5, [], 2, time);
 });
 
-test("v5 bridge rejects malformed Pulse fields and combined counts then recovers",async context=>{
-  const instantiate=WebAssembly.instantiate;let mutate=()=>{};
-  context.mock.method(WebAssembly,"instantiate",async(...args)=>{
-    const {instance}=await instantiate(...args),abi=instance.exports;
-    return {instance:{exports:{...abi,kin_apply_events(pointer,length){
-      const status=abi.kin_apply_events(pointer,length);
-      if(status===0)mutate(new Uint8Array(abi.memory.buffer,abi.kin_result_ptr(),abi.kin_result_len()));
-      return status;
-    }}}};
+test("v5 bridge rejects malformed Pulse fields and combined counts then recovers", async (context) => {
+  const instantiate = WebAssembly.instantiate;
+  let mutate = () => {};
+  context.mock.method(WebAssembly, "instantiate", async (...args) => {
+    const { instance } = await instantiate(...args),
+      abi = instance.exports;
+    return {
+      instance: {
+        exports: {
+          ...abi,
+          kin_apply_events(pointer, length) {
+            const status = abi.kin_apply_events(pointer, length);
+            if (status === 0)
+              mutate(
+                new Uint8Array(
+                  abi.memory.buffer,
+                  abi.kin_result_ptr(),
+                  abi.kin_result_len(),
+                ),
+              );
+            return status;
+          },
+        },
+      },
+    };
   });
-  const engine=await pulseEngine();
-  const mutations=[bytes=>bytes[0]=0,bytes=>bytes[4]=6,bytes=>bytes[6]=1,bytes=>bytes[7]=1,
-    bytes=>bytes[56]=5,bytes=>bytes[57]=2,...[58,59,60,61,62,63].map(i=>bytes=>bytes[i]=1),
-    ...[40,48].map(i=>bytes=>new DataView(bytes.buffer,bytes.byteOffset).setBigInt64(i,8640000000000001n,true)),
-    bytes=>new DataView(bytes.buffer,bytes.byteOffset).setBigInt64(48,1000n,true),
-    ...[8,12,16,20].map(i=>bytes=>new DataView(bytes.buffer,bytes.byteOffset).setUint32(i,0xffffffff,true)),
-    bytes=>{const v=new DataView(bytes.buffer,bytes.byteOffset);for(const i of [8,12,16,20])v.setUint32(i,2501,true);}
+  const engine = await pulseEngine();
+  const mutations = [
+    (bytes) => (bytes[0] = 0),
+    (bytes) => (bytes[4] = 7),
+    (bytes) => (bytes[6] = 1),
+    (bytes) => (bytes[7] = 1),
+    (bytes) => (bytes[84] = 5),
+    (bytes) => (bytes[85] = 2),
+    ...[86, 87, 88, 89, 90, 91].map((i) => (bytes) => (bytes[i] = 1)),
+    ...[68, 76].map(
+      (i) => (bytes) =>
+        new DataView(bytes.buffer, bytes.byteOffset).setBigInt64(
+          i,
+          8640000000000001n,
+          true,
+        ),
+    ),
+    (bytes) =>
+      new DataView(bytes.buffer, bytes.byteOffset).setBigInt64(76, 0n, true),
+    ...[8, 12, 16, 20].map(
+      (i) => (bytes) =>
+        new DataView(bytes.buffer, bytes.byteOffset).setUint32(
+          i,
+          0xffffffff,
+          true,
+        ),
+    ),
+    (bytes) => {
+      const v = new DataView(bytes.buffer, bytes.byteOffset);
+      for (const i of [8, 12, 16, 20]) v.setUint32(i, 2501, true);
+    },
   ];
-  for(mutate of mutations)assert.throws(()=>engine.applyEvents([pulseRecord(1)],0),e=>e.code===6);
-  mutate=()=>{};assert.equal(engine.applyEvents([pulseRecord(1)],0).pulses[0].value,"drained");
+  for (mutate of mutations)
+    assert.throws(
+      () => engine.applyEvents([pulseRecord(1)], 0),
+      (e) => e.code === 6,
+    );
+  mutate = () => {};
+  assert.equal(
+    engine.applyEvents([pulseRecord(1)], 0).pulses[0].value,
+    "drained",
+  );
 });
 
-test("Pulse real WASM rejects malformed schema, payload, reserved and duration",async()=>{
-  const apply=await rawEngine();
-  for(const original of [pulseRecord(1),pulseRecord(1,null)]) {
-    for(let length=0;length<=20;length++){
-      if(length===original.length-88)continue;
-      const bad=new Uint8Array(88+length);bad.set(original.subarray(0,bad.length));
-      new DataView(bad.buffer).setUint32(84,length,true);apply(5,[bad],2);
+test("Pulse real WASM rejects malformed schema, payload, reserved and duration", async () => {
+  const apply = await rawEngine();
+  for (const original of [pulseRecord(1), pulseRecord(1, null)]) {
+    for (let length = 0; length <= 20; length++) {
+      if (length === original.length - 88) continue;
+      const bad = new Uint8Array(88 + length);
+      bad.set(original.subarray(0, bad.length));
+      new DataView(bad.buffer).setUint32(84, length, true);
+      apply(5, [bad], 2);
     }
-    for(const version of [0,2,65535]){const bad=original.slice();new DataView(bad.buffer).setUint16(0,version,true);apply(5,[bad],3);}
+    for (const version of [0, 2, 65535]) {
+      const bad = original.slice();
+      new DataView(bad.buffer).setUint16(0, version, true);
+      apply(5, [bad], 3);
+    }
   }
-  for(let offset=89;offset<96;offset++){const bad=pulseRecord(1);bad[offset]=1;apply(5,[bad],2);}
-  for(const expiry of [999,1000])apply(5,[pulseRecord(1,"good",expiry)],4);
+  for (let offset = 89; offset < 96; offset++) {
+    const bad = pulseRecord(1);
+    bad[offset] = 1;
+    apply(5, [bad], 2);
+  }
+  for (const expiry of [999, 1000])
+    apply(5, [pulseRecord(1, "good", expiry)], 4);
 });
 
-
-test("v5 bridge rejects every truncated header and Pulse record boundary",async context=>{
-  const instantiate=WebAssembly.instantiate;let resultLength;
-  context.mock.method(WebAssembly,"instantiate",async(...args)=>{
-    const {instance}=await instantiate(...args),abi=instance.exports;
-    return {instance:{exports:{...abi,kin_result_len:()=>resultLength??abi.kin_result_len()}}};
+test("v6 bridge rejects every truncated header and Pulse record boundary", async (context) => {
+  const instantiate = WebAssembly.instantiate;
+  let resultLength;
+  context.mock.method(WebAssembly, "instantiate", async (...args) => {
+    const { instance } = await instantiate(...args),
+      abi = instance.exports;
+    return {
+      instance: {
+        exports: {
+          ...abi,
+          kin_result_len: () => resultLength ?? abi.kin_result_len(),
+        },
+      },
+    };
   });
-  const engine=await pulseEngine();
-  for(resultLength=0;resultLength<64;resultLength++)assert.throws(()=>engine.applyEvents([pulseRecord(1)],0),e=>e.code===6);
-  resultLength=65;assert.throws(()=>engine.applyEvents([pulseRecord(1)],0),e=>e.code===6);
-  resultLength=undefined;assert.equal(engine.applyEvents([pulseRecord(1)],0).pulses.length,1);
+  const engine = await pulseEngine();
+  for (resultLength = 0; resultLength < 92; resultLength++)
+    assert.throws(
+      () => engine.applyEvents([pulseRecord(1)], 0),
+      (e) => e.code === 6,
+    );
+  resultLength = 93;
+  assert.throws(
+    () => engine.applyEvents([pulseRecord(1)], 0),
+    (e) => e.code === 6,
+  );
+  resultLength = undefined;
+  assert.equal(engine.applyEvents([pulseRecord(1)], 0).pulses.length, 1);
 });
 
-test("v5 rejects duplicate or unordered actor records",async context=>{
-  const instantiate=WebAssembly.instantiate;let reverse=false;
-  context.mock.method(WebAssembly,"instantiate",async(...args)=>{
-    const {instance}=await instantiate(...args),abi=instance.exports;
-    return {instance:{exports:{...abi,kin_apply_events(pointer,length){
-      const status=abi.kin_apply_events(pointer,length);
-      if(status===0){const bytes=new Uint8Array(abi.memory.buffer,abi.kin_result_ptr(),abi.kin_result_len());
-        bytes.copyWithin(64,24,40);if(reverse)bytes.fill(0xff,24,40);}
-      return status;
-    }}}};
+test("v5 rejects duplicate or unordered actor records", async (context) => {
+  const instantiate = WebAssembly.instantiate;
+  let reverse = false;
+  context.mock.method(WebAssembly, "instantiate", async (...args) => {
+    const { instance } = await instantiate(...args),
+      abi = instance.exports;
+    return {
+      instance: {
+        exports: {
+          ...abi,
+          kin_apply_events(pointer, length) {
+            const status = abi.kin_apply_events(pointer, length);
+            if (status === 0) {
+              const bytes = new Uint8Array(
+                abi.memory.buffer,
+                abi.kin_result_ptr(),
+                abi.kin_result_len(),
+              );
+              bytes.copyWithin(64, 24, 40);
+              if (reverse) bytes.fill(0xff, 24, 40);
+            }
+            return status;
+          },
+        },
+      },
+    };
   });
-  const engine=await pulseEngine();
-  for(reverse of [false,true])assert.throws(()=>engine.applyEvents([pulseRecord(1,"good",2000,1),pulseRecord(2,"okay",2000,2)],0),e=>e.code===6);
+  const engine = await pulseEngine();
+  for (reverse of [false, true])
+    assert.throws(
+      () =>
+        engine.applyEvents(
+          [pulseRecord(1, "good", 2000, 1), pulseRecord(2, "okay", 2000, 2)],
+          0,
+        ),
+      (e) => e.code === 6,
+    );
 });
 
-test("10,000 mixed v5 events grow memory and retain copied results across success error empty",async context=>{
-  const instantiate=WebAssembly.instantiate;let memory;
-  context.mock.method(WebAssembly,"instantiate",async(...args)=>{const result=await instantiate(...args);memory=result.instance.exports.memory;return result;});
-  const engine=await pulseEngine();const initialBytes=memory.buffer.byteLength;
-  const records=[];
-  for(let n=1;n<=10000;n++){
-    const id=new Uint8Array(16);new DataView(id.buffer).setUint32(0,n,true);
-    const identity={eventId:id,householdId:zeroId,actorId:id,deviceId:zeroId,timestamp:1000,logicalTime:n};
-    const text=n<=1000?"x".repeat(4096):"x";
-    records.push(n%4===0?encodePulseSetRecord({...identity,value:"need-quiet",expiresAt:2000}):
-      n%4===1?encodeAddedRecord({...identity,itemId:id,text}):
-      n%4===2?encodeHandoffAddedRecord({...identity,handoffId:id,text}):encodeTalkAddedRecord({...identity,talkId:id,text}));
+test("10,000 mixed v5 events grow memory and retain copied results across success error empty", async (context) => {
+  const instantiate = WebAssembly.instantiate;
+  let memory;
+  context.mock.method(WebAssembly, "instantiate", async (...args) => {
+    const result = await instantiate(...args);
+    memory = result.instance.exports.memory;
+    return result;
+  });
+  const engine = await pulseEngine();
+  const initialBytes = memory.buffer.byteLength;
+  const records = [];
+  for (let n = 1; n <= 10000; n++) {
+    const id = new Uint8Array(16);
+    new DataView(id.buffer).setUint32(0, n, true);
+    const identity = {
+      eventId: id,
+      householdId: zeroId,
+      actorId: id,
+      deviceId: zeroId,
+      timestamp: 1000,
+      logicalTime: n,
+    };
+    const text = n <= 1000 ? "x".repeat(4096) : "x";
+    records.push(
+      n % 4 === 0
+        ? encodePulseSetRecord({
+            ...identity,
+            value: "need-quiet",
+            expiresAt: 2000,
+          })
+        : n % 4 === 1
+          ? encodeAddedRecord({ ...identity, itemId: id, text })
+          : n % 4 === 2
+            ? encodeHandoffAddedRecord({ ...identity, handoffId: id, text })
+            : encodeTalkAddedRecord({ ...identity, talkId: id, text }),
+    );
   }
-  const state=engine.applyEvents(records,1999),snapshot=structuredClone(state);
-  assert.deepEqual([state.items.length,state.handoffs.length,state.talks.length,state.pulses.length],[2500,2500,2500,2500]);
-  assert.ok(memory.buffer.byteLength>initialBytes,"real memory growth observed");
-  const expired=engine.applyEvents(records,2000);assert.ok(expired.pulses.every(p=>p.status==="expired"));
-  assert.deepEqual(state,snapshot,"old host-owned state survives next call");
-  for(let n=0;n<8;n++){
-    const bad=pulseRecord(1);bad[2]=99;assert.throws(()=>engine.applyEvents([bad],0),e=>e.code===3);
-    assert.deepEqual(engine.applyEvents([],0),{items:[],handoffs:[],talks:[],pulses:[]});
-    assert.deepEqual(engine.applyEvents(records,1999),snapshot);
+  const state = engine.applyEvents(records, 1999),
+    snapshot = structuredClone(state);
+  assert.deepEqual(
+    [
+      state.items.length,
+      state.handoffs.length,
+      state.talks.length,
+      state.pulses.length,
+    ],
+    [2500, 2500, 2500, 2500],
+  );
+  assert.ok(
+    memory.buffer.byteLength > initialBytes,
+    "real memory growth observed",
+  );
+  const expired = engine.applyEvents(records, 2000);
+  assert.ok(expired.pulses.every((p) => p.status === "expired"));
+  assert.deepEqual(state, snapshot, "old host-owned state survives next call");
+  for (let n = 0; n < 8; n++) {
+    const bad = pulseRecord(1);
+    bad[2] = 99;
+    assert.throws(
+      () => engine.applyEvents([bad], 0),
+      (e) => e.code === 3,
+    );
+    assert.deepEqual(engine.applyEvents([], 0), emptyV6State());
+    assert.deepEqual(engine.applyEvents(records, 1999), snapshot);
   }
-  assert.throws(()=>engine.applyEvents([...records,records[0]],0),e=>e.code===5);
-  assert.deepEqual(state,snapshot);
+  assert.throws(
+    () => engine.applyEvents([...records, records[0]], 0),
+    (e) => e.code === 5,
+  );
+  assert.deepEqual(state, snapshot);
 });
 
-
-test("v5 copied result bytes outlive subsequent success error and empty calls",async()=>{
-  const apply=await rawEngine(),copy=apply(5,[pulseRecord(1)],0,1999),snapshot=copy.slice();
-  for(let n=0;n<8;n++){
-    apply(5,[pulseRecord(1)],0,2000);apply(5,[pulseRecord(1,"good",1000)],4);
-    assert.equal(apply(5,[]).length,24);assert.deepEqual(copy,snapshot);
+test("v6 copied result bytes outlive subsequent success error and empty calls", async () => {
+  const apply = await rawEngine(),
+    copy = apply(6, [legacyRecord(1, 1), pulseRecord(2)], 0, 1999),
+    snapshot = copy.slice();
+  const header = new DataView(copy.buffer);
+  assert.equal(header.getUint16(4, true), 6);
+  assert.equal(
+    header.getUint32(24, true),
+    1,
+    "copied v6 result has a summary record",
+  );
+  assert.equal(header.getUint32(28, true), 1);
+  assert.equal(new TextDecoder().decode(copy.subarray(-4)), "Milk");
+  for (let n = 0; n < 8; n++) {
+    apply(6, [pulseRecord(1)], 0, 2000);
+    apply(6, [pulseRecord(1, "good", 1000)], 4);
+    assert.equal(apply(6, []).length, 52);
+    assert.deepEqual(copy, snapshot);
   }
+});
+
+test("protocol v6 summarizes after a stable cursor and reports the full snapshot boundary", async () => {
+  const engine = await pulseEngine();
+  const records = [legacyRecord(1, 1), legacyRecord(2, 2), pulseRecord(3)];
+  const summary = engine.applyEvents(records, 1000, "01".repeat(16)).summary;
+
+  assert.deepEqual(summary, {
+    entries: [
+      {
+        eventId: "02".repeat(16),
+        kind: "item-completed",
+        entityKind: "item",
+        text: "Milk",
+        classification: null,
+      },
+    ],
+    totalCount: 1,
+    throughEventId: "03".repeat(16),
+  });
+  assert.deepEqual(Object.keys(summary.entries[0]), [
+    "eventId",
+    "kind",
+    "entityKind",
+    "text",
+    "classification",
+  ]);
+  assert.throws(
+    () => engine.applyEvents(records, 1000, "ff".repeat(16)),
+    (error) => error.code === 4,
+  );
+  assert.deepEqual(
+    engine
+      .applyEvents(records, 1000)
+      .summary.entries.map((entry) => entry.kind),
+    ["item-added", "item-completed"],
+  );
+});
+
+test("v6 rejects every truncated summary boundary and malformed summary field", async (context) => {
+  const instantiate = WebAssembly.instantiate;
+  let mutate = () => {};
+  let reportedResultLength;
+  let validResultLength = 0;
+  context.mock.method(WebAssembly, "instantiate", async (...args) => {
+    const result = await instantiate(...args);
+    if (result instanceof WebAssembly.Instance) return result;
+    const { instance } = result;
+    const abi = instance.exports;
+    return {
+      instance: {
+        exports: {
+          ...abi,
+          kin_apply_events(pointer, length) {
+            const status = abi.kin_apply_events(pointer, length);
+            if (status === 0) {
+              validResultLength = abi.kin_result_len();
+              mutate(
+                new Uint8Array(
+                  abi.memory.buffer,
+                  abi.kin_result_ptr(),
+                  validResultLength,
+                ),
+              );
+            }
+            return status;
+          },
+          kin_result_len: () => reportedResultLength ?? abi.kin_result_len(),
+        },
+      },
+    };
+  });
+  const engine = await pulseEngine();
+  const records = [legacyRecord(1, 1), legacyRecord(2, 2)];
+  const valid = engine.applyEvents(records, 0);
+  assert.equal(valid.summary.entries.length, 2);
+
+  const firstSummaryOffset = 52 + 52;
+  const secondSummaryOffset = firstSummaryOffset + 28;
+  const mutations = [
+    (bytes) =>
+      new DataView(bytes.buffer, bytes.byteOffset).setUint32(24, 9, true),
+    (bytes) =>
+      new DataView(bytes.buffer, bytes.byteOffset).setUint32(28, 1, true),
+    (bytes) =>
+      new DataView(bytes.buffer, bytes.byteOffset).setUint32(28, 10001, true),
+    (bytes) => (bytes[32] = 2),
+    (bytes) => (bytes[32] = 0),
+    (bytes) => (bytes[33] = 1),
+    (bytes) => (bytes[firstSummaryOffset + 16] = 12),
+    (bytes) => (bytes[firstSummaryOffset + 17] = 2),
+    (bytes) => (bytes[firstSummaryOffset + 18] = 255),
+    (bytes) => (bytes[firstSummaryOffset + 19] = 1),
+    (bytes) => (bytes[firstSummaryOffset + 24] = 255),
+    ...[0, 4097, 0xffffffff].map(
+      (length) => (bytes) =>
+        new DataView(bytes.buffer, bytes.byteOffset).setUint32(
+          firstSummaryOffset + 20,
+          length,
+          true,
+        ),
+    ),
+    (bytes) => {
+      bytes[secondSummaryOffset + 16] = 2;
+      bytes[secondSummaryOffset + 18] = 0;
+    },
+  ];
+  for (const [index, mutation] of mutations.entries()) {
+    mutate = mutation;
+    assert.throws(
+      () => engine.applyEvents(records, 0),
+      (error) => error.code === 6,
+      `malformed v6 summary mutation ${index}`,
+    );
+  }
+  mutate = () => {};
+  assert.deepEqual(engine.applyEvents(records, 0), valid);
+
+  for (
+    reportedResultLength = 0;
+    reportedResultLength < validResultLength;
+    reportedResultLength += 1
+  ) {
+    assert.throws(
+      () => engine.applyEvents(records, 0),
+      (error) => error.code === 6,
+    );
+  }
+  reportedResultLength = validResultLength + 1;
+  assert.throws(
+    () => engine.applyEvents(records, 0),
+    (error) => error.code === 6,
+  );
+  reportedResultLength = undefined;
+  assert.deepEqual(engine.applyEvents(records, 0), valid);
+});
+
+test("v6 10,000-event history permits bounded summary records and copied results", async (context) => {
+  const instantiate = WebAssembly.instantiate;
+  let memory;
+  context.mock.method(WebAssembly, "instantiate", async (...args) => {
+    const result = await instantiate(...args);
+    memory = result.instance.exports.memory;
+    return result;
+  });
+  const engine = await pulseEngine();
+  const initialMemoryBytes = memory.buffer.byteLength;
+  const makeId = (number) => {
+    const value = new Uint8Array(16);
+    new DataView(value.buffer).setUint32(0, number, true);
+    return value;
+  };
+  const records = Array.from({ length: 10_000 }, (_, index) => {
+    const eventNumber = index + 1;
+    return encodeAddedRecord({
+      eventId: makeId(eventNumber),
+      householdId: zeroId,
+      actorId: zeroId,
+      deviceId: zeroId,
+      timestamp: 1_760_000_000_000 + eventNumber,
+      logicalTime: eventNumber,
+      itemId: makeId(eventNumber + 10_000),
+      text: "x",
+    });
+  });
+  const state = engine.applyEvents(records, 1_760_000_020_000);
+  const snapshot = structuredClone(state);
+  const toHex = (bytes) =>
+    [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  assert.ok(
+    memory.buffer.byteLength > initialMemoryBytes,
+    "real WASM memory growth occurred",
+  );
+  assert.equal(state.items.length, 10_000);
+  assert.equal(state.summary.entries.length, 8);
+  assert.equal(state.summary.totalCount, 10_000);
+  assert.equal(state.items.length + state.summary.entries.length, 10_008);
+  assert.equal(state.summary.entries[0].eventId, toHex(makeId(9_993)));
+  assert.equal(state.summary.throughEventId, toHex(makeId(10_000)));
+
+  for (let iteration = 0; iteration < 3; iteration += 1) {
+    const invalid = records[0].slice();
+    new DataView(invalid.buffer).setUint16(2, 99, true);
+    assert.throws(
+      () => engine.applyEvents([invalid], 0),
+      (error) => error.code === 3,
+    );
+    assert.deepEqual(engine.applyEvents([], 0), emptyV6State());
+    assert.deepEqual(engine.applyEvents(records, 1_760_000_020_000), snapshot);
+  }
+  assert.deepEqual(state, snapshot, "host-owned summary survives later calls");
 });

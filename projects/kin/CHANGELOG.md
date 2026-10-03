@@ -2,6 +2,28 @@
 
 This file records completed Kin releases. The `v0.0.x` releases are planning and documentation milestones; they do not represent implemented application features. The first implementation milestone remains `v0.1.0`.
 
+## [0.6.3] — Summary Hardening & Polish
+
+Pre-merge hardening fixes committed catch-up cursor recovery after a failed snapshot reload, with immediate content-free peer invalidation and refresh-only retry. Added two-tab recovery coverage and explicit no-broadcast checks for quota/abort failures; corrected the raw copied-result test to use a v6 summary result. Revalidation passed 82 Rust tests, 31 Node/real-WASM tests, the complete Chrome runner (12 initial scenarios and 21 PASS groups), and the established release checks and PowerShell/WSL HTTP smokes. Moved the misplaced v0.6.2 validation paragraph to its proper section.
+
+No new capability. Added malformed v6 summary record/count/classification/UTF-8/length/trailing-byte coverage, every truncated v6 summary-result boundary, and a 10,000-event real-WASM v6 summary replay with memory-growth and copied-result lifetime checks. Completed the summary privacy and UI polish audit. Passed 82 Rust and 31 Node/real-WASM tests, fmt, Clippy, release WASM, version check, PowerShell/WSL build-run HTTP smokes and complete Chrome 154.0.8037.95 browser regressions. Firefox, Safari, macOS, native zoom, NVDA and VoiceOver remain unverified; no screen-reader certification is claimed. Full environment details are in [V0.6.0](docs/V0.6.0.md).
+
+## [0.6.2] — Summary Resilience & Accessibility
+
+No new capability. Added catch-up cursor quota/abort rollback and retry, repeated snapshot-read failure recovery, pending cursor-write reconnect, missed view-state notification recovery, both stale/new tab write orders, and Pulse timer refresh while the summary is visible. Extended keyboard, focus, semantic status, reflow, forced-colors, text-spacing and reduced-motion checks. Passed 81 Rust and 29 Node/real-WASM tests, fmt, Clippy, release WASM, version check, PowerShell/WSL build-run HTTP smokes, and complete Chrome 154.0.8037.95 browser regressions. Firefox, Safari, macOS, native zoom, NVDA and VoiceOver remain unverified. Full environment details are in [V0.6.0](docs/V0.6.0.md).
+
+## [0.6.1] — Summary Correctness
+
+No new capability. Added explicit empty/first/middle/latest cursor cases, first-occurrence handling for exact duplicate event IDs, conflicting-ID failure, exact 8/9-entry cap cases, and browser checks for mismatched/partial local cursor metadata. No production behavior change was required. Passed 81 Rust and 29 Node/real-WASM tests, fmt, Clippy, release WASM, version check, PowerShell/WSL build-run HTTP smokes, and complete Chrome 154.0.8037.95 browser regressions on Windows x64 (Rust 1.93.0, Node 22.12.0; WSL2 Ubuntu 22.04.5 POSIX validation). Native zoom, Firefox, Safari, NVDA and VoiceOver remain unverified.
+
+Detailed validation evidence is in [V0.6.0](docs/V0.6.0.md).
+
+## [0.6.0] — Since You Last Looked
+
+Added a Rust-derived, eight-entry catch-up summary for Item, Handoff and Talk changes, with total/omitted counts and an explicit Caught up control. The local cursor is initialized at existing history on first run, stored in the existing `local_context` singleton, and advances transactionally through only the frozen snapshot boundary. Protocol v6 preserves explicit `as_of` and adds a stable event-ID cursor and structured summary result; v1–v5, event codes/bytes and IndexedDB schema 1 remain unchanged. Pulse is excluded from entries but may define the snapshot boundary. No read receipts, member tracking, actor attribution, summary history, analytics, AI, remote service, new household events, migration or dependency.
+
+Passed 78 Rust and 29 Node/real-WASM tests, formatting, Clippy with warnings denied, release WASM build, version consistency, PowerShell and WSL build/run workflows (page and WASM HTTP 200), and the complete Chrome browser regression suite. Windows x64, Rust 1.93.0, Node 22.12.0, Chrome 154.0.8037.95; POSIX build/run via WSL2 Ubuntu 22.04.5. Catch-up keyboard/focus, 48px targets, 320px reflow, forced colors, increased spacing, reduced motion and 200% page-scale emulation passed. Firefox, Safari, macOS, native desktop zoom, NVDA and VoiceOver remain unverified; no screen-reader certification is claimed. Full evidence is in [V0.6.0](docs/V0.6.0.md).
+
 ## [0.5.3] — Pulse Hardening & Polish
 
 Added every v5 request/header/envelope/payload and result truncation boundary, 10,000-event mixed replay, memory-growth and copied-result lifetime tests. Made numeric enum identifiers explicit and prefilled Change with the current capacity. Completed time/domain/privacy audit and 320px visual review. No new capability; the authorized Pulse line stops here. Passed 69 Rust and 28 Node/real-WASM tests, the complete Chrome browser suite, fmt/Clippy/version checks, both WASM builds and PowerShell/WSL build-run workflows. Accessibility modes and remaining unverified environments are recorded in [V0.5.0](docs/V0.5.0.md).

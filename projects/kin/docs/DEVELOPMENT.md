@@ -1,6 +1,6 @@
 # Development Workflow
 
-**Status:** Current through v0.5.3 Pulse; earlier version sections are historical contracts. See Pulse below.
+**Status:** Current through v0.6.0 Since You Last Looked; earlier version sections are historical contracts. See Pulse and v0.6.0 below.
 
 ## Build and run
 
@@ -20,7 +20,7 @@ build the Rust/WASM module using the project-local manifest
 serve the static web files from localhost
         |
         v
-open the supported browser and exercise Today + Needs + Handoff + Talk + Pulse
+        open the supported browser and exercise Today + Needs + Handoff + Talk + Pulse + catch-up
 ```
 
 From the repository root in PowerShell:
@@ -50,7 +50,7 @@ No npm dependency tree or framework runtime is planned. If static serving later 
 
 ## Browser capabilities
 
-The application requires WebAssembly, ES modules, Custom Elements, IndexedDB, `CustomEvent`, text encoders/decoders, and secure-context browser APIs. WebAuthn and Web Crypto for content security belong to later identity/sync work, not v0.5.x. Browser validation is recorded per release and does not certify the full browser support target.
+The application requires WebAssembly, ES modules, Custom Elements, IndexedDB, `CustomEvent`, text encoders/decoders, and secure-context browser APIs. WebAuthn and Web Crypto for content security remain future identity/sync work. Browser validation is recorded per release and does not certify the full browser support target.
 
 ## Development data
 
@@ -59,3 +59,7 @@ Use synthetic household text only. Never copy private family messages, health de
 ## v0.5.0 Pulse
 
 Pulse uses the established build/run scripts and complete regression runner. No runtime dependency or parent-level build changes. See [V0.5.0](V0.5.0.md).
+
+## v0.6.0 Since You Last Looked
+
+Catch-up behavior is local to the browser installation and uses the canonical event store plus the existing WASM build and browser regression workflows. Use synthetic test events only; do not put real household history into fixtures or diagnostics. The v0.6 browser suite exercises cursor races, reload, keyboard/focus, content-free tab invalidation, and accessibility modes. No additional runtime dependency or parent-level build change is required. See [V0.6.0](V0.6.0.md).

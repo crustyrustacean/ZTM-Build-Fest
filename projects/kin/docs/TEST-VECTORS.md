@@ -1,6 +1,6 @@
 # v0.1.0 Canonical Test Vectors
 
-**Status:** Current through v0.5.3 Pulse; earlier version sections are historical contracts. See Pulse below.
+**Status:** Current through v0.6.0 Since You Last Looked; earlier version sections are historical contracts. See Pulse and v0.6.0 below.
 
 ## Common envelope values
 
@@ -266,3 +266,9 @@ Architecture/product/privacy audit confirms Rust-only reduction; separate Item/H
 ## v0.5.0 Pulse
 
 Vector 021: actor A SET Drained at 1000ms, expiry 2000ms. as_of 1999 => active; 2000/2001 => expired; rollback to 1000 => active. SET replaces A only; CLEAR A twice succeeds; B remains independent. No expiry event. See [V0.5.0](V0.5.0.md).
+
+## v0.6.0 Since You Last Looked
+
+Vector 022: protocol v6 stream is `ITEM_ADDED(event 1, "Milk")`, `ITEM_COMPLETED(event 2, milk)`, `PULSE_SET(event 3)`, with cursor event 1. Expected summary: one `item-completed` entry with event ID 2, entity Item, text “Milk”, absent classification; `summary_total_count = 1`; through-event ID is 3, not 2. Pulse has no entry. A cursor absent from the stream fails category 4 rather than guessing.
+
+Vector 023: ten meaningful changes followed by `PULSE_CLEARED(event 11)`, no cursor. Expected `summary_total_count = 10`, `summary_count = 8`, entries are meaningful events 3–10 in original order, omitted count is 2, and through-event ID is 11. No actor ID or event timestamp is part of any summary record. Exact protocol layout and browser race vectors are in [V0.6.0](V0.6.0.md).

@@ -6,3 +6,6 @@ pub mod state;
 
 #[cfg(test)]
 mod pulse_tests;
+
+#[cfg(test)]
+mod catchup_tests;

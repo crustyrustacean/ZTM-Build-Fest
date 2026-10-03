@@ -1,6 +1,6 @@
 # v0.1.0 Implementation Contract
 
-**Status:** Current through v0.5.3 Pulse; earlier version sections are historical contracts. See Pulse below.
+**Status:** Current through v0.6.0 Since You Last Looked; earlier version sections are historical contracts. See Pulse and v0.6.0 below.
 
 ## Proposed project layout
 
@@ -78,3 +78,7 @@ rust/src/event.rs and state.rs add distinct TalkId/TalkStatus/TalkState; protoco
 ## v0.5.0 Pulse
 
 event.rs defines PulseValue; state.rs defines actor-scoped PulseState/rebuild_at; protocol.rs adds v5; kin-engine.js requires asOf; kin-pulse.js presents capacity. KinApp owns canonical reprojection and existing retries; EventStore appends atomically. See [V0.5.0](V0.5.0.md).
+
+## v0.6.0 Since You Last Looked
+
+`state.rs` derives the bounded structured summary and exact through-event ID. `protocol.rs` adds v6 without changing earlier layouts. `event-store.js` initializes and transactionally advances local cursor metadata in schema 1. `kin-app.js` pairs consistent snapshots, maps stable event IDs to local sequence, owns explicit Caught up intent and emits content-free view-state invalidation. `kin-catch-up.js` renders the projection only; it has no storage or reducer access. See [V0.6.0](V0.6.0.md).

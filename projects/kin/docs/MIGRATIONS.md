@@ -1,6 +1,6 @@
 # Data Migrations
 
-**Status:** Current through v0.5.3 Pulse; earlier version sections are historical contracts. See Pulse below.
+**Status:** Current through v0.6.0 Since You Last Looked; earlier version sections are historical contracts. See Pulse and v0.6.0 below.
 
 ## Migration categories
 
@@ -54,3 +54,7 @@ Migration implementations must have tests for supported old versions, malformed 
 ## v0.5.0 Pulse
 
 No migration is required. New Pulse events coexist with unchanged historical bytes in IndexedDB schema 1. See [V0.5.0](V0.5.0.md).
+
+## v0.6.0 Since You Last Looked
+
+No migration is required. Three optional fields are added to the existing `local_context` singleton, which is not a canonical household event. A context with all fields absent is initialized atomically with the current event tail; partial or malformed metadata fails closed and is not overwritten. IndexedDB schema remains version 1 and event bytes remain unchanged. See [V0.6.0](V0.6.0.md).

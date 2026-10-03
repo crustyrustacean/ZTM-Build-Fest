@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::error::KinError;
 use crate::event::{
@@ -78,6 +78,48 @@ pub struct HouseholdState {
     pub talks: Vec<TalkState>,
     pub pulses: Vec<PulseState>,
 }
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[repr(u8)]
+pub enum SummaryKind {
+    ItemAdded = 1,
+    ItemCompleted = 2,
+    ItemReopened = 3,
+    ItemArchived = 4,
+    HandoffAdded = 5,
+    HandoffAcknowledged = 6,
+    HandoffArchived = 7,
+    TalkAdded = 8,
+    TalkResolved = 9,
+    TalkReopened = 10,
+    TalkArchived = 11,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[repr(u8)]
+pub enum SummaryEntityKind {
+    Item = 1,
+    Handoff = 2,
+    Talk = 3,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SummaryEntry {
+    pub event_id: EventId,
+    pub kind: SummaryKind,
+    pub entity_kind: SummaryEntityKind,
+    pub text: String,
+    pub classification: Option<ItemClassification>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CatchUpSummary {
+    pub entries: Vec<SummaryEntry>,
+    pub total_count: u32,
+    pub through_event_id: Option<EventId>,
+}
+
+pub const MAX_SUMMARY_ENTRIES: usize = 8;
 
 pub fn rebuild(events: &[EventEnvelope]) -> Result<HouseholdState, KinError> {
     if events
@@ -275,6 +317,162 @@ pub fn rebuild_at(events: &[EventEnvelope], as_of: i64) -> Result<HouseholdState
         handoffs,
         talks,
         pulses: pulses.into_values().collect(),
+    })
+}
+
+pub fn summarize(
+    events: &[EventEnvelope],
+    cursor: Option<EventId>,
+) -> Result<CatchUpSummary, KinError> {
+    let state = rebuild_at(events, 0)?;
+    summarize_validated(events, cursor, &state)
+}
+
+pub(crate) fn summarize_validated(
+    events: &[EventEnvelope],
+    cursor: Option<EventId>,
+    state: &HouseholdState,
+) -> Result<CatchUpSummary, KinError> {
+    let start = match cursor {
+        Some(cursor_id) => events
+            .iter()
+            .position(|event| event.event_id == cursor_id)
+            .map(|index| index + 1)
+            .ok_or(KinError::InvalidEvent)?,
+        None => 0,
+    };
+    let mut seen: BTreeSet<EventId> = events[..start].iter().map(|event| event.event_id).collect();
+    let items: BTreeMap<ItemId, (&str, ItemClassification)> = state
+        .items
+        .iter()
+        .map(|item| (item.item_id, (item.text.as_str(), item.classification)))
+        .collect();
+    let handoffs: BTreeMap<HandoffId, &str> = state
+        .handoffs
+        .iter()
+        .map(|handoff| (handoff.handoff_id, handoff.text.as_str()))
+        .collect();
+    let talks: BTreeMap<TalkId, &str> = state
+        .talks
+        .iter()
+        .map(|talk| (talk.talk_id, talk.text.as_str()))
+        .collect();
+    let mut entries = Vec::new();
+    let mut total_count = 0u32;
+
+    for event in &events[start..] {
+        if !seen.insert(event.event_id) {
+            continue;
+        }
+        let summary = match &event.kind {
+            EventKind::ItemAdded {
+                item_id: _,
+                text,
+                classification,
+            } => Some((
+                SummaryKind::ItemAdded,
+                SummaryEntityKind::Item,
+                text.as_str(),
+                Some(*classification),
+            )),
+            EventKind::ItemCompleted { item_id } => items.get(item_id).map(|(text, _)| {
+                (
+                    SummaryKind::ItemCompleted,
+                    SummaryEntityKind::Item,
+                    *text,
+                    None,
+                )
+            }),
+            EventKind::ItemReopened { item_id } => items.get(item_id).map(|(text, _)| {
+                (
+                    SummaryKind::ItemReopened,
+                    SummaryEntityKind::Item,
+                    *text,
+                    None,
+                )
+            }),
+            EventKind::ItemArchived { item_id } => items.get(item_id).map(|(text, _)| {
+                (
+                    SummaryKind::ItemArchived,
+                    SummaryEntityKind::Item,
+                    *text,
+                    None,
+                )
+            }),
+            EventKind::HandoffAdded { text, .. } => Some((
+                SummaryKind::HandoffAdded,
+                SummaryEntityKind::Handoff,
+                text.as_str(),
+                None,
+            )),
+            EventKind::HandoffAcknowledged { handoff_id } => handoffs.get(handoff_id).map(|text| {
+                (
+                    SummaryKind::HandoffAcknowledged,
+                    SummaryEntityKind::Handoff,
+                    *text,
+                    None,
+                )
+            }),
+            EventKind::HandoffArchived { handoff_id } => handoffs.get(handoff_id).map(|text| {
+                (
+                    SummaryKind::HandoffArchived,
+                    SummaryEntityKind::Handoff,
+                    *text,
+                    None,
+                )
+            }),
+            EventKind::TalkAdded { text, .. } => Some((
+                SummaryKind::TalkAdded,
+                SummaryEntityKind::Talk,
+                text.as_str(),
+                None,
+            )),
+            EventKind::TalkResolved { talk_id } => talks.get(talk_id).map(|text| {
+                (
+                    SummaryKind::TalkResolved,
+                    SummaryEntityKind::Talk,
+                    *text,
+                    None,
+                )
+            }),
+            EventKind::TalkReopened { talk_id } => talks.get(talk_id).map(|text| {
+                (
+                    SummaryKind::TalkReopened,
+                    SummaryEntityKind::Talk,
+                    *text,
+                    None,
+                )
+            }),
+            EventKind::TalkArchived { talk_id } => talks.get(talk_id).map(|text| {
+                (
+                    SummaryKind::TalkArchived,
+                    SummaryEntityKind::Talk,
+                    *text,
+                    None,
+                )
+            }),
+            EventKind::PulseSet { .. } | EventKind::PulseCleared => None,
+        };
+
+        if let Some((kind, entity_kind, text, classification)) = summary {
+            total_count = total_count.checked_add(1).ok_or(KinError::SizeLimit)?;
+            if entries.len() == MAX_SUMMARY_ENTRIES {
+                entries.remove(0);
+            }
+            entries.push(SummaryEntry {
+                event_id: event.event_id,
+                kind,
+                entity_kind,
+                text: text.to_owned(),
+                classification,
+            });
+        }
+    }
+
+    Ok(CatchUpSummary {
+        entries,
+        total_count,
+        through_event_id: events.last().map(|event| event.event_id),
     })
 }
 

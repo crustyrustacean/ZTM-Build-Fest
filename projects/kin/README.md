@@ -2,7 +2,7 @@
 
 > A private, lightweight household coordination app for the little things families need to know, remember, hand off, or discuss.
 
-**Current status: `v0.5.3` — Pulse Hardening & Polish.** Kin separates household items into Today and Needs, defaults fast capture to Needs, and supports completion, reopening, and archival. Rust remains the only domain reducer; IndexedDB schema 1 remains canonical, v0.1.x event bytes remain unchanged, and no runtime framework or remote service is present. Handoff adds short context capture, acknowledgement, and archival with protocol v3. Talk adds short topics, Open/Resolved lists, resolve/reopen/archive and protocol v4. Resolution is workflow state only. Pulse adds fixed temporary capacity, set/replace/clear and deterministic explicit-time expiry through protocol v5. Actor IDs remain local placeholders, not verified people.
+**Current status: `v0.6.3` — Summary Hardening & Polish.** Kin presents a bounded, event-derived catch-up summary for Items, Handoff and Talk. Catch-up position is explicit, local to this browser installation, and never records who viewed the summary. Rust owns summary selection, ordering, truncation and event boundaries through protocol v6. IndexedDB remains schema 1; canonical event bytes and event codes 1–13 are unchanged, and no view/read event is written. Existing Today/Needs, Handoff, Talk and Pulse capabilities remain local. Actor IDs are placeholders, not verified people. No runtime framework, analytics, AI or remote service is present.
 
 ## The problem
 
@@ -12,7 +12,7 @@ Kin aims to make useful household context easier to share and find. It is not a 
 
 ## Intended direction
 
-Kin is intended as a private, lightweight shared household operating layer. Today and Needs views, lightweight classification, capture, completion, reopening, and archival are implemented locally. Handoff capture, acknowledgement, and recent context are implemented locally. Talk captures short topics for later, with Open/Resolved lists, resolve, reopen, and archive. Resolved is workflow state only, not agreement or an objective solution. Pulse adds fixed current capacity, set/replace/clear and explicit expiry through Rust protocol v5. Values are context only, never scores or diagnoses. Routines and Since You Last Looked remain future concepts.
+Kin is intended as a private, lightweight shared household operating layer. Today and Needs views, lightweight classification, capture, completion, reopening, and archival are implemented locally. Handoff capture, acknowledgement, and recent context are implemented locally. Talk captures short topics for later, with Open/Resolved lists, resolve, reopen, and archive. Resolved is workflow state only, not agreement or an objective solution. Pulse adds fixed current capacity, set/replace/clear and explicit expiry through Rust protocol v5. Since You Last Looked shows at most eight recent meaningful household changes with an omitted-change count; Pulse is excluded. The user explicitly marks the displayed snapshot caught up. Values are context only, never scores or diagnoses. Routines remain future work.
 
 The intended technical direction is Rust compiled to WebAssembly, native Web Components, vanilla JavaScript, and browser APIs, with a local-first start and no external framework unless a demonstrated requirement justifies one.
 
@@ -55,6 +55,10 @@ The intended technical direction is Rust compiled to WebAssembly, native Web Com
 - `v0.5.1` — Pulse Correctness (`kin-v0.5.1`)
 - `v0.5.2` — Pulse Resilience & Accessibility (`kin-v0.5.2`)
 - `v0.5.3` — Pulse Hardening & Polish (`kin-v0.5.3`)
+- `v0.6.0` — Since You Last Looked (`kin-v0.6.0`)
+- `v0.6.1` — Summary Correctness (`kin-v0.6.1`)
+- `v0.6.2` — Summary Resilience & Accessibility (`kin-v0.6.2`)
+- `v0.6.3` — Summary Hardening & Polish (`kin-v0.6.3`)
 - See the [changelog](CHANGELOG.md) for the completed release history.
 
 ## Install, build, and run
@@ -124,6 +128,7 @@ Kin is nested in the ZTM Build Fest repository. Its community files and template
 - [Implementation preflight](docs/PREFLIGHT.md)
 - [Requirement traceability](docs/TRACEABILITY.md)
 - [Canonical test vectors](docs/TEST-VECTORS.md)
+- [Since You Last Looked release contract](docs/V0.6.0.md)
 - [Accepted architecture decision: event-sourced household state](docs/decisions/0001-event-sourced-household-state.md)
 - [UX flows](docs/UX.md)
 - [Roadmap](docs/ROADMAP.md)

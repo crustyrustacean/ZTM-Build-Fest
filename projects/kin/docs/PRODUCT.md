@@ -38,7 +38,7 @@ A lightweight indication of current capacity, such as “Good,” “Drained,”
 
 ### Since You Last Looked
 
-A compact, useful summary of household changes since another member last checked: additions, completions, handoffs, and relevant updates. It should answer what changed without making people inspect an audit log.
+A compact, bounded summary of meaningful Item, Handoff, and Talk changes since this browser installation was explicitly marked caught up. Pulse is excluded. The cursor is local UI state, not a member read receipt; the summary has no actor attribution, per-entry timestamps, timeline, or history browser. It answers what changed without monitoring who looked.
 
 ## Product boundaries
 
@@ -46,4 +46,4 @@ Kin is not couples therapy, a marriage score, a chore competition, a relationshi
 
 ## Current status
 
-Kin implements the Today and Needs views, fixed lightweight classification, fast local capture, completion, reopening, and archival. Older v0.1.x items without classification remain visible in Today. Handoff adds short context capture, acknowledgement, recent context, and archival. Local actors are not verified people. Talk captures short topics with workflow-only resolution. Pulse adds fixed temporary current capacity, explicit expiry and clear. Since You Last Looked and Routines remain future concepts.
+Kin implements the Today and Needs views, fixed lightweight classification, fast local capture, completion, reopening, and archival. Older v0.1.x items without classification remain visible in Today. Handoff adds short context capture, acknowledgement, recent context, and archival. Local actors are not verified people. Talk captures short topics with workflow-only resolution. Pulse adds fixed temporary current capacity, explicit expiry and clear. Since You Last Looked is implemented as a bounded protocol-v6 projection with schema-1 local cursor metadata; Routines remain future work.

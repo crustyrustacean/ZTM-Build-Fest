@@ -1,6 +1,6 @@
 # Architecture
 
-**Status:** Current through v0.5.3 Pulse; earlier version sections are historical contracts. See Pulse below.
+**Status:** Current through v0.6.0 Since You Last Looked; earlier version sections are historical contracts. See Pulse and v0.6.0 below.
 
 ## System shape
 
@@ -83,18 +83,18 @@ The service is intended as an authenticated encrypted-event relay, not a househo
 
 The v0.1.x core is intended to be extended, not treated as proof that later features already exist:
 
-| Future capability     | Foundation already present                           | Extendable without replacing the core? | Still required                                                     |
-| --------------------- | ---------------------------------------------------- | -------------------------------------- | ------------------------------------------------------------------ |
-| Today / Needs         | Versioned event pipeline and Rust-derived projection | Implemented in v0.2.0                  | Stabilization and accessibility audit in v0.2.1–v0.2.3             |
-| Handoff | Actor-aware immutable event envelope | Implemented in v0.3.0 | Stabilization through v0.3.3 |
-| Talk | Identified events and deterministic replay | Implemented in v0.4.0 | Stabilization audited through v0.4.3; see V0.4.0 |
-| Pulse | Actor IDs and timestamps | Implemented in v0.5.0 | Explicit as_of, fixed enum, set/replace/clear; audited through v0.5.3 |
-| Since You Last Looked | Ordered immutable event history                      | Yes                                    | Last-seen marker and derived summary                               |
-| Routines              | Event infrastructure and replay                      | Yes                                    | Recurrence model and occurrence semantics                          |
-| Pairing               | Household/member/device identity fields              | Yes                                    | Authentication, authorization, pairing, recovery, and device trust |
-| Offline sync          | Random event IDs and immutable canonical event bytes | Yes                                    | Multi-device transport and conflict/reconciliation policy          |
-| Encrypted sync        | Deterministic, versioned event representation        | Yes                                    | Reviewed cryptographic protocol and key lifecycle                  |
-| Export/import         | Versioned event representation and preserved history | Yes                                    | Portable container, validation, and recovery UX                    |
+| Future capability     | Foundation already present                           | Extendable without replacing the core? | Still required                                                        |
+| --------------------- | ---------------------------------------------------- | -------------------------------------- | --------------------------------------------------------------------- |
+| Today / Needs         | Versioned event pipeline and Rust-derived projection | Implemented in v0.2.0                  | Stabilization and accessibility audit in v0.2.1–v0.2.3                |
+| Handoff               | Actor-aware immutable event envelope                 | Implemented in v0.3.0                  | Stabilization through v0.3.3                                          |
+| Talk                  | Identified events and deterministic replay           | Implemented in v0.4.0                  | Stabilization audited through v0.4.3; see V0.4.0                      |
+| Pulse                 | Actor IDs and timestamps                             | Implemented in v0.5.0                  | Explicit as_of, fixed enum, set/replace/clear; audited through v0.5.3 |
+| Since You Last Looked | Ordered immutable event history                      | Implemented in v0.6.0                  | Stabilization through v0.6.3                                          |
+| Routines              | Event infrastructure and replay                      | Yes                                    | Recurrence model and occurrence semantics                             |
+| Pairing               | Household/member/device identity fields              | Yes                                    | Authentication, authorization, pairing, recovery, and device trust    |
+| Offline sync          | Random event IDs and immutable canonical event bytes | Yes                                    | Multi-device transport and conflict/reconciliation policy             |
+| Encrypted sync        | Deterministic, versioned event representation        | Yes                                    | Reviewed cryptographic protocol and key lifecycle                     |
+| Export/import         | Versioned event representation and preserved history | Yes                                    | Portable container, validation, and recovery UX                       |
 
 “Yes” means the existing infrastructure can be extended; it does not mean the capability is implemented, secure, or ready to ship without its listed domain and validation work.
 
@@ -109,3 +109,7 @@ The domain event envelope, event naming, ordering requirements, and replay behav
 ## v0.5.0 Pulse
 
 Pulse adds Rust rebuild_at(events, as_of). Timers request canonical reprojection; Rust never reads ambient time. Same events plus same explicit time yield identical state. See [V0.5.0](V0.5.0.md).
+
+## v0.6.0 Since You Last Looked
+
+Rust protocol v6 derives structured summary entries and the exact through-event boundary from the ordered canonical stream plus an optional stable event-ID cursor. IndexedDB local_sequence remains browser-only. Browser local_context holds the installation cursor; no summary view or acknowledgement is a household event. See [V0.6.0](V0.6.0.md).

@@ -1,9 +1,21 @@
 // Node 22+ and a Chromium-family executable; no npm packages required.
 // Uses a fresh temporary profile and loopback server, never an existing Kin DB.
-import { pulseRegressions, pulsePeerRegressions, pulseResilienceRegressions, pulseKeyboardRegressions } from "./pulse-regression.mjs";
+import {
+  pulseRegressions,
+  pulsePeerRegressions,
+  pulseResilienceRegressions,
+  pulseKeyboardRegressions,
+} from "./pulse-regression.mjs";
 import { talkRegressions, talkPeerRegressions } from "./talk-regression.mjs";
 import assert from "node:assert/strict";
-import { handoffRegressions, handoffPeerRegressions } from "./handoff-regression.mjs";
+import {
+  handoffRegressions,
+  handoffPeerRegressions,
+} from "./handoff-regression.mjs";
+import {
+  catchUpRegressions,
+  catchUpPeerRegressions,
+} from "./catch-up-regression.mjs";
 import { spawn } from "node:child_process";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
@@ -191,6 +203,14 @@ async function regressions() {
     );
   };
   check(app.status.textContent === "Ready.", "startup");
+  const initialCatchUp = await app.store.getCatchUpState();
+  check(
+    initialCatchUp.events.length === 0 &&
+      initialCatchUp.cursor.eventId === null &&
+      initialCatchUp.cursor.localSequence === 0 &&
+      app.state.summary.totalCount === 0,
+    "empty first install starts caught up without synthetic history",
+  );
   edit("Normal success");
   await submit();
   check((await count()) === 1, "normal add exactly once");
@@ -395,12 +415,21 @@ async function regressions() {
     if (changed) edit("Buy bread", "today");
     if (changed) {
       const retry = app.retryAction;
-      const load = app.store.loadEvents.bind(app.store);
-      app.store.loadEvents = async () => { throw new Error("Synthetic item refresh failure"); };
-      try { await app.refreshFromEvents(); await app.refreshFromEvents(); }
-      finally { app.store.loadEvents = load; }
+      const load = app.store.getCatchUpState.bind(app.store);
+      app.store.getCatchUpState = async () => {
+        throw new Error("Synthetic item refresh failure");
+      };
+      try {
+        await app.refreshFromEvents();
+        await app.refreshFromEvents();
+      } finally {
+        app.store.getCatchUpState = load;
+      }
       await app.retryAction();
-      check(app.retryAction === retry, "Item retry survives repeated refresh failure");
+      check(
+        app.retryAction === retry,
+        "Item retry survives repeated refresh failure",
+      );
       app.handlePeerMessage({ data: { type: "events-changed" } });
       await idle();
       check(
@@ -554,7 +583,9 @@ async function regressions() {
   );
   check((await count()) === actionEventCount, "aborted reopen does not append");
   let releaseRetry;
-  const retryGate = new Promise((done) => { releaseRetry = done; });
+  const retryGate = new Promise((done) => {
+    releaseRetry = done;
+  });
   let appendCalls = 0;
   app.store.append = async (...args) => {
     appendCalls++;
@@ -564,19 +595,33 @@ async function regressions() {
   app.retryButton.click();
   check(app.busy, "retry remains busy while append is pending");
   const checkControls = (disabled) => {
-    for (const selector of [".complete-button", ".reopen-button", ".archive-button"]) {
+    for (const selector of [
+      ".complete-button",
+      ".reopen-button",
+      ".archive-button",
+    ]) {
       const buttons = [...app.querySelectorAll(`kin-item ${selector}`)];
       check(buttons.length > 0, `fixture must expose ${selector}`);
-      check(buttons.every((button) => button.disabled === disabled), `${selector} disabled state`);
+      check(
+        buttons.every((button) => button.disabled === disabled),
+        `${selector} disabled state`,
+      );
     }
-    for (const control of [compose.input, compose.classification, compose.button, app.retryButton]) {
+    for (const control of [
+      compose.input,
+      compose.classification,
+      compose.button,
+      app.retryButton,
+    ]) {
       check(control.disabled === disabled, `${control.tagName} disabled state`);
     }
   };
   checkControls(true);
   // Native disabled buttons must suppress activation, including retry clicks.
   let activations = 0;
-  const recordActivation = () => { activations++; };
+  const recordActivation = () => {
+    activations++;
+  };
   app.addEventListener("click", recordActivation);
   for (const button of app.querySelectorAll("button")) button.click();
   app.removeEventListener("click", recordActivation);
@@ -587,13 +632,22 @@ async function regressions() {
   app.store.append = append;
   check(appendCalls === 1, "busy clicks must not start additional writes");
   check(
-    [...app.querySelectorAll("kin-item button")].every((button) => !button.disabled) &&
-      !compose.input.disabled && !compose.classification.disabled && !compose.button.disabled &&
+    [...app.querySelectorAll("kin-item button")].every(
+      (button) => !button.disabled,
+    ) &&
+      !compose.input.disabled &&
+      !compose.classification.disabled &&
+      !compose.button.disabled &&
       !app.retryButton.disabled,
     "all appropriate controls become usable after retry",
   );
-  check(document.activeElement === compose.input, "pending retry restores compose focus");
-  passed.push("pending retry disables Complete, Reopen, every Archive, compose input/select/Add and retry; controls and focus recover");
+  check(
+    document.activeElement === compose.input,
+    "pending retry restores compose focus",
+  );
+  passed.push(
+    "pending retry disables Complete, Reopen, every Archive, compose input/select/Add and retry; controls and focus recover",
+  );
   check(
     app.state.items.find((item) => item.text === actionText).status ===
       "active",
@@ -748,7 +802,7 @@ async function regressions() {
   }
   edit("Restored after reload");
   sessionStorage.removeItem(classificationKey);
-  window.kinExpectedState = JSON.stringify(app.state);
+  sessionStorage.setItem("kin.test.expectedState", JSON.stringify(app.state));
   passed.push("sessionStorage denial does not prevent persistence");
   return passed;
 }
@@ -792,17 +846,36 @@ try {
   console.log(await first.evaluate(`(${handoffRegressions.toString()})()`));
   console.log(await first.evaluate(`(${talkRegressions.toString()})()`));
   console.log(await first.evaluate(`(${pulseRegressions.toString()})()`));
-  console.log(await first.evaluate(`(${pulseResilienceRegressions.toString()})()`));
-  const state = await first.evaluate('JSON.stringify(document.querySelector("kin-app").state)');
-  await first.send("Page.reload");
-  await until(() => first.evaluate("window.kinExpectedState === undefined"));
-  await ready(first);
-  assert.equal(
-    await first.evaluate(
-      'JSON.stringify(document.querySelector("kin-app").state)',
-    ),
-    state,
+  console.log(
+    await first.evaluate(`(${pulseResilienceRegressions.toString()})()`),
   );
+  console.log(await first.evaluate(`(${catchUpRegressions.toString()})()`));
+  await first.evaluate(
+    'sessionStorage.setItem("kin.test.expectedState", JSON.stringify(document.querySelector("kin-app").state))',
+  );
+  await first.send("Page.reload");
+  await ready(first);
+  const stateDifferences = await first.evaluate(`(() => {
+    const before = JSON.parse(sessionStorage.getItem("kin.test.expectedState"));
+    const after = document.querySelector("kin-app").state;
+    return Object.keys(before).filter(key => JSON.stringify(before[key]) !== JSON.stringify(after[key]));
+  })()`);
+  assert.deepEqual(
+    stateDifferences,
+    [],
+    "Rust-derived household and summary state survives reload",
+  );
+  assert.equal(
+    await first.evaluate(`(async()=>{
+      const app=document.querySelector('kin-app');
+      const expected=JSON.parse(sessionStorage.getItem('kin.test.catchUpCursor'));
+      return JSON.stringify((await app.store.getCatchUpState()).cursor)===JSON.stringify(expected);
+    })()`),
+    true,
+    "installation-local catch-up cursor survives reload",
+  );
+  await first.evaluate('sessionStorage.removeItem("kin.test.catchUpCursor")');
+  await first.evaluate('sessionStorage.removeItem("kin.test.expectedState")');
   assert.equal(
     await first.evaluate(`(() => {
       const app = document.querySelector("kin-app");
@@ -850,40 +923,96 @@ try {
   );
   console.log("PASS reload/replay, draft restoration, keyboard submission");
 
-  assert.equal(await first.evaluate('document.querySelector("#handoff-text").value'), "Newer handoff draft");
+  assert.equal(
+    await first.evaluate('document.querySelector("#handoff-text").value'),
+    "Newer handoff draft",
+  );
   await first.evaluate('document.querySelector("#handoff-text").focus()');
-  for (const type of ["keyDown", "keyUp"]) await first.send("Input.dispatchKeyEvent", {
-    type, key: "Enter", code: "Enter", windowsVirtualKeyCode: 13,
-    ...(type === "keyDown" ? { text: "\r" } : {}),
-  });
+  for (const type of ["keyDown", "keyUp"])
+    await first.send("Input.dispatchKeyEvent", {
+      type,
+      key: "Enter",
+      code: "Enter",
+      windowsVirtualKeyCode: 13,
+      ...(type === "keyDown" ? { text: "\r" } : {}),
+    });
   await ready(first);
-  assert.equal(await first.evaluate('document.querySelector("#handoff-text").value'), "");
-  await first.evaluate('document.querySelector("kin-handoff-list .complete-button").focus()');
-  for (const type of ["keyDown", "keyUp"]) await first.send("Input.dispatchKeyEvent", {
-    type, key: "Enter", code: "Enter", windowsVirtualKeyCode: 13,
-    ...(type === "keyDown" ? { text: "\r" } : {}),
-  });
+  assert.equal(
+    await first.evaluate('document.querySelector("#handoff-text").value'),
+    "",
+  );
+  await first.evaluate(
+    'document.querySelector("kin-handoff-list [aria-label=\\\"Acknowledge Newer handoff draft\\\"]").focus()',
+  );
+  for (const type of ["keyDown", "keyUp"])
+    await first.send("Input.dispatchKeyEvent", {
+      type,
+      key: "Enter",
+      code: "Enter",
+      windowsVirtualKeyCode: 13,
+      ...(type === "keyDown" ? { text: "\r" } : {}),
+    });
   await ready(first);
-  assert.equal(await first.evaluate('document.activeElement === document.querySelector("#handoff-text")'), true);
-  assert.equal(await first.evaluate('document.querySelector("kin-app").state.handoffs.at(-1).status'), "acknowledged");
-  console.log("PASS Handoff draft reload, keyboard capture/acknowledgement, focus restoration");
-  assert.equal(await first.evaluate('document.querySelector("#talk-text").value'), "Newer talk draft");
+  assert.equal(
+    await first.evaluate(
+      'document.activeElement === document.querySelector("#handoff-text")',
+    ),
+    true,
+  );
+  assert.equal(
+    await first.evaluate(
+      'document.querySelector("kin-app").state.handoffs.find(row=>row.text==="Newer handoff draft").status',
+    ),
+    "acknowledged",
+  );
+  console.log(
+    "PASS Handoff draft reload, keyboard capture/acknowledgement, focus restoration",
+  );
+  assert.equal(
+    await first.evaluate('document.querySelector("#talk-text").value'),
+    "Newer talk draft",
+  );
   await first.evaluate('document.querySelector("#talk-text").focus()');
-  for (const type of ["keyDown", "keyUp"]) await first.send("Input.dispatchKeyEvent", {
-    type, key: "Enter", code: "Enter", windowsVirtualKeyCode: 13,
-    ...(type === "keyDown" ? { text: "\r" } : {}),
-  });
+  for (const type of ["keyDown", "keyUp"])
+    await first.send("Input.dispatchKeyEvent", {
+      type,
+      key: "Enter",
+      code: "Enter",
+      windowsVirtualKeyCode: 13,
+      ...(type === "keyDown" ? { text: "\r" } : {}),
+    });
   await ready(first);
-  assert.equal(await first.evaluate('document.querySelector("#talk-text").value'), "");
-  await first.evaluate('document.querySelector("kin-talk-list .complete-button").focus()');
-  for (const type of ["keyDown", "keyUp"]) await first.send("Input.dispatchKeyEvent", {
-    type, key: "Enter", code: "Enter", windowsVirtualKeyCode: 13,
-    ...(type === "keyDown" ? { text: "\r" } : {}),
-  });
+  assert.equal(
+    await first.evaluate('document.querySelector("#talk-text").value'),
+    "",
+  );
+  await first.evaluate(
+    'document.querySelector("kin-talk-list .complete-button").focus()',
+  );
+  for (const type of ["keyDown", "keyUp"])
+    await first.send("Input.dispatchKeyEvent", {
+      type,
+      key: "Enter",
+      code: "Enter",
+      windowsVirtualKeyCode: 13,
+      ...(type === "keyDown" ? { text: "\r" } : {}),
+    });
   await ready(first);
-  assert.equal(await first.evaluate('document.activeElement === document.querySelector("#talk-text")'), true);
-  assert.equal(await first.evaluate('document.querySelector("kin-app").state.talks.at(-1).status'), "resolved");
-  console.log("PASS Talk draft reload, keyboard capture/resolution, focus restoration");
+  assert.equal(
+    await first.evaluate(
+      'document.activeElement === document.querySelector("#talk-text")',
+    ),
+    true,
+  );
+  assert.equal(
+    await first.evaluate(
+      'document.querySelector("kin-app").state.talks.at(-1).status',
+    ),
+    "resolved",
+  );
+  console.log(
+    "PASS Talk draft reload, keyboard capture/resolution, focus restoration",
+  );
   // Exercise the remaining Talk lifecycle through native keyboard activation.
   for (const label of ["Reopen", "Resolve", "Archive"]) {
     await first.evaluate(`(()=>{
@@ -891,24 +1020,60 @@ try {
       const row=[...capture.querySelectorAll('li')].find(row=>row.querySelector('.item-text').textContent==='Newer talk draft');
       [...row.querySelectorAll('button')].find(button=>button.textContent==='${label}').focus();
     })()`);
-    for (const type of ["keyDown", "keyUp"]) await first.send("Input.dispatchKeyEvent", {
-      type,key:"Enter",code:"Enter",windowsVirtualKeyCode:13,...(type==="keyDown"?{text:"\r"}:{})
-    });
+    for (const type of ["keyDown", "keyUp"])
+      await first.send("Input.dispatchKeyEvent", {
+        type,
+        key: "Enter",
+        code: "Enter",
+        windowsVirtualKeyCode: 13,
+        ...(type === "keyDown" ? { text: "\r" } : {}),
+      });
     await ready(first);
-    assert.equal(await first.evaluate('document.activeElement===document.querySelector("#talk-text")'),true);
-    assert.equal(await first.evaluate('document.querySelector("kin-app").state.talks.at(-1).status'),
-      label==="Reopen"?"open":label==="Resolve"?"resolved":"archived");
+    assert.equal(
+      await first.evaluate(
+        'document.activeElement===document.querySelector("#talk-text")',
+      ),
+      true,
+    );
+    assert.equal(
+      await first.evaluate(
+        'document.querySelector("kin-app").state.talks.at(-1).status',
+      ),
+      label === "Reopen"
+        ? "open"
+        : label === "Resolve"
+          ? "resolved"
+          : "archived",
+    );
   }
   await first.evaluate('document.querySelector("#talk-text").focus()');
-  await first.send("Input.dispatchKeyEvent",{type:"keyDown",key:"Tab",code:"Tab",windowsVirtualKeyCode:9});
-  await first.send("Input.dispatchKeyEvent",{type:"keyUp",key:"Tab",code:"Tab",windowsVirtualKeyCode:9});
-  assert.equal(await first.evaluate('document.activeElement===document.querySelector("kin-talk-list .add-button")'),true,"Talk input followed by Add in native focus order");
-  console.log("PASS Talk keyboard resolve/reopen/archive, focus and native tab order");
+  await first.send("Input.dispatchKeyEvent", {
+    type: "keyDown",
+    key: "Tab",
+    code: "Tab",
+    windowsVirtualKeyCode: 9,
+  });
+  await first.send("Input.dispatchKeyEvent", {
+    type: "keyUp",
+    key: "Tab",
+    code: "Tab",
+    windowsVirtualKeyCode: 9,
+  });
+  assert.equal(
+    await first.evaluate(
+      'document.activeElement===document.querySelector("kin-talk-list .add-button")',
+    ),
+    true,
+    "Talk input followed by Add in native focus order",
+  );
+  console.log(
+    "PASS Talk keyboard resolve/reopen/archive, focus and native tab order",
+  );
   const second = await tab();
   await second.evaluate(`window.peerReads=0; window.peerReplays=0; window.peerMessages=[];
-    { const a=document.querySelector('kin-app'); const load=a.store.loadEvents.bind(a.store); const replay=a.engine.applyEvents;
-      a.store.loadEvents=async()=>{window.peerReads++;return load();};
-      a.engine.applyEvents=(events,asOf)=>{window.peerReplays++;return replay(events,asOf);};
+    { const a=document.querySelector('kin-app'); const load=a.store.getCatchUpState.bind(a.store); const replay=a.engine.applyEvents;
+      a.store.getCatchUpState=async()=>{window.peerReads++;return load();};
+      a.engine.applyEvents=(events,asOf,cursor)=>{window.peerReplays++;return replay(events,asOf,cursor);};
       a.channel.addEventListener('message',e=>window.peerMessages.push(e.data)); }`);
   await first.evaluate(
     `{const a=document.querySelector('kin-app');a.compose.input.value='Peer addition';a.compose.saveDraft();a.compose.form.requestSubmit();}`,
@@ -1090,6 +1255,7 @@ try {
   await handoffPeerRegressions(first, second, until);
   await talkPeerRegressions(first, second, until);
   await pulsePeerRegressions(first, second, until);
+  await catchUpPeerRegressions(first, second, until);
   await pulseKeyboardRegressions(first, until);
   await first.evaluate(`(()=>{
     const app=document.querySelector('kin-app');
@@ -1129,7 +1295,9 @@ try {
   );
   await ready(first);
   assert.equal(
-    await first.evaluate('document.querySelectorAll("kin-compose .compose-form").length'),
+    await first.evaluate(
+      'document.querySelectorAll("kin-compose .compose-form").length',
+    ),
     1,
   );
   await first.send("Emulation.setDeviceMetricsOverride", {
@@ -1140,7 +1308,9 @@ try {
   });
   await first.evaluate('document.querySelector("input").focus()');
   assert.equal(
-    await first.evaluate("document.documentElement.scrollWidth <= document.documentElement.clientWidth"),
+    await first.evaluate(
+      "document.documentElement.scrollWidth <= document.documentElement.clientWidth",
+    ),
     true,
   );
   assert.equal(
@@ -1186,7 +1356,8 @@ try {
       overflow: false,
     },
   );
-  assert.equal(await first.evaluate(`(()=>{
+  assert.equal(
+    await first.evaluate(`(()=>{
     const app=document.querySelector('kin-app');
     const capture=app.handoffs;
     capture.input.focus();
@@ -1196,8 +1367,12 @@ try {
       getComputedStyle(capture.input).outlineWidth==='3px' &&
       app.status.getAttribute('aria-live')==='polite' && app.alert.getAttribute('role')==='alert' &&
       [...capture.querySelectorAll('button')].every(button=>button.textContent && button.getBoundingClientRect().height>=48);
-  })()`),true,"Handoff semantics, announcements, focus and targets in forced colors");
-  assert.equal(await first.evaluate(`(()=>{
+  })()`),
+    true,
+    "Handoff semantics, announcements, focus and targets in forced colors",
+  );
+  assert.equal(
+    await first.evaluate(`(()=>{
     const app=document.querySelector('kin-app'),capture=app.talks;
     capture.input.focus();
     return capture.querySelector('h2').textContent==='Talk' &&
@@ -1207,15 +1382,22 @@ try {
       getComputedStyle(capture.input).outlineWidth==='3px' &&
       app.status.getAttribute('aria-live')==='polite' && app.alert.getAttribute('role')==='alert' &&
       [...capture.querySelectorAll('button')].every(button=>button.textContent && button.getBoundingClientRect().height>=48);
-  })()`),true,"Talk semantics, announcements, focus and targets in forced colors");
-  assert.equal(await first.evaluate(`(()=>{
+  })()`),
+    true,
+    "Talk semantics, announcements, focus and targets in forced colors",
+  );
+  assert.equal(
+    await first.evaluate(`(()=>{
     const p=document.querySelector('kin-app').pulse;p.valueSelect.focus();
     return p.querySelector('h2').textContent==='Pulse' &&
       p.valueSelect.labels[0].textContent.startsWith('Current capacity') &&
       p.durationSelect.labels[0].textContent.startsWith('For') &&
       getComputedStyle(p.valueSelect).outlineWidth==='3px' &&
       [...p.querySelectorAll('button,select')].filter(c=>c.getClientRects().length).every(c=>c.getBoundingClientRect().height>=48);
-  })()`),true,"Pulse semantics, native labels, focus and targets in forced colors");
+  })()`),
+    true,
+    "Pulse semantics, native labels, focus and targets in forced colors",
+  );
   const spacingResult = await first.evaluate(`(()=>{
     const sheet=[...document.styleSheets].find(candidate=>candidate.href?.endsWith('/styles/app.css'));
     const ruleIndex=sheet.cssRules.length;
@@ -1232,11 +1414,29 @@ try {
   // Keep optional visual evidence under ignored project build output.
   if (process.env.KIN_VISUAL_CHECK === "1") {
     await first.send("Emulation.setEmulatedMedia", { features: [] });
-    await first.evaluate(`(async()=>{const a=document.querySelector('kin-app'),timestamp=Date.now();await a.savePulse({type:'set-pulse',value:'need-quiet',timestamp,expiresAt:timestamp+14400000});a.pulse.scrollIntoView({block:'center'});})()`);
-    await writeFile(resolve(webRoot,"../target/pulse-active-320.png"),Buffer.from((await first.send("Page.captureScreenshot",{format:"png"})).data,"base64"));
-    await first.evaluate(`(()=>{const p=document.querySelector('kin-app').pulse;p.changeButton.click();p.scrollIntoView({block:'end'});})()`);
-    await writeFile(resolve(webRoot,"../target/pulse-change-320.png"),Buffer.from((await first.send("Page.captureScreenshot",{format:"png"})).data,"base64"));
-    await first.evaluate(`document.querySelector('kin-app').savePulse({type:'clear-pulse'})`);
+    await first.evaluate(
+      `(async()=>{const a=document.querySelector('kin-app'),timestamp=Date.now();await a.savePulse({type:'set-pulse',value:'need-quiet',timestamp,expiresAt:timestamp+14400000});a.pulse.scrollIntoView({block:'center'});})()`,
+    );
+    await writeFile(
+      resolve(webRoot, "../target/pulse-active-320.png"),
+      Buffer.from(
+        (await first.send("Page.captureScreenshot", { format: "png" })).data,
+        "base64",
+      ),
+    );
+    await first.evaluate(
+      `(()=>{const p=document.querySelector('kin-app').pulse;p.changeButton.click();p.scrollIntoView({block:'end'});})()`,
+    );
+    await writeFile(
+      resolve(webRoot, "../target/pulse-change-320.png"),
+      Buffer.from(
+        (await first.send("Page.captureScreenshot", { format: "png" })).data,
+        "base64",
+      ),
+    );
+    await first.evaluate(
+      `document.querySelector('kin-app').savePulse({type:'clear-pulse'})`,
+    );
   }
   await first.send("Emulation.setDeviceMetricsOverride", {
     width: 640,
@@ -1328,11 +1528,16 @@ try {
         device_id:context.device_id,timestamp,logical_time:logicalTime,kind:'ITEM_ADDED',
         event_version:1,encoded_event:encoded});
     }
-    transaction.objectStore('local_context').put({...context,next_logical_time:nextLogicalTime});
+    const replacementContext={...context,next_logical_time:nextLogicalTime};
+    delete replacementContext.last_looked_event_id;
+    delete replacementContext.last_looked_local_sequence;
+    delete replacementContext.last_looked_at;
+    transaction.objectStore('local_context').put(replacementContext);
     await new Promise((resolve,reject)=>{
       transaction.oncomplete=resolve;
       transaction.onabort=()=>reject(transaction.error);
     });
+    await app.store.ensureContext();
     let rejected=false;
     try{
       await app.store.append({type:'add',text:'Beyond the limit',classification:'need'},app.engine);

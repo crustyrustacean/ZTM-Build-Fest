@@ -1,6 +1,6 @@
 # Derived Household State
 
-**Status:** Current through v0.5.3 Pulse; earlier version sections are historical contracts. See Pulse below.
+**Status:** Current through v0.6.0 Since You Last Looked; earlier version sections are historical contracts. See Pulse and v0.6.0 below.
 
 ## Projection pipeline
 
@@ -93,3 +93,7 @@ HouseholdState adds talks: Vec<TalkState> beside items and handoffs. Each is ord
 ## v0.5.0 Pulse
 
 HouseholdState adds pulses sorted by actor ID. Explicit rebuild_at(events, as_of) projects active iff as_of < expires_at, otherwise expired. SET replaces per actor; CLEAR removes, including absent no-op. Clock rollback may reactivate latest expired context; source events stay unchanged. See [V0.5.0](V0.5.0.md).
+
+## v0.6.0 Since You Last Looked
+
+Protocol v6 derives a structured summary after an optional stable event-ID cursor. Rust validates the cursor against the supplied ordered stream, deduplicates exact repeated delivery, excludes Pulse entries, retains the latest eight entries in event order, counts all meaningful events, and reports the actual last stream event as the through-boundary. This summary is not a second authoritative household state and contains no actor attribution. See [V0.6.0](V0.6.0.md).

@@ -1,6 +1,6 @@
 # Release Process
 
-**Status:** The v0.5.0–v0.5.3 Pulse line is complete on kin-v0.5.0-development. Stop for evaluation. No v0.5.4, v0.6.0, push or kin-main merge is authorized.
+**Status:** The authorized v0.6.0–v0.6.3 Since You Last Looked line is complete on `kin-development`. Stop for release-line evaluation. Do not create v0.6.4, begin v0.7.0, push, or merge to `kin-main`.
 
 ## Release sequence
 
@@ -66,3 +66,7 @@ Use kin-v0.4.0-development; create dedicated commits and annotated kin-v0.4.0 th
 ## v0.5.x Pulse
 
 Dedicated validated commits and annotated kin-v0.5.0 through kin-v0.5.3 tags. Stop after v0.5.3. See [V0.5.0](V0.5.0.md).
+
+## v0.6.x Since You Last Looked
+
+Create dedicated validated commits and annotated `kin-v0.6.0` through `kin-v0.6.3` tags. Preserve protocol v1–v5, schema-1 event bytes, and IndexedDB schema 1. Do not push or merge automatically. Stop after v0.6.3 and hand control back for release-line evaluation. See [V0.6.0](V0.6.0.md).

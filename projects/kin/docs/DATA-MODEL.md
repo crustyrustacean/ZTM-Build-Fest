@@ -1,6 +1,6 @@
 # Data Model
 
-**Status:** Current through v0.5.3 Pulse; earlier version sections are historical contracts. See Pulse below.
+**Status:** Current through v0.6.0 Since You Last Looked; earlier version sections are historical contracts. See Pulse and v0.6.0 below.
 
 ## Event-oriented source of truth
 
@@ -59,3 +59,7 @@ An event history can support reconstruction after reload, household history, eve
 ## v0.5.0 Pulse
 
 PulseState has actor_id, fixed enum value, set_at, expires_at and active/expired status. No mutable persistent Pulse table; canonical events remain the sole authority. See [V0.5.0](V0.5.0.md).
+
+## v0.6.0 Since You Last Looked
+
+`last_looked_event_id`, `last_looked_local_sequence`, and `last_looked_at` are installation-local view metadata in `local_context`, not fields on Household, Member, or Event. Rust summary records expose only source event ID, semantic kind, entity kind, text, and optional Item classification; actor and device provenance are not part of the presentation projection. See [V0.6.0](V0.6.0.md).
