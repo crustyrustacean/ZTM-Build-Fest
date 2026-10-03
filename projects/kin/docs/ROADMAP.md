@@ -1,6 +1,6 @@
 # Roadmap
 
-Current implementation: `v0.10.0 — Portable Core + Local Data Security` (publication pending).
+Current implementation: `v0.10.1 — Security Lifecycle & Sync Recovery Correctness` (remote publication pending).
 
 ```text
 v0.9.3 — Encrypted Event Sync Stabilization
@@ -218,7 +218,7 @@ Completed: recovery and metadata threat assessment, encrypted logging/privacy bo
 
 ### `v0.10.x` — Portable Core + Local Data Security
 
-The final architecture/security development line. v0.10.0 implements cryptographically locked local household data, independent credential/recovery wrappers, recoverable plaintext migration, Rust-owned command semantics and canonical codecs, encrypted export/import, native domain tests, a static offline shell and signed transport-key migration. The evidence inventory, compatibility, measured limits and readiness work are in [V0.10.0](V0.10.0.md). Remaining architectural/security review belongs here before the v0.11 handoff.
+The final architecture/security development line. v0.10.0 implements cryptographically locked local household data, independent credential/recovery wrappers, recoverable plaintext migration, Rust-owned command semantics and canonical codecs, encrypted export/import, native domain tests, a static offline shell and signed transport-key migration. v0.10.1 corrects overlapping unlock feedback, asynchronous trusted-device pinning and interrupted key-rotation recovery. The evidence inventory, compatibility, measured limits and readiness work are in [V0.10.0](V0.10.0.md). Remaining architectural/security review belongs here before the v0.11 handoff.
 
 Increase the Rust footprint by increasing the amount of Kin that is deterministic, portable, invariant-driven, and independently testable — not by moving browser-native capabilities into Wasm. Web Crypto and networking remain browser/server adapter responsibilities.
 

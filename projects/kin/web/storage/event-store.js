@@ -984,7 +984,30 @@ export class EventStore {
     });
   }
 
-  commitPendingRotation({ expectedEpoch, currentEpoch }) {
+  replacePendingRotationPackages({ expected, packages, issuerFingerprint }) {
+    const transaction = this.database.transaction(SYNC_STATE_STORE, "readwrite");
+    const store = transaction.objectStore(SYNC_STATE_STORE);
+    const request = store.get("active");
+    return transactionResult(transaction, (finish) => {
+      request.onsuccess = () => {
+        const state = request.result;
+        if (!state?.pendingRotation || state.currentEpoch !== expected.expectedEpoch ||
+            canonicalJson(state.pendingRotation) !== canonicalJson(expected)) {
+          abortWith(transaction, new EventStoreError("The pending key rotation changed. Retry synchronization."));
+          return;
+        }
+        // Only packages change: the proposal ID and sealed epoch key survive an
+        // ambiguous request, so an earlier accepted submission remains usable.
+        state.pendingRotation = { ...state.pendingRotation, packages: structuredClone(packages), issuerFingerprint };
+        const write = store.put(state);
+        write.onerror = () => abortWith(transaction, storageError(write.error));
+        finish(state.pendingRotation);
+      };
+      request.onerror = () => abortWith(transaction, storageError(request.error));
+    });
+  }
+
+  commitPendingRotation({ expectedEpoch, currentEpoch, proposalId }) {
     const transaction = this.database.transaction(
       SYNC_STATE_STORE,
       "readwrite",
@@ -998,7 +1021,9 @@ export class EventStore {
           !state ||
           !state.pendingRotation ||
           state.pendingRotation.expectedEpoch !== expectedEpoch ||
-          state.pendingRotation.epoch !== currentEpoch
+          state.pendingRotation.epoch !== currentEpoch ||
+          state.pendingRotation.proposalId !== proposalId ||
+          state.currentEpoch > currentEpoch
         ) {
           abortWith(
             transaction,
@@ -1009,8 +1034,8 @@ export class EventStore {
           return;
         }
         state.currentEpoch = currentEpoch;
-        state.pendingEpoch = null;
-        state.rotationPending = false;
+        // A later access change may already require the following rotation.
+        // Only a fresh server-status update can release queued local events.
         state.pendingRotation = null;
         const write = store.put(state);
         write.onerror = () => abortWith(transaction, storageError(write.error));
@@ -1021,7 +1046,7 @@ export class EventStore {
     });
   }
 
-  clearPendingRotation() {
+  clearPendingRotation(proposalId) {
     const transaction = this.database.transaction(
       SYNC_STATE_STORE,
       "readwrite",
@@ -1031,7 +1056,7 @@ export class EventStore {
     return transactionResult(transaction, (finish) => {
       request.onsuccess = () => {
         const state = request.result;
-        if (!state) {
+        if (!state || state.pendingRotation?.proposalId !== proposalId) {
           finish(false);
           return;
         }

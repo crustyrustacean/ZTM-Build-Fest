@@ -9,6 +9,7 @@ import { dirname, extname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
 import { keyMigrationRegression } from "./security-key-regression.mjs";
+import { rotationStorageRegression } from "./rotation-storage-regression.mjs";
 
 export async function securityStorageRegressions(client, { adapterOnly = false } = {}) {
   const result = await client.evaluate(`(${browserChecks.toString()})(${JSON.stringify({ adapterOnly })})`);
@@ -353,6 +354,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     for (let attempt = 0; attempt < 100; attempt += 1) { if (await client.evaluate("location.origin === " + JSON.stringify(origin))) break; await delay(20); }
     await securityStorageRegressions(client, { adapterOnly: process.argv.includes("--adapter-only") });
     if (!process.argv.includes("--adapter-only")) console.log(await client.evaluate(`(${keyMigrationRegression.toString()})()`));
+    if (!process.argv.includes("--adapter-only")) console.log(await client.evaluate(`(${rotationStorageRegression.toString()})()`));
     if (process.argv.includes("--performance")) console.log("PERFORMANCE " + JSON.stringify(await client.evaluate(`(${storagePerformance.toString()})(${JSON.stringify({ maximumPayload: process.argv.includes("--maximum-payload") })})`)));
   } finally {
     if (socket) {

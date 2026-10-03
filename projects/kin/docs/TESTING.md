@@ -1,6 +1,6 @@
 # Testing Contracts
 
-**Status:** Current through v0.10.0. Earlier version sections are historical release gates. See [V0.10.0](V0.10.0.md) for exact final counts, environment and measurements.
+**Status:** Current through v0.10.1. Earlier version sections are historical release gates. See [V0.10.0](V0.10.0.md) for milestone and patch counts, environment and measurements.
 
 ## v0.10 security and portability gate
 
@@ -29,6 +29,26 @@ round trips. The WebAuthn runner uses a CDP virtual authenticator supporting PRF
 real browser ceremonies and the real server verifier; it is not physical hardware
 or cross-platform certification. Preserve prior feature suites when changing
 startup/draft expectations: security must not weaken domain, rollback or a11y checks.
+
+## v0.10.1 correctness regressions
+
+The same commands above include the patch checks. `security-operation-regression.mjs`
+(called by the security UI runner) holds an old recovery unlock across lock and a
+new unlock, then settles it both during and after the new operation. It also
+holds an authentication-error metadata read across re-unlock. Verify the live
+vault, lock control, busy state, disabled controls and feedback remain current,
+and the old root is disposed.
+
+The key-migration suite now delays fingerprint hashing for new, existing,
+mismatched, conflicting and concurrently proposed trusted pins. It checks input
+mutation during verification and locking before verification completes.
+
+`server/rotation-recovery.test.mjs` uses real cryptographic packages and service
+validation with controlled transport loss/expiry. It covers expired unaccepted
+proposals, accepted lost responses, subsequent access changes, recipient key
+succession/revocation, acceptance racing package refresh, competing proposals and
+mismatched acknowledgements. The storage runner also exercises pending-rotation
+compare-and-set and the retained rotation barrier in encrypted IndexedDB.
 
 ## Rust domain tests
 

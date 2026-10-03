@@ -1,6 +1,6 @@
 # Security Policy
 
-**Current security status:** Kin v0.10.0 is an incubation prototype with encrypted local household storage, recovery/optional-PRF unlock, encrypted archives, passkey-authenticated pairing and client-encrypted sync. Locked startup does not replay household content or retain usable local/sync private keys. The same-origin Node identity/relay service remains memory-only. This release has not received an independent audit or production hardening. Encryption cannot protect a compromised unlocked runtime, origin, privileged extension or OS, and revocation cannot erase data or keys already copied. See [THREAT-MODEL](docs/THREAT-MODEL.md), [CRYPTOGRAPHY](docs/CRYPTOGRAPHY.md) and [V0.10.0](docs/V0.10.0.md).
+**Current security status:** Kin v0.10.1 is an incubation prototype with encrypted local household storage, recovery/optional-PRF unlock, encrypted archives, passkey-authenticated pairing and client-encrypted sync. Locked startup does not replay household content or retain usable local/sync private keys. The same-origin Node identity/relay service remains memory-only. This release has not received an independent audit or production hardening. Encryption cannot protect a compromised unlocked runtime, origin, privileged extension or OS, and revocation cannot erase data or keys already copied. See [THREAT-MODEL](docs/THREAT-MODEL.md), [CRYPTOGRAPHY](docs/CRYPTOGRAPHY.md) and [V0.10.0](docs/V0.10.0.md).
 
 ## Supported versions
 

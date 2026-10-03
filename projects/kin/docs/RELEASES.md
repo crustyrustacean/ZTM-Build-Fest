@@ -1,11 +1,12 @@
 # Release Process
 
-**Status:** Current implementation: v0.10.0 Portable Core + Local Data Security; publication pending. Stabilization remains on v0.10 until the architecture/security readiness gate, followed by v0.11 UX/UI Consolidation and then v1.0.0. Sync is opt-in and encrypted, but identity/relay state remains process-memory only; accepted relay data is not durable.
+**Status:** Current implementation: v0.10.1 Security Lifecycle & Sync Recovery Correctness; remote publication pending. Stabilization remains on v0.10 until the architecture/security readiness gate, followed by v0.11 UX/UI Consolidation and then v1.0.0. Sync is opt-in and encrypted, but identity/relay state remains process-memory only; accepted relay data is not durable.
 
 ## Release sequence
 
 The intended progression is `kin-v0.9.3` → `kin-v0.10.0` (Portable Core + Local
-Data Security) → `kin-v0.11.0` (UX/UI Consolidation) → `kin-v1.0.0` (Stable Kin
+Data Security) → `kin-v0.10.1` (Security Lifecycle & Sync Recovery Correctness) →
+`kin-v0.11.0` (UX/UI Consolidation) → `kin-v1.0.0` (Stable Kin
 Platform). v1.0 requires BOTH architecture/security and UX/UI readiness. Use the
 concrete development slices and gates in [V0.10.0](V0.10.0.md); do not manufacture
 patch releases or knowingly defer a necessary correctness fix. Create tags only
@@ -36,6 +37,11 @@ push commit/tag when explicitly authorized
 A tag is created only for a completed, validated milestone. Use a descriptive annotated tag such as `kin-v0.0.8` or `kin-v0.1.0`. Never use generic tags such as `v0.1.0`; the repository contains multiple independent projects. Published tags are immutable: do not move, force-update, or reuse them. Correct a released mistake with a new patch version.
 
 Before a new version starts, verify that the previous completed Kin version has its matching tag. Inspect the entire worktree and stage/commit only paths under `projects/kin/`. Do not include another contributor's changes.
+
+The v0.10.1 patch starts from the untagged v0.10.0 development commit `2dc94f8`.
+The requested patch packages that implementation and its correctness fixes into
+one validated local milestone; it does not create a retrospective v0.10.0 tag.
+Remote push and kin-main/kin-development merges remain separate actions.
 
 ## Changelog
 

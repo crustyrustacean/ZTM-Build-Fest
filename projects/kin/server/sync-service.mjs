@@ -445,7 +445,7 @@ export class EncryptedSyncService {
       )
         return {
           currentEpoch: state.currentEpoch,
-          rotationPending: false,
+          rotationPending: state.rotationPending,
           retried: true,
           proposalId,
         };
@@ -546,7 +546,8 @@ export class EncryptedSyncService {
   onAccessChange(householdId, excludedDeviceIds = []) {
     const state = this.state(householdId);
     state.rotationPending = true;
-    state.lastRotation = null;
+    // Keep the latest committed proposal recoverable after a lost response,
+    // even when an access change already requires the following rotation.
     for (const [grantId, grant] of state.grants)
       if (
         excludedDeviceIds.includes(grant.senderDeviceId) ||

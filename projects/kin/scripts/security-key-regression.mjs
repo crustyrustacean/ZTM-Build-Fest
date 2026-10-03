@@ -75,6 +75,7 @@ export async function keyMigrationRegression() {
   const envelope = await encryptEvent({ ...identity, eventId: 'd'.repeat(32), deviceSequence: 1, logicalTime: 1,
     keyEpoch: 1, plaintext, householdKey: epoch.householdKey, signingKey: keys.signingPrivateKey });
   check(new TextDecoder().decode(await decryptEvent({ envelope, householdKey: restored.householdKey, signingKey: keys.signingPublicKey })) === 'retained history', 'historical epoch unchanged');
+  await trustedPinRegression();
   store.close();
   vault.lock();
   await assertFails(() => store.getDevice(identity.deviceId));
@@ -86,7 +87,87 @@ export async function keyMigrationRegression() {
     const request = indexedDB.deleteDatabase(name);
     request.onsuccess = resolve; request.onerror = () => reject(request.error);
   });
-  return 'PASS legacy AES/seal mismatch preservation, staged nonextractable-key migration, exact interrupted retry, rotation reseal, protected persistence, recovery reload and lock';
+  return 'PASS legacy AES/seal mismatch preservation, staged nonextractable-key migration, exact interrupted retry, rotation reseal, protected persistence, recovery reload, lock and delayed-digest trusted-device pinning (new, existing, mismatched, conflicting, concurrent, mutable input and lock cancellation)';
+
+  async function trustedPinRegression() {
+    const candidate = { ...identity, deviceId: 'e'.repeat(32), publicKeys, fingerprint };
+    const otherKeys = await exportDevicePublicKeys(await generateDeviceKeys());
+    const otherFingerprint = await deviceKeyFingerprint(otherKeys);
+    const first = await delayedDigest(() => store.pinTrustedDevice(candidate));
+    check(first.fingerprint === fingerprint, 'delayed fingerprint must allow a new trusted pin');
+    check((await store.getPinnedDevice(identity.householdId, candidate.deviceId)).fingerprint === fingerprint,
+      'new trusted pin must be committed before the operation resolves');
+    const repeated = await delayedDigest(() => store.pinTrustedDevice(candidate));
+    check(JSON.stringify(repeated) === JSON.stringify(first), 'delayed fingerprint must preserve an existing matching pin');
+    const invalid = { ...candidate, deviceId: 'f'.repeat(32), fingerprint: otherFingerprint };
+    await assertFails(() => delayedDigest(() => store.pinTrustedDevice(invalid)));
+    check(await store.getPinnedDevice(identity.householdId, invalid.deviceId) === null,
+      'a mismatched fingerprint must not persist a pin');
+    await assertFails(() => delayedDigest(() => store.pinTrustedDevice({
+      ...candidate, publicKeys: otherKeys, fingerprint: otherFingerprint,
+    })));
+    check((await store.getPinnedDevice(identity.householdId, candidate.deviceId)).fingerprint === fingerprint,
+      'conflicting trusted key material must preserve the established pin');
+
+    const mutable = { ...candidate, deviceId: '1'.repeat(32), publicKeys: structuredClone(publicKeys) };
+    const saved = await delayedDigest(() => store.pinTrustedDevice(mutable), () => {
+      Object.assign(mutable.publicKeys, otherKeys);
+    });
+    const persisted = await store.getPinnedDevice(identity.householdId, mutable.deviceId);
+    check(await deviceKeyFingerprint(saved.publicKeys) === fingerprint &&
+      await deviceKeyFingerprint(persisted.publicKeys) === fingerprint,
+    'a mutation during fingerprint verification must not alter the verified or persisted key material');
+
+    const concurrent = { ...candidate, deviceId: '2'.repeat(32) };
+    const outcomes = await delayedDigest(() => Promise.allSettled([
+      store.pinTrustedDevice(concurrent),
+      store.pinTrustedDevice({ ...concurrent, publicKeys: otherKeys, fingerprint: otherFingerprint }),
+    ]));
+    check(outcomes.filter(result => result.status === 'fulfilled').length === 1 &&
+      outcomes.filter(result => result.status === 'rejected').length === 1,
+    'concurrent different pins must atomically retain only the first verified key');
+    const winner = outcomes.find(result => result.status === 'fulfilled').value;
+    check((await store.getPinnedDevice(identity.householdId, concurrent.deviceId)).fingerprint === winner.fingerprint,
+      'the concurrently accepted pin must match persistent storage');
+
+    const lockingVault = await LocalVault.unlock(manifest, recoverySecret);
+    const lockingStore = await SyncKeyStore.open({ vault: lockingVault });
+    const lockedCandidate = { ...candidate, deviceId: '3'.repeat(32) };
+    try {
+      await assertFails(() => delayedDigest(() => lockingStore.pinTrustedDevice(lockedCandidate), () => lockingVault.lock()));
+      check(await store.getPinnedDevice(identity.householdId, lockedCandidate.deviceId) === null,
+        'locking during fingerprint verification must not publish a trusted pin');
+    } finally {
+      lockingStore.close();
+      lockingVault.lock();
+    }
+
+    async function delayedDigest(action, duringDigest = () => {}) {
+      const original = crypto.subtle.digest;
+      let enter, release;
+      const entered = new Promise(resolve => { enter = resolve; });
+      const gate = new Promise(resolve => { release = resolve; });
+      crypto.subtle.digest = function (...args) {
+        const digest = original.apply(this, args);
+        enter();
+        return Promise.all([digest, gate]).then(([result]) => result);
+      };
+      const operation = Promise.resolve().then(action);
+      // Observe rejection immediately: the regression intentionally allows IDB
+      // to become idle while the fingerprint result is still pending.
+      operation.catch(() => {});
+      try {
+        await entered;
+        await duringDigest();
+        await new Promise(resolve => setTimeout(resolve, 50));
+        release();
+        return await operation;
+      } finally {
+        release();
+        crypto.subtle.digest = original;
+      }
+    }
+  }
 
   async function writeLegacyEpoch(value) {
     const db = await new Promise((resolve, reject) => {

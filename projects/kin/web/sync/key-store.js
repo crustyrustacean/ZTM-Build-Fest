@@ -87,40 +87,43 @@ export class SyncKeyStore {
     }).then(record => hydrateDevice(record, this.vault));
   }
 
-  pinTrustedDevice({
+  async pinTrustedDevice({
     householdId,
     deviceId,
     memberId,
     publicKeys,
     fingerprint,
   }) {
-    const key = `${householdId}:${deviceId}`;
+    this.vault?.assertUnlocked();
+    const pin = {
+      key: `${householdId}:${deviceId}`,
+      householdId,
+      deviceId,
+      memberId,
+      fingerprint,
+      publicKeys: structuredClone(publicKeys),
+    };
+    // Verify a stable snapshot before opening IDB: its request callbacks cannot
+    // retain a transaction while an unrelated Web Crypto operation is pending.
+    if ((await deviceKeyFingerprint(pin.publicKeys)) !== fingerprint)
+      throw new SyncKeyStoreError(
+        "Kin could not match this trusted device's key fingerprint.",
+      );
+    this.vault?.assertUnlocked();
     const transaction = this.database.transaction(
       TRUSTED_DEVICE_STORE,
       "readwrite",
     );
     const store = transaction.objectStore(TRUSTED_DEVICE_STORE);
-    const request = store.get(key);
+    const request = store.get(pin.key);
     return transactionResult(transaction, (finish) => {
-      request.onsuccess = async () => {
+      request.onsuccess = () => {
         try {
-          if ((await deviceKeyFingerprint(publicKeys)) !== fingerprint)
-            throw new SyncKeyStoreError(
-              "Kin could not match this trusted device's key fingerprint.",
-            );
           const existing = request.result;
           if (existing && existing.fingerprint !== fingerprint)
             throw new SyncKeyStoreError(
               "Kin detected that a trusted device key changed.",
             );
-          const pin = {
-            key,
-            householdId,
-            deviceId,
-            memberId,
-            fingerprint,
-            publicKeys: structuredClone(publicKeys),
-          };
           if (!existing) store.add(pin);
           finish(existing ?? pin);
         } catch (error) {

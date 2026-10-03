@@ -100,7 +100,7 @@ If an unrelated parent-repository file was modified accidentally, revert that ch
 
 # Current Development Stage
 
-Kin uses semantic versions. The current implementation is `v0.10.0` — Portable Core + Local Data Security, built from merged v0.9.3. Publication/tagging requires separate approval. The active line remains v0.10 for architectural/security stabilization; `v0.11.x` will consolidate UX/UI after its readiness gate. Do not begin v1.0 implementation until BOTH v0.10 architectural/security readiness AND v0.11 UX/UI readiness criteria have been satisfied. Relay/identity state remains in-memory; no production certification is claimed. No automatic kin-main or kin-development merge. See [V0.10.0](docs/V0.10.0.md) for implementation evidence, compatibility and remaining work; do not present planned work as completed.
+Kin uses semantic versions. The current implementation is `v0.10.1` — Security Lifecycle & Sync Recovery Correctness, following the v0.10.0 local-security implementation built from merged v0.9.3. The user requested this patch and its local release packaging; remote publication still requires explicit authorization. The untagged v0.10.0 development milestone is not retroactively tagged. The active line remains v0.10 for architectural/security stabilization; `v0.11.x` will consolidate UX/UI after its readiness gate. Do not begin v1.0 implementation until BOTH v0.10 architectural/security readiness AND v0.11 UX/UI readiness criteria have been satisfied. Relay/identity state remains in-memory; no production certification is claimed. No automatic kin-main or kin-development merge. See [V0.10.0](docs/V0.10.0.md) for implementation and patch evidence, compatibility and remaining work; do not present planned work as completed.
 
 The pre-implementation releases are:
 
@@ -1101,6 +1101,7 @@ kin-v0.9.1
 kin-v0.9.2
 kin-v0.9.3
 kin-v0.10.0
+kin-v0.10.1
 kin-v0.11.0
 kin-v1.0.0
 ```

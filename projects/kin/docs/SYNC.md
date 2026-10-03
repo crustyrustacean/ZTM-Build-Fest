@@ -1,6 +1,6 @@
 # Synchronization Design
 
-**Status:** Implemented through v0.10.0 for the local incubation service. Existing encrypted envelopes and v8 canonical replay remain compatible. The local outbox, sync state, epoch secrets and private device keys are encrypted at rest and unavailable while locked. Signed device-key successors preserve verification history and repair entitled post-join epoch grants. The relay and identity service remain in-memory; acknowledgements are process-local, not durable.
+**Status:** Implemented through v0.10.1 for the local incubation service. Existing encrypted envelopes and v8 canonical replay remain compatible. The local outbox, sync state, epoch secrets and private device keys are encrypted at rest and unavailable while locked. Signed device-key successors preserve verification history and repair entitled post-join epoch grants. The relay and identity service remain in-memory; acknowledgements are process-local, not durable.
 
 ## Intended direction
 
@@ -27,6 +27,28 @@ Archive restore is explicitly local-only and cannot silently rejoin sync; see
 removal/device revocation still reserves future sync key epochs and cannot erase
 prior plaintext/keys. Local recovery possession is a separate authorized path;
 removing a server member does not magically revoke a copied recovery key/root.
+
+## v0.10.1 interrupted rotation recovery
+
+Before retrying a pending rotation, refresh authenticated server status and the
+verified device directory. If the proposal already committed, recover its exact
+sealed epoch key without replacing its packages. Otherwise refresh expired
+packages or packages bound to superseded sender/recipient keys and the current
+active recipient set. Keep the proposal ID, sealed epoch key and fingerprint;
+only recipient packages and optional issuer-fingerprint retry metadata change.
+An older request accepted during this refresh still identifies the same key.
+
+Replacing pending packages compares the complete expected pending record in one
+encrypted IndexedDB transaction. Completion and removal match the proposal ID,
+so a stale tab cannot clear a newer proposal. Completion preserves the local
+rotation barrier until an authoritative server-status update releases it; local
+events created while another rotation is required retain an unassigned epoch.
+
+The service keeps its latest committed proposal identity across a later access
+change while marking the following rotation pending. Uploads remain blocked by
+that pending state. A competing accepted proposal requires an authorized transfer
+of its key; the losing local proposal never supplies the accepted epoch key.
+No canonical event, transport-envelope or database-schema version changes.
 
 ## Historical transport progression
 

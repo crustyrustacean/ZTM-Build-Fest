@@ -105,39 +105,8 @@ export class SyncCoordinator {
 
     const storedSyncState = await this.store.getSyncState();
     const localRotation = storedSyncState?.pendingRotation;
-    if (
-      localRotation &&
-      status.currentEpoch === localRotation.epoch &&
-      !status.rotationPending
-    ) {
-      if (status.lastRotationProposalId === localRotation.proposalId) {
-        const householdKey = await restoreHouseholdEpochKey({
-          sealed: localRotation.sealed,
-          deviceKeys: this.deviceKeys.keys,
-        });
-        await this.keyStore.saveEpoch({
-          householdId: this.identity.householdId,
-          keyEpoch: localRotation.epoch,
-          householdKey,
-          sealed: localRotation.sealed,
-          fingerprint: localRotation.fingerprint,
-        });
-        await this.store.commitPendingRotation({
-          expectedEpoch: localRotation.expectedEpoch,
-          currentEpoch: localRotation.epoch,
-        });
-      } else {
-        const acceptedKey = await this.keyStore.getEpoch(
-          this.identity.householdId,
-          status.currentEpoch,
-        );
-        if (!acceptedKey)
-          throw new Error(
-            "Another trusted device completed key rotation. This device needs its approved key transfer.",
-          );
-        await this.store.clearPendingRotation();
-      }
-    }
+    if (localRotation && status.currentEpoch >= localRotation.epoch)
+      await this.reconcilePendingRotation(localRotation, status);
 
     let currentKey = await this.keyStore.getEpoch(
       this.identity.householdId,
@@ -173,7 +142,7 @@ export class SyncCoordinator {
       );
     }
     if (status.rotationPending && currentKey) {
-      await this.commitRotation(status, devices);
+      await this.commitRotation();
       status = await this.request("/api/sync/status");
       await this.store.updateSyncServerState(status);
       devices = await this.loadDeviceDirectory();
@@ -433,10 +402,18 @@ export class SyncCoordinator {
     }
   }
 
-  async commitRotation(status, devices) {
+  async commitRotation() {
+    // A previous submission may have committed even when its response was lost.
+    // Reconcile before changing its packages, keeping the proposal's exact key.
+    const status = await this.request("/api/sync/status");
+    let pending = (await this.store.getSyncState())?.pendingRotation;
+    if (pending && await this.reconcilePendingRotation(pending, status)) return;
+    if (!status.rotationPending) return;
     const expectedEpoch = status.currentEpoch;
     const epoch = expectedEpoch + 1;
-    let pending = (await this.store.getSyncState())?.pendingRotation;
+    const devices = await this.loadDeviceDirectory();
+    const recipients = devices.filter((device) =>
+      device.deviceId !== this.identity.deviceId && !device.revokedAt && device.publicKeys);
     if (!pending) {
       const currentKey = await this.keyStore.getEpoch(
         this.identity.householdId,
@@ -446,18 +423,6 @@ export class SyncCoordinator {
         throw new Error(
           "The current household key is unavailable for rotation.",
         );
-      const recipients = devices
-        .filter(
-          (device) =>
-            device.deviceId !== this.identity.deviceId &&
-            !device.revokedAt &&
-            device.publicKeys,
-        )
-        .map((device) => ({
-          deviceId: device.deviceId,
-          publicKeys: device.publicKeys,
-          fingerprint: device.fingerprint,
-        }));
       const rotation = await createProvisionedHouseholdEpoch({
         householdId: this.identity.householdId,
         keyEpoch: epoch,
@@ -473,6 +438,30 @@ export class SyncCoordinator {
         sealed: rotation.sealed,
         fingerprint: rotation.fingerprint,
         packages: rotation.packages,
+        issuerFingerprint: this.deviceKeys.fingerprint,
+      });
+    } else if (pending.issuerFingerprint !== this.deviceKeys.fingerprint ||
+        pending.packages.length !== recipients.length ||
+        recipients.some((recipient) => !pending.packages.some((keyPackage) =>
+          keyPackage.recipientDeviceId === recipient.deviceId &&
+          keyPackage.recipientFingerprint === recipient.fingerprint &&
+          keyPackage.expiresAt > Date.now()))) {
+      const expiresAt = Date.now() + KEY_GRANT_TTL_MS;
+      const packages = await Promise.all(recipients.map((recipient) =>
+        provisionSealedEpochKey({
+          sealed: pending.sealed, deviceKeys: this.deviceKeys.keys,
+          grant: {
+            householdId: this.identity.householdId, keyEpoch: pending.epoch,
+            senderDeviceId: this.identity.deviceId,
+            recipientDeviceId: recipient.deviceId,
+            recipientPublicKeys: recipient.publicKeys,
+            recipientFingerprint: recipient.fingerprint,
+            grantId: randomIdHex(), expiresAt,
+            signingKey: this.deviceKeys.keys.signingPrivateKey,
+          },
+        })));
+      pending = await this.store.replacePendingRotationPackages({
+        expected: pending, packages, issuerFingerprint: this.deviceKeys.fingerprint,
       });
     }
     const result = await this.request("/api/sync/epochs", {
@@ -483,25 +472,45 @@ export class SyncCoordinator {
         proposalId: pending.proposalId,
       }),
     });
+    if (result.currentEpoch !== pending.epoch || result.proposalId !== pending.proposalId)
+      throw new Error("Kin could not match the accepted key rotation.");
+    await this.acceptPendingRotation(pending);
+    await this.provisionMemberHistory(
+      result.currentEpoch,
+      await this.loadDeviceDirectory(),
+    );
+  }
+
+  async reconcilePendingRotation(pending, status) {
+    if (status.currentEpoch === pending.expectedEpoch) return false;
+    if (status.currentEpoch === pending.epoch && status.lastRotationProposalId === pending.proposalId) {
+      await this.acceptPendingRotation(pending);
+      return true;
+    }
+    if (status.currentEpoch < pending.epoch ||
+        !await this.keyStore.getEpoch(this.identity.householdId, status.currentEpoch))
+      throw new Error("Another trusted device completed key rotation. This device needs its approved key transfer.");
+    await this.store.clearPendingRotation(pending.proposalId);
+    return true;
+  }
+
+  async acceptPendingRotation(pending) {
     const householdKey = await restoreHouseholdEpochKey({
       sealed: pending.sealed,
       deviceKeys: this.deviceKeys.keys,
     });
     await this.keyStore.saveEpoch({
       householdId: this.identity.householdId,
-      keyEpoch: result.currentEpoch,
+      keyEpoch: pending.epoch,
       householdKey,
       sealed: pending.sealed,
       fingerprint: pending.fingerprint,
     });
     await this.store.commitPendingRotation({
       expectedEpoch: pending.expectedEpoch,
-      currentEpoch: result.currentEpoch,
+      currentEpoch: pending.epoch,
+      proposalId: pending.proposalId,
     });
-    await this.provisionMemberHistory(
-      result.currentEpoch,
-      await this.loadDeviceDirectory(),
-    );
   }
 
   async provisionMemberHistory(currentEpoch, devices) {

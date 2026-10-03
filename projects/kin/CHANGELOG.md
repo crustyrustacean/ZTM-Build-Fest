@@ -2,6 +2,15 @@
 
 This file records completed Kin releases. The `v0.0.x` releases are planning and documentation milestones; they do not represent implemented application features. The first implementation milestone remains `v0.1.0`.
 
+## [0.10.1] — Security Lifecycle & Sync Recovery Correctness
+
+- Keep cancelled security operations from changing a newer unlock's status, controls or busy state. Late completion cannot label an unlocked household as locked or remove its lock control.
+- Verify a stable copy of a trusted device's public keys before opening its pinning transaction. Slow fingerprint hashing no longer lets IndexedDB commit before the pin is saved; conflicting pins still fail atomically.
+- Recover interrupted key rotations when recipient packages expire or recipient keys change, retaining the proposed epoch key and reconciling accepted proposals after lost responses. Protect pending-rotation updates against stale tabs.
+- Advance the static shell cache so offline clients receive the fixes. Canonical events, ABI protocols, encrypted envelopes, archive framing and database versions remain unchanged. No new product capability or dependency.
+
+Passed 117 Rust and 140 Node/WASM/server tests, formatting, Clippy, release WASM build, version consistency, the complete product browser suite, 78 security UI assertions, 18 virtual-authenticator assertions, and encrypted storage/migration/pinning checks including 12 new rotation-storage assertions. Validation and remaining readiness work are recorded in [V0.10.0](docs/V0.10.0.md). Packaged locally as `kin-v0.10.1`; remote publication and merges are not included.
+
 ## [0.10.0] — Portable Core + Local Data Security
 
 Implemented and validated on the v0.10 development branch; publication/tagging is pending approval. Startup now requires recovery or verified PRF unlock before loading protected history. A random local root encrypts complete event/context/outbox values and private sync material; independent credential wrappers avoid corpus re-encryption. Revision checks and a durable lock epoch prevent stale-tab wrapper resurrection and protected writes after lock. Drafts are memory-only.

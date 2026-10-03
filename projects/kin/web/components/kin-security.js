@@ -24,11 +24,16 @@ class KinSecurity extends HTMLElement {
   }
 
   async initialize() {
+    const operation = this.operation;
     clearLegacyDrafts();
     try {
-      this.manifest = await EventStore.securityStatus();
+      const manifest = await EventStore.securityStatus();
+      if (operation !== this.operation) return;
+      this.manifest = manifest;
       this.render();
-    } catch (error) { this.render(); this.error(error); }
+    } catch (error) {
+      if (operation === this.operation) { this.render(); this.error(error); }
+    }
   }
 
   render() {
@@ -52,19 +57,23 @@ class KinSecurity extends HTMLElement {
       this.button("Add passkey unlock", () => this.run(() => this.addPasskey()));
       for (const wrapper of this.manifest?.wrappers ?? []) {
         if (wrapper.type !== "prf") continue;
-        this.button("Remove passkey unlock", () => this.run(async () => {
+        this.button("Remove passkey unlock", () => this.run(async (operation) => {
           if (!confirm("Remove this local passkey unlock path? Your recovery key will still work. Previously copied keys cannot be recalled.")) return;
           const vault = getActiveVault();
           const manifest = vault.removeWrapper(wrapper.id);
           await EventStore.updateSecurityManifest(manifest, vault);
-          this.manifest = await EventStore.securityStatus();
+          this.assertCurrentOperation(operation);
+          const current = await EventStore.securityStatus();
+          this.assertCurrentOperation(operation);
+          this.manifest = current;
           this.onLockRequested?.();
         }));
       }
       this.button("Download encrypted backup", () => this.run(() => this.downloadArchive()));
       this.button("Restore encrypted backup", () => this.showRestore());
-      if (navigator.storage?.persist) this.button("Request persistent storage", () => this.run(async () => {
+      if (navigator.storage?.persist) this.button("Request persistent storage", () => this.run(async (operation) => {
         const granted = await navigator.storage.persist();
+        this.assertCurrentOperation(operation);
         this.message.textContent = granted ? "This browser granted persistent storage. Keep encrypted backups too." : "Persistent storage was not granted. Keep encrypted backups to protect against browser data loss.";
       }));
       this.text("A backup preserves household history. Keep its recovery key separately. Restore uses an empty household and does not restore device trust.");
@@ -140,9 +149,12 @@ class KinSecurity extends HTMLElement {
     const operation = this.operation;
     const { vault, manifest } = await LocalVault.create(secret);
     try {
-      if (operation !== this.operation) throw new Error("Security setup was cancelled.");
+      this.assertCurrentOperation(operation);
       await EventStore.prepareSecurity(manifest);
-      this.manifest = await EventStore.securityStatus();
+      this.assertCurrentOperation(operation);
+      const current = await EventStore.securityStatus();
+      this.assertCurrentOperation(operation);
+      this.manifest = current;
       await this.finishUnlock(vault, operation);
     } catch (error) { vault.lock(); throw error; }
   }
@@ -150,8 +162,9 @@ class KinSecurity extends HTMLElement {
   async unlockRecovery(secret) {
     const operation = this.operation;
     await this.closest("kin-app")?.lockBarrier;
-    if (operation !== this.operation) throw new Error("Unlock was cancelled.");
+    this.assertCurrentOperation(operation);
     const manifest = await EventStore.securityStatus();
+    this.assertCurrentOperation(operation);
     const vault = await LocalVault.unlock(manifest, secret);
     await this.finishUnlock(vault, operation);
   }
@@ -162,8 +175,10 @@ class KinSecurity extends HTMLElement {
     const { secret } = await authenticatePrf(wrapper, { signal });
     try {
       await this.closest("kin-app")?.lockBarrier;
-      if (operation !== this.operation) throw new Error("Unlock was cancelled.");
-      const vault = await LocalVault.unlock(await EventStore.securityStatus(), secret, wrapper.id);
+      this.assertCurrentOperation(operation);
+      const manifest = await EventStore.securityStatus();
+      this.assertCurrentOperation(operation);
+      const vault = await LocalVault.unlock(manifest, secret, wrapper.id);
       await this.finishUnlock(vault, operation);
     } finally { secret.fill(0); }
   }
@@ -171,14 +186,17 @@ class KinSecurity extends HTMLElement {
   async finishUnlock(vault, operation) {
     try {
       await this.closest("kin-app")?.lockBarrier;
-      if (operation !== this.operation) throw new Error("Unlock was cancelled.");
+      this.assertCurrentOperation(operation);
       setActiveVault(vault);
       this.message.textContent = "Unlocking and verifying household data…";
       const status = await EventStore.securityStatus();
+      this.assertCurrentOperation(operation);
+      vault.assertUnlocked();
       if (status.phase !== "encrypted") {
         this.message.textContent = "Encrypting and verifying saved information. Keep this tab open.";
         const engine = await loadKinEngine();
         try {
+          this.assertCurrentOperation(operation);
           await EventStore.migrate({ vault, engine,
             prepareKeys: (current) => migrateSyncKeys(current, { prepareOnly: true }),
             finalizeKeys: (current) => finalizeSyncKeyMigration(current),
@@ -186,36 +204,55 @@ class KinSecurity extends HTMLElement {
         } finally { engine.dispose(); }
       }
       vault.assertUnlocked();
-      if (operation !== this.operation) throw new Error("Unlock was cancelled.");
-      this.manifest = await EventStore.securityStatus();
+      this.assertCurrentOperation(operation);
+      const manifest = await EventStore.securityStatus();
+      this.assertCurrentOperation(operation);
+      vault.assertUnlocked();
+      this.manifest = manifest;
       this.phase = "unlocked";
       this.render();
       await this.onUnlocked?.(vault);
+      this.assertCurrentOperation(operation);
     } catch (error) {
       vault.lock();
-      this.phase = "locked";
-      this.manifest = await EventStore.securityStatus();
-      this.render();
+      // Revoking this result is always required. Only its current operation may
+      // update the panel; a later unlock can already own the visible household.
+      if (operation === this.operation) {
+        const manifest = await EventStore.securityStatus().catch(() => this.manifest);
+        if (operation === this.operation) {
+          this.manifest = manifest;
+          this.phase = "locked";
+          this.render();
+        }
+      }
       throw error;
     }
   }
 
   async addPasskey() {
+    const operation = this.operation;
     const vault = getActiveVault();
     const { secret, credentialId, prfSalt } = await authenticatePrf(null, {
       signal: this.operationAbort.signal,
     });
     try {
+      this.assertCurrentOperation(operation);
       const manifest = await vault.addCredentialWrapper(secret, { credentialId, prfSalt });
+      this.assertCurrentOperation(operation);
       await EventStore.updateSecurityManifest(manifest, vault);
-      this.manifest = await EventStore.securityStatus();
+      this.assertCurrentOperation(operation);
+      const current = await EventStore.securityStatus();
+      this.assertCurrentOperation(operation);
+      this.manifest = current;
       this.message.textContent = "Passkey unlock added. Your recovery key still works.";
     } finally { secret.fill(0); }
   }
 
   async downloadArchive() {
+    const operation = this.operation;
     const app = this.closest("kin-app");
     const bytes = await exportHouseholdArchive({ store: app.store, engine: app.engine, vault: getActiveVault() });
+    this.assertCurrentOperation(operation);
     const url = URL.createObjectURL(new Blob([bytes], { type: "application/octet-stream" }));
     const link = document.createElement("a");
     link.href = url;
@@ -243,11 +280,16 @@ class KinSecurity extends HTMLElement {
     form.addEventListener("submit", (event) => {
       event.preventDefault();
       const selected = file.files[0]; const secret = recovery.value; recovery.value = "";
-      void this.run(async () => {
+      void this.run(async (operation) => {
         if (!selected || selected.size > 64 * 1024 * 1024) throw new Error("Choose a Kin archive smaller than 64 MiB.");
         const app = this.closest("kin-app");
-        await importHouseholdArchive({ bytes: new Uint8Array(await selected.arrayBuffer()), recoverySecret: secret, engine: app.engine, vault: getActiveVault() });
+        const engine = app.engine, vault = getActiveVault();
+        const bytes = new Uint8Array(await selected.arrayBuffer());
+        this.assertCurrentOperation(operation);
+        await importHouseholdArchive({ bytes, recoverySecret: secret, engine, vault });
+        this.assertCurrentOperation(operation);
         await app.refreshFromEvents();
+        this.assertCurrentOperation(operation);
         app.broadcastEventChange();
         this.render();
         this.message.textContent = "Household history restored locally. Device trust has not been restored.";
@@ -262,6 +304,7 @@ class KinSecurity extends HTMLElement {
     this.operationAbort = new AbortController();
     this.phase = "locked";
     this.busy = false;
+    this.setAttribute("aria-busy", "false");
     clearLegacyDrafts();
     this.render();
     this.heading.focus();
@@ -269,22 +312,32 @@ class KinSecurity extends HTMLElement {
 
   async run(action) {
     if (this.busy) return;
+    const operation = ++this.operation;
     this.busy = true;
     this.setAttribute("aria-busy", "true");
     this.alert.textContent = "";
     for (const element of this.querySelectorAll("button,input")) element.disabled = true;
-    try { await action(); }
+    try { await action(operation); }
     catch (error) {
+      if (operation !== this.operation) return;
       if (this.phase !== "unlocked") {
-        this.manifest = await EventStore.securityStatus().catch(() => this.manifest);
+        const manifest = await EventStore.securityStatus().catch(() => this.manifest);
+        if (operation !== this.operation) return;
+        this.manifest = manifest;
         this.render();
       }
       this.error(error);
     } finally {
-      this.busy = false;
-      this.setAttribute("aria-busy", "false");
-      for (const element of this.querySelectorAll("button,input")) element.disabled = false;
+      if (operation === this.operation) {
+        this.busy = false;
+        this.setAttribute("aria-busy", "false");
+        for (const element of this.querySelectorAll("button,input")) element.disabled = false;
+      }
     }
+  }
+
+  assertCurrentOperation(operation) {
+    if (operation !== this.operation) throw new Error("This security operation was cancelled.");
   }
 
   error(error) {

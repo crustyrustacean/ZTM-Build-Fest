@@ -1,14 +1,14 @@
 # Persistent Contract Versioning
 
-**Status:** Current through v0.10.0; earlier version sections preserve historical contracts.
+**Status:** Current through v0.10.1; earlier version sections preserve historical contracts.
 
 ## Independent version axes
 
 Kin version numbers describe product releases; they do not version every persistent or transport contract.
 
-| Version axis | v0.10.0 read/write contract | Governs |
+| Version axis | v0.10.1 read/write contract | Governs |
 | --- | --- | --- |
-| Application | `0.10.0` | Source milestone; publication/tagging separate |
+| Application | `0.10.1` | Correctness patch; remote publication separate |
 | Canonical event schema | Item add 1/2; other kinds 1 | Immutable event interpretation; original bytes retained |
 | Replay protocol | Reads v1–v8; writes local v7 / synchronized v8 | Request context and projection semantics |
 | Manual WASM ABI | Existing exports plus additive command/metadata/archive/import APIs | Host ownership and calls; new command packet v1 |
@@ -24,7 +24,7 @@ The v0.2.0 implementation reads event schema 1 for all supported kinds and schem
 
 ## Compatibility policy
 
-The table records implemented decoders and migrations, validated in [V0.10.0](V0.10.0.md).
+The table records implemented decoders and migrations, validated in [V0.10.0](V0.10.0.md). v0.10.1 preserves every v0.10.0 persistent format and requires no additional database migration.
 An additive ABI or storage change does not rewrite canonical history or imply a
 sync-protocol bump. v0.9 clients cannot open the upgraded local databases or unlock
 the protected records. Mixed old/new sync clients preserve relay-envelope format,
