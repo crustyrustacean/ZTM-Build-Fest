@@ -526,8 +526,8 @@ function copyWasmBytes(memory, pointer, length) {
 function decodeError(bytes, status) {
   if (bytes.length < 12 || readAscii(bytes, 0, 4) !== "KERR") {
     return new KinEngineError(
-      status,
-      USER_MESSAGES.get(status) ?? USER_MESSAGES.get(6),
+      6,
+      USER_MESSAGES.get(6),
     );
   }
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
@@ -535,13 +535,13 @@ function decodeError(bytes, status) {
   const code = view.getUint16(6, true);
   const messageLength = view.getUint32(8, true);
   if (
-    ![1, 2, 3, 4, PROTOCOL_VERSION].includes(version) ||
+    version !== 1 ||
     code !== status ||
     bytes.length !== 12 + messageLength
   ) {
     return new KinEngineError(
-      status,
-      USER_MESSAGES.get(status) ?? USER_MESSAGES.get(6),
+      6,
+      USER_MESSAGES.get(6),
     );
   }
   return new KinEngineError(

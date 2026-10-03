@@ -122,7 +122,7 @@ Items remain serialized in original add-event order, including archived tombston
 
 - `kin_alloc(n)` allocates an input buffer owned by JavaScript. For `n == 0`, it returns `0`. Allocation failure returns `0`; the bridge treats that as failure and does not call apply.
 - JavaScript writes exactly `n` bytes within the current `memory.buffer`, refreshes its view after any operation that may grow memory, and calls `kin_apply_events(ptr, n)`.
-- The input pointer is borrowed only for the duration of `kin_apply_events`. Rust must validate pointer/length bounds before reading and must not retain the pointer after return.
+- `kin_apply_events` accepts only the exact pointer and length of a currently tracked `kin_alloc` input buffer. Rust reads from that owned allocation for the duration of the call and does not retain a caller pointer after return.
 - JavaScript calls `kin_free(ptr, n)` exactly once after apply returns, whether apply succeeds or fails. `(0, 0)` is a no-op; other invalid free ranges fail safely and never free an unrelated allocation.
 - Rust owns result/error buffers. `kin_result_ptr/len` refer to the most recent successful result; `kin_error_ptr/len` refer to the most recent failed call. The inactive pair returns `(0, 0)`.
 - Result/error bytes stay valid until the next `kin_apply_events` call or module teardown. JavaScript must copy them into host-owned memory before another call. The bridge must not retain a view that may become stale if WASM memory grows.

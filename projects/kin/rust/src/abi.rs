@@ -32,30 +32,8 @@ fn lock_state() -> std::sync::MutexGuard<'static, AbiState> {
         .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
-fn range_is_valid(pointer: u32, length: u32, memory_length: u64) -> bool {
-    if length == 0 {
-        return true;
-    }
-    if pointer == 0 {
-        return false;
-    }
-    u64::from(pointer)
-        .checked_add(u64::from(length))
-        .is_some_and(|end| end <= memory_length)
-}
-
 fn request_length_is_supported(length: u32) -> bool {
     usize::try_from(length).is_ok_and(|size| size <= MAX_PROTOCOL_BYTES)
-}
-
-#[cfg(target_arch = "wasm32")]
-fn linear_memory_length() -> u64 {
-    u64::from(core::arch::wasm32::memory_size(0) as u32) * 65_536
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-fn linear_memory_length() -> u64 {
-    u64::MAX
 }
 
 fn error_buffer(error: KinError) -> Vec<u8> {
@@ -126,39 +104,41 @@ pub extern "C" fn kin_apply_events(pointer: u32, length: u32) -> i32 {
 
     let outcome = if !request_length_is_supported(length) {
         Err(KinError::SizeLimit)
-    } else if !range_is_valid(pointer, length, linear_memory_length()) {
-        Err(KinError::InvalidAbi)
     } else if length == 0 {
         Err(KinError::MalformedProtocol)
     } else {
-        let input = unsafe {
-            // The WASM caller borrows an in-bounds byte range for this call only.
-            std::slice::from_raw_parts(pointer as *const u8, length as usize)
-        };
-        decode_request_with_summary(input).and_then(|request| {
-            let state = if let Some(date) = request.civil_date {
-                rebuild_on(&request.events, request.as_of.unwrap(), date)
-            } else {
-                match request.as_of {
-                    Some(time) => rebuild_at(&request.events, time),
-                    None => rebuild(&request.events),
+        state
+            .allocations
+            .get(&pointer)
+            .map_or(Err(KinError::InvalidAbi), |input| {
+                if input.len() != length as usize {
+                    return Err(KinError::InvalidAbi);
                 }
-            };
-            state.and_then(|household| {
-                if request.protocol_version >= PROTOCOL_V6 {
-                    summarize_validated(&request.events, request.summary_cursor, &household)
-                        .and_then(|summary| {
-                            if request.protocol_version == PROTOCOL_V7 {
-                                encode_state_v7(&household, &summary)
-                            } else {
-                                encode_state_v6(&household, &summary)
-                            }
-                        })
-                } else {
-                    encode_state(&household, request.protocol_version)
-                }
+                decode_request_with_summary(input).and_then(|request| {
+                    let state = if let Some(date) = request.civil_date {
+                        rebuild_on(&request.events, request.as_of.unwrap(), date)
+                    } else {
+                        match request.as_of {
+                            Some(time) => rebuild_at(&request.events, time),
+                            None => rebuild(&request.events),
+                        }
+                    };
+                    state.and_then(|household| {
+                        if request.protocol_version >= PROTOCOL_V6 {
+                            summarize_validated(&request.events, request.summary_cursor, &household)
+                                .and_then(|summary| {
+                                    if request.protocol_version == PROTOCOL_V7 {
+                                        encode_state_v7(&household, &summary)
+                                    } else {
+                                        encode_state_v6(&household, &summary)
+                                    }
+                                })
+                        } else {
+                            encode_state(&household, request.protocol_version)
+                        }
+                    })
+                })
             })
-        })
     };
 
     match outcome {
@@ -195,17 +175,8 @@ pub extern "C" fn kin_error_len() -> u32 {
 
 #[cfg(test)]
 mod tests {
-    use super::{range_is_valid, request_length_is_supported};
+    use super::request_length_is_supported;
     use crate::protocol::MAX_PROTOCOL_BYTES;
-
-    #[test]
-    fn memory_ranges_reject_null_overflow_and_out_of_bounds() {
-        assert!(range_is_valid(12, 8, 20));
-        assert!(range_is_valid(20, 0, 20));
-        assert!(!range_is_valid(0, 1, 20));
-        assert!(!range_is_valid(19, 2, 20));
-        assert!(!range_is_valid(u32::MAX, 2, u64::from(u32::MAX) + 1));
-    }
 
     #[test]
     fn request_size_is_bounded_before_pointer_dereference() {
