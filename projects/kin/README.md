@@ -4,7 +4,7 @@
 
 **Current status: `v0.9.3` — Encrypted Event Sync stabilization.** Kin supports opt-in encrypted synchronization of canonical household events between the two passkey-paired adults' trusted devices. Browser Web Crypto encrypts events before the authenticated service relay; the relay coordinates opaque delivery and still sees routing metadata, timing, counts, ciphertext sizes, and device membership. Device revocation invalidates sessions and advances the content-key epoch. Existing local event bytes are preserved during migration, and offline retries reuse the same encrypted envelope.
 
-The next planned development line is `v0.10.x` — Portable Core / Architectural Consolidation. The current implementation remains v0.9.3; v1.0.0 readiness follows that architectural line.
+The next development line is `v0.10.x` — Portable Core + Local Data Security; its [architecture, migration and release contract](docs/V0.10.0.md) is under development. `v0.11.x` then consolidates UX/UI and accessibility. v1.0.0 requires both readiness gates. The current release remains v0.9.3, whose local events and drafts are plaintext and whose persisted sync keys remain usable after logout; encrypted relay sync is not local-at-rest protection.
 
 ## The problem
 
@@ -79,7 +79,8 @@ The intended technical direction is Rust compiled to WebAssembly, native Web Com
 - `v0.9.1` — Device Provisioning, Epochs, and Revocation (`kin-v0.9.1`)
 - `v0.9.2` — Offline Reconciliation and Conflict Semantics (`kin-v0.9.2`)
 - `v0.9.3` — Recovery, Privacy, and Feedback Readiness (`kin-v0.9.3`)
-- Next planned development line: `v0.10.x` — Portable Core / Architectural Consolidation
+- Next development line: `v0.10.x` — Portable Core + Local Data Security
+- Then `v0.11.x` — UX/UI Consolidation, before `v1.0.0` — Stable Kin Platform
 - See the [changelog](CHANGELOG.md) for the completed release history.
 
 ## Install, build, and run

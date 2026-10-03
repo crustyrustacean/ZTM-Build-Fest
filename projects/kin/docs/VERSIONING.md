@@ -20,6 +20,15 @@ The v0.2.0 implementation reads event schema 1 for all supported kinds and schem
 
 ## Compatibility policy
 
+The v0.10 security work tracks seven separate axes: application release; canonical
+event protocol/schema (existing v1–v8); manual WASM ABI; IndexedDB schema (v0.9.3
+event DB 2 / key DB 3); encrypted local envelope (new v1); portable archive (new
+v1); and sync envelope/protocol (existing v1). A device-key successor certificate
+has its own version/generation. An additive ABI or storage change does not rewrite
+canonical history or imply a sync-protocol bump. Exact implemented read/write
+versions and migration evidence must be recorded before a v0.10 release; the
+planned format numbers above are not claims that decoders already exist.
+
 Newer Kin versions should read older supported household data whenever reasonably possible. Each release must declare which event, protocol, storage, and export versions it can read and write. A version is supported only when a tested decoder/migration exists; compatibility must not be assumed from a version number alone.
 
 - **Known supported version:** decode, validate, and process according to its documented semantics.

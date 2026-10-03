@@ -5,7 +5,9 @@ Current implementation: `v0.9.3 — Encrypted Event Sync Stabilization`.
 ```text
 v0.9.3 — Encrypted Event Sync Stabilization
 	↓
-v0.10.x — Portable Core / Architectural Consolidation
+v0.10.x — Portable Core + Local Data Security
+	↓
+v0.11.x — UX/UI Consolidation
 	↓
 v1.0.0 — Stable Kin Platform
 ```
@@ -214,15 +216,27 @@ Completed: persistent exact-envelope outbox, crash-safe remote commit/cursor adv
 
 Completed: recovery and metadata threat assessment, encrypted logging/privacy boundary, bounds and malformed-envelope handling, same-member device enrollment, relay restart semantics, browser storage migration verification, and product-facing sync states. The identity service/relay remain memory-only and no independent security audit is claimed. This is the final v0.9.x encrypted-sync stabilization gate.
 
-### `v0.10.x` — Portable Core / Architectural Consolidation
+### `v0.10.x` — Portable Core + Local Data Security
 
-The final architectural development line before v1.0. Consolidate Rust-owned command semantics and a single canonical event encoder/decoder boundary; reduce duplicated JavaScript knowledge of the wire protocol; grow a portable, deterministic Rust domain core; and address backup/export/import, data portability, PWA/offline hardening, and synchronization/reconciliation boundary cleanup. Stabilize protocol and compatibility contracts, then define explicit v1.0 readiness criteria. These are planned areas, not v0.9.3 accomplishments.
+The final architecture/security development line. Establish cryptographically locked local household data, explicit key hierarchy and recovery, recoverable plaintext migration, Rust-owned command semantics and canonical codecs, encrypted export/import, portable native domain logic, PWA/offline hardening, sync/local-storage boundary cleanup and compatibility stabilization. Reduce JavaScript wire-format knowledge. These are planned areas, not v0.9.3 accomplishments. The evidence inventory, frozen contracts, implementation slices and completion gates are in [V0.10.0](V0.10.0.md).
 
 Increase the Rust footprint by increasing the amount of Kin that is deterministic, portable, invariant-driven, and independently testable — not by moving browser-native capabilities into Wasm. Web Crypto and networking remain browser/server adapter responsibilities.
 
+### `v0.11.x` — UX/UI Consolidation
+
+Refine information architecture, navigation, responsive behavior, accessibility,
+keyboard interaction, focus management and screen-reader semantics. Consolidate
+authentication/unlock, pairing, backup/recovery, sync status and onboarding;
+loading/empty/error states; component consistency, visual hierarchy, typography,
+spacing, motion, modern CSS, PWA/install experience and cross-browser UX. v0.10
+must deliver working accessible security states, while this line owns holistic
+product polish. It must not need to redesign encryption, storage or commands.
+
 ### `v1.0.0` — Stable Kin Platform
 
-Begin implementation only after the v0.10.x readiness criteria are satisfied. Establish and validate the explicit stable-platform acceptance criteria; this is not part of the v0.9.3 scope.
+Begin implementation only after BOTH v0.10 architecture/security and v0.11 UX/UI
+readiness criteria are satisfied. Stabilize what those lines secured and refined;
+do not introduce another major architecture at v1.0.
 
 ## Scope discipline
 

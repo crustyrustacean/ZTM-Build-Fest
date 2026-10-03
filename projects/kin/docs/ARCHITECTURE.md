@@ -4,6 +4,74 @@
 
 ## System shape
 
+## v0.10 target and current implementation boundary
+
+v0.9.3 already implements encrypted relay sync, two-adult passkey pairing,
+recipient-bound key provisioning, deterministic v8 replay, exact-envelope retries
+and revocation/epoch rotation. It does **not** encrypt its local canonical event
+store or gate replay on authentication. The [v0.10 contract](V0.10.0.md) records
+the inspected baseline and freezes the following target before implementation.
+
+```text
+HTML / CSS / Web Components
+          |
+     application shell
+          |
+  Locked -> Unlocking -> Unlocked
+          |                 |
+  public metadata    WebAuthn PRF or explicit recovery
+                            |
+                      Web Crypto / key capability
+                            |
+                    browser persistence adapter
+                            |
+              manual WASM ABI / portable Rust
+               commands -> canonical events -> replay
+                            |
+                authenticated encrypted values
+                            |
+                         IndexedDB
+```
+
+Locked startup loads only the shell/security metadata. It has no household
+projection, decrypted corpus, root/DEK, or protected command capability. Successful
+unlock obtains/unwraps a root, decrypts the complete corpus and invokes Rust
+validation/replay before rendering. Lock invalidates asynchronous work, disposes
+the engine, keys and plaintext, clears drafts and broadcasts to peer tabs. This is
+a capability boundary, not CSS hiding. Reference disposal does not guarantee
+physical memory erasure. Failure returns to Locked without partial projection.
+
+Rust owns household intent semantics, canonical encode/decode/validate and metadata,
+historical version interpretation, recurrence, identity-aware deterministic replay,
+archive parsing/import planning and deterministic migration policy. The existing
+single native `rlib` plus WASM `cdylib` is sufficient; a workspace split has no
+demonstrated benefit yet. Browser clock, civil date, random IDs and authorization
+context are explicit command inputs. Domain commands remain distinct from browser
+authentication and transport operations. JS only passes opaque canonical bytes
+outside the narrow codec adapter; it must not decode Lamport time or IDs by offset.
+
+JavaScript retains WebAuthn, Web Crypto, DOM, Web Components, IndexedDB, network,
+file/download, lifecycle, focus and accessibility capabilities. A transaction-aware
+encrypted storage adapter preserves event/context/outbox/cursor atomicity while
+crypto is pending. Root wrappers, recovery and legacy device-key transitions are
+specified in [CRYPTOGRAPHY](CRYPTOGRAPHY.md); migration preserves exact event bytes
+and resumes cross-database progress as specified in [MIGRATIONS](MIGRATIONS.md).
+
+Sync remains the v0.9 opaque-envelope transport, distinct from local encryption.
+Keep canonical identity, retry idempotency, conflict/revocation semantics and
+historical signatures. Portable archives use an independent versioned encrypted
+container, validated completely before an atomic import. The service worker only
+caches an explicit static-shell allowlist; API/user data cannot enter Cache Storage.
+Offline startup uses the same lock boundary. See [PORTABILITY](PORTABILITY.md)
+and [V0.10.0](V0.10.0.md).
+
+v0.11 owns holistic navigation, visual and interaction refinement after these
+boundaries stabilize. Basic accessible lock, unsupported-unlock, recovery,
+migration and corruption states are required in v0.10. The architecture is not
+complete if v0.11 must redesign encryption, storage, commands or recovery.
+
+## v0.9.3 system shape (baseline)
+
 ```text
 Web Components
       |
@@ -43,7 +111,7 @@ Rust owns deterministic domain behavior:
 
 - Household event model and event validation
 - State transitions and reconstruction by replay
-- Recurrence rules when routines are introduced
+- Implemented Daily/Weekly recurrence with explicit civil-date context
 - Diffing and useful search/indexing where justified
 - Distributed v8 event ordering and deterministic domain replay
 
@@ -97,7 +165,7 @@ The v0.1.x core is intended to be extended, not treated as proof that later feat
 | Pulse                 | Actor IDs and timestamps                             | Implemented in v0.5.0                  | Explicit as_of, fixed enum, set/replace/clear; audited through v0.5.3 |
 | Since You Last Looked | Ordered immutable event history                      | Implemented in v0.6.0                  | Stabilization through v0.6.3                                          |
 | Routines              | Event infrastructure and explicit civil context      | Implemented in v0.7.0                  | Correctness/resilience/hardening audits in v0.7.1–v0.7.4              |
-| Pairing               | Household/member/device identity fields              | Yes                                    | Authentication, authorization, pairing, recovery, and device trust    |
+| Pairing               | Household/member/device identity fields              | Implemented through v0.8.8             | Durable identity service and recovery beyond live trusted devices     |
 | Offline sync          | Random event IDs and immutable canonical event bytes | Implemented in v0.9.2                  | Bounded to current relay/storage limits; restart is not durable       |
 | Encrypted sync        | Versioned canonical events and browser Web Crypto    | Implemented through v0.9.3             | Independent audit, durable relay, all-device recovery, broader UX     |
 | Export/import         | Versioned event representation and preserved history | Yes                                    | Portable container, validation, and recovery UX                       |

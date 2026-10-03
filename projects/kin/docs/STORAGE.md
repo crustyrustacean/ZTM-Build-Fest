@@ -6,6 +6,26 @@ The compose input keeps a best-effort in-progress text and classification draft 
 
 ## Database
 
+## v0.10 encrypted storage contract
+
+The [v0.10 contract](V0.10.0.md) defines the complete baseline inventory, minimal
+routing metadata, AES-GCM envelope/AAD, key hierarchy and transaction requirements.
+All event values, duplicate canonical outbox values, protected context and sync
+metadata require encryption. The schema version, envelope version and event
+protocol version remain independent. Canonical bytes remain authoritative and
+unchanged inside ciphertext; routing indexes must match authenticated content.
+
+Reads are unavailable without a live unlock capability. Writes must abort if that
+capability is revoked while Web Crypto is pending. Preserve serialized native
+IndexedDB transactions through explicit keepalive tracking; never await crypto
+without keeping the transaction active. Authentication failure aborts the whole
+operation. Unlocked plaintext is ephemeral. v0.10 removes household draft text
+from sessionStorage; lock clears drafts and projected content in all live tabs.
+
+The remaining schema description records v0.9.3 until implementation replaces it.
+
+## v0.9.3 database
+
 ```text
 database: kin
 version: 2

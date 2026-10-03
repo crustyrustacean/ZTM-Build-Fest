@@ -1,6 +1,6 @@
 # Portable Household Data
 
-**Status:** Current through v0.7.4 Routine Stale-Action Correctness; export/import design only. No export file, import path, integrity checker, or encryption exists. Format versioning is discussed in [VERSIONING](VERSIONING.md), migration failure behavior in [MIGRATIONS](MIGRATIONS.md), and retention/deletion in [RETENTION](RETENTION.md).
+**Status:** Current release v0.9.3 implements encrypted sync, but no portable export/import. The secure archive boundary in [V0.10.0](V0.10.0.md) is the v0.10 implementation contract. Normal archives preserve encryption and require a surviving recovery wrapper. Rust owns framing, bounds, version validation and import planning; browser APIs own crypto/files/downloads and explicit replacement confirmation. Complete decrypt/canonical validation/replay precedes any import commit. Reject corrupt/unsupported archives without partial import. Do not restore device trust from a backup. Earlier conceptual sections below are design history, not implemented formats.
 
 ## Ownership principle
 

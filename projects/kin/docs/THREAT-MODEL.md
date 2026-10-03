@@ -4,6 +4,31 @@
 
 ## Assets and boundaries
 
+## v0.10 local-at-rest boundary (development contract)
+
+Intended protection: an unauthorized person with persisted browser site data but
+without an authorized Kin credential/recovery mechanism cannot trivially recover
+household plaintext while Kin is locked. v0.9.3 does not provide this protection:
+its canonical events, draft text and usable sync CryptoKeys survive logout.
+The [v0.10 contract](V0.10.0.md) gates this claim on complete migration, including
+outbox duplicates and legacy provisioning/decryption capabilities.
+
+This does not protect a compromised unlocked browser runtime, privileged malicious
+extensions, OS malware, resident-key memory forensics, a compromised origin/build,
+XSS while unlocked, someone able to satisfy the configured authenticator/recovery
+path, or previously authorized devices that obtained plaintext/keys. Removing a
+member or wrapper cannot erase copies. Browser garbage collection is not guaranteed
+physical memory zeroization. Lock drops references and closes capability paths;
+encryption protects persisted content, not a compromised running endpoint.
+
+Ciphertext still exposes sizes, counts and minimal routing identifiers. Complete
+site-data rollback cannot be reliably detected without an independent trusted
+monotonic witness. Recovery-secret disclosure grants its intended access; loss of
+all authorized secrets means permanent data loss. An incomplete migration remains
+explicitly unprotected legacy data and must never be labelled securely locked.
+
+## Assets and boundaries continued
+
 Assets include household plaintext (items, handoffs, Talk topics, Pulse), event history, household/member/device identifiers, authentication credentials, device authorization state, encryption keys, pairing-session secrets, and member safety/expectations.
 
 Trust boundaries include the browser UI ↔ Rust/WASM engine, local browser storage, authorized device ↔ sync service, service ↔ database/logs, and one pairing device ↔ another. The service should relay ciphertext, while household content and content keys remain on authorized clients. A compromised authorized client is inside the confidentiality boundary and can expose what it can access.

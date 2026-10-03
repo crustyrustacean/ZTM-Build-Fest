@@ -1,6 +1,22 @@
 # Data Migrations
 
-**Status:** Current through v0.7.4 Routine Stale-Action Correctness; earlier version sections are historical contracts. See Pulse and v0.6.0 below.
+**Status:** v0.9.3 uses additive schema 1→2 sync stores without rewriting canonical bytes. The recoverable local-encryption migration below is a v0.10 development contract; earlier version sections are historical.
+
+## v0.9.3 → v0.10 local protection
+
+Follow [V0.10.0](V0.10.0.md): establish/verify recovery and root wrappers first;
+persist a stable journal; exclude stale writers; stage all events, context, outbox,
+bindings and keys; decrypt/compare exact canonical bytes and perform complete Rust
+replay; replace each database atomically; remove legacy plaintext and capabilities;
+publish encrypted only after both databases agree. Key migration must include the
+signed successor transition for nonextractable legacy transport private keys.
+
+An interruption, tab closure, aborted transaction, quota error, key-generation
+failure, cancelled authentication or failed ciphertext verification preserves the
+legacy dataset or a verified replacement recoverable with the same wrappers.
+Restart resumes the journal and never silently creates another root. Cross-DB
+progress is recoverable, not one fictional atomic transaction. Schema upgrades
+only establish structure; asynchronous crypto and network work happen outside them.
 
 ## Migration categories
 

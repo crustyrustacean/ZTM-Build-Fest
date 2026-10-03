@@ -4,6 +4,13 @@
 
 ## Release sequence
 
+The intended progression is `kin-v0.9.3` → `kin-v0.10.0` (Portable Core + Local
+Data Security) → `kin-v0.11.0` (UX/UI Consolidation) → `kin-v1.0.0` (Stable Kin
+Platform). v1.0 requires BOTH architecture/security and UX/UI readiness. Use the
+concrete development slices and gates in [V0.10.0](V0.10.0.md); do not manufacture
+patch releases or knowingly defer a necessary correctness fix. Create tags only
+after completed validation and requested approval, never at development start.
+
 ```text
 scope complete
       |
