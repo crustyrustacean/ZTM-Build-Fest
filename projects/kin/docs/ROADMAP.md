@@ -1,6 +1,6 @@
 # Roadmap
 
-Current release: `v0.7.0 — Routines`. Daily/Weekly capability is implemented; the next authorized step is v0.7.1 correctness. Stabilization must not add feature scope.
+Current release: `v0.7.1 — Routine Correctness`. Daily/Weekly capability is implemented; this release audits correctness without adding feature scope.
 
 ## Planning releases
 

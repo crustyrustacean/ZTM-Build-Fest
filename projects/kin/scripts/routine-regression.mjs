@@ -40,6 +40,26 @@ export async function routineRegressions() {
     check((await rows()).length === before.length && app.retryAction === null, "stale key rejected and obsolete retry retired");
     check(app.status.textContent.includes("period changed"), "stale action has feedback");
 
+    // The candidate transaction samples its context once. A clock crossing
+    // midnight while the transaction is open cannot retarget the frozen key.
+    const originalEngineApply = app.engine.applyEvents;
+    let sampled = false;
+    app.engine.applyEvents = (...args) => {
+      if (!sampled && args[0].length > 0) {
+        sampled = true;
+        now = new Date(2026, 9, 4, 0, 0, 1).getTime();
+      }
+      return originalEngineApply(...args);
+    };
+    const delayedCount = (await rows()).length;
+    try { await app.saveRoutine({ type: "complete-routine-occurrence", routineId: dailyId, occurrenceKey: 20261003 }); }
+    finally { app.engine.applyEvents = originalEngineApply; }
+    check((await rows()).length === delayedCount + 1, "transaction keeps one sampled context across a clock boundary");
+    routine = app.state.routines.find(r => r.routineId === dailyId);
+    check(routine.occurrenceKey === 20261003 && routine.occurrenceStatus === "completed", "sampled context commits the intended occurrence");
+    now = new Date(2026, 9, 3, 12).getTime();
+    await app.refreshFromEvents();
+
     await app.saveRoutine({ type: "create-routine", text: "Weekly kitchen", cadence: "weekly" });
     const weeklyId = app.state.routines.at(-1).routineId;
     await app.saveRoutine({ type: "complete-routine-occurrence", routineId: weeklyId, occurrenceKey: 20260928 });

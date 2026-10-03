@@ -1,6 +1,6 @@
 # Release Process
 
-**Status:** v0.7.0 Routines release gate. Complete validation and create its annotated tag before starting v0.7.1 correctness. No push or kin-main merge is authorized.
+**Status:** v0.7.1 Routine Correctness release gate. No capability is added. No push or kin-main merge is authorized.
 
 ## Release sequence
 

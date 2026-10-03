@@ -2,7 +2,7 @@
 
 > A private, lightweight household coordination app for the little things families need to know, remember, hand off, or discuss.
 
-**Current status: `v0.7.0` — Routines.** Kin supports Daily and Monday-start Weekly household routines: create, complete the current occurrence, reopen and archive. Rust derives occurrences from saved events and explicit browser-local civil context through protocol v7. Midnight/focus refresh never creates an event. Human Routine actions join the bounded catch-up summary; time transitions do not. IndexedDB stays schema 1; protocols v1–v6 and source event bytes remain supported. No framework, analytics, AI or remote service is present.
+**Current status: `v0.7.1` — Routine Correctness.** Kin supports Daily and Monday-start Weekly household routines: create, complete the current occurrence, reopen and archive. Rust derives occurrences from saved events and explicit browser-local civil context through protocol v7. v0.7.1 hardens recurrence boundaries, replay ordering, malformed context and historical compatibility. Midnight/focus refresh never creates an event. IndexedDB stays schema 1; protocols v1–v6 and source event bytes remain supported. No framework, analytics, AI or remote service is present.
 
 ## The problem
 
@@ -19,6 +19,7 @@ The intended technical direction is Rust compiled to WebAssembly, native Web Com
 ## Release history
 
 - `v0.7.0` — Routines (`kin-v0.7.0`)
+- `v0.7.1` — Routine Correctness (`kin-v0.7.1`)
 
 - `v0.0.1` — Product definition and principles (`kin-v0.0.1`)
 - `v0.0.2` — Architecture, event model, and privacy design (`kin-v0.0.2`)

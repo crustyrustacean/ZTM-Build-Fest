@@ -61,6 +61,23 @@ test("v7 real Wasm daily/weekly lifecycle, rollback and summary", async () => {
   }
 });
 
+test("v7 projection requires matching explicit timestamp/date context and handles DST-shaped civil days", async () => {
+  const engine = await loadKinEngine(url);
+  const daily = [create("daily", "DST", 20260301)];
+  const weekly = [create("weekly", "DST week", 20260301)];
+  assert.equal(engine.applyEvents(daily, 1, null, 20260308).routines[0].occurrenceKey, 20260308);
+  assert.equal(engine.applyEvents(daily, 1, null, 20260309).routines[0].occurrenceKey, 20260309);
+  // The same civil date remains the same period even when its local day is
+  // 23 or 25 elapsed hours around a browser DST transition.
+  assert.equal(engine.applyEvents(daily, 1, null, 20261101).routines[0].occurrenceKey, 20261101);
+  assert.equal(engine.applyEvents(weekly, 1, null, 20260308).routines[0].occurrenceKey, 20260302);
+  assert.equal(engine.applyEvents(weekly, 1, null, 20260309).routines[0].occurrenceKey, 20260309);
+  for (const civilDate of [0, 20260229, 20261301, 20260100, 20260132, 100000101]) {
+    assert.throws(() => engine.applyEvents([], 1, null, civilDate), error => error.code === 2);
+  }
+  assert.throws(() => engine.applyEvents([], 8640000000000001, null, 20260308), error => error.code === 2);
+});
+
 test("v7 result decoder rejects truncation, fields, duplicates and trailing bytes", async context => {
   const instantiate = WebAssembly.instantiate;
   let mutate = () => {}, reportedLength, actualLength;
