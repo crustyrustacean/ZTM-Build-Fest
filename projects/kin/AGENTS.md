@@ -100,7 +100,7 @@ If an unrelated parent-repository file was modified accidentally, revert that ch
 
 # Current Development Stage
 
-Kin uses semantic versions. The current implementation is `v0.10.3` — Bounded Storage/Archive Hardening & Architecture Closure, following the published v0.10.0/v0.10.1 and root-lifecycle v0.10.2 releases. The user authorized annotated tags before updating existing PR #15 into `kin-development`, then a stop for human review. Preserve every published tag exactly. Root replacement follows [ROOT-ROTATION](docs/ROOT-ROTATION.md); archive recovery is intentionally local-only and KARC v1 remains supported. Do not begin v0.11 or v1.0 automatically, and do not manufacture v0.10.4 for housekeeping. Relay/identity state remains in-memory; no production certification, mobile readiness or independent audit is claimed. No automatic kin-main or kin-development merge. See [V0.10.0](docs/V0.10.0.md) for actual evidence and limitations.
+Kin uses semantic versions. The current implementation is `v0.10.3` — Bounded Storage/Archive Hardening & Architecture Closure, following the published v0.10.0/v0.10.1 and root-lifecycle v0.10.2 releases. The user authorized annotated tags before updating existing PR #15 into `kin-development`, then a stop for human review. Preserve every published tag exactly. Root replacement follows [ROOT-ROTATION](docs/ROOT-ROTATION.md); archive recovery is intentionally local-only and KARC v1 remains supported. The forward roadmap is v0.11 durable service/deployment, v0.12 data lifecycle/deletion, v0.13 recovery/continuity, v0.14 UX/UI consolidation, then v1.0 stability. These lines are planned, not implemented; do not begin any automatically or manufacture v0.10.4 for housekeeping. Relay/identity state remains in-memory; no production certification, mobile readiness or independent audit is claimed. No automatic kin-main or kin-development merge. See [V0.10.0](docs/V0.10.0.md) for actual evidence and limitations.
 
 The pre-implementation releases are:
 
@@ -1006,9 +1006,12 @@ v0.7.0 — Routines
 v0.8.0 — Household Pairing
 v0.9.0 — Encrypted Sync
 v0.9.3 — Encrypted Event Sync Stabilization
-v0.10.x — Portable Core + Local Data Security
-v0.11.x — UX/UI Consolidation
-v1.0.0 — Stable Kin Platform
+v0.10.x — Portable Core + Local Security
+v0.11.x — Durable Service & Deployment (planned)
+v0.12.x — Data Lifecycle, Retention & Deletion (planned)
+v0.13.x — Recovery & Household Continuity (planned)
+v0.14.x — UX/UI Consolidation (planned)
+v1.0.0 — Stable Kin Platform (planned)
 ```
 
 This roadmap may evolve.
@@ -1038,7 +1041,9 @@ After `.3`, stop and ask the user whether the minor release line is satisfactory
 
 Kin uses namespaced Git tags because it lives inside the multi-project ZTM Build Fest repository. Tag every completed Kin version, including planning, documentation, implementation, patch, and other milestone releases.
 
-Use the `kin-` prefix for every tag:
+Use the `kin-` prefix for every tag. Names listed for releases after the current
+implementation are guidance only, not evidence that a tag exists. Verify before
+reporting a release; a roadmap-only task creates no tags.
 
 ```text
 kin-v0.0.1
@@ -1105,6 +1110,9 @@ kin-v0.10.1
 kin-v0.10.2
 kin-v0.10.3
 kin-v0.11.0
+kin-v0.12.0
+kin-v0.13.0
+kin-v0.14.0
 kin-v1.0.0
 ```
 

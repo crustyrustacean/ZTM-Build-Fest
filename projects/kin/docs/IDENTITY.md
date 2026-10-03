@@ -69,3 +69,13 @@ Bootstrap and claim activation set a separate opaque `kin_device` cookie whose h
 ## v0.1.0 boundary
 
 The first coded release uses local household, actor, and device placeholders only. No account, passkey, membership, pairing, authorization, remote session, or multi-device behavior is implied.
+
+## Forward platform gates
+
+The planned v0.11 line must make the membership, credential, trusted-device,
+revocation and coordination state that currently lives in process memory durable
+across restart, without changing the service into a plaintext household
+authority. The planned v0.13 line must define replacement-device and household
+recovery against current membership, deletion and revocation state. These are
+planning requirements, not implemented behavior; see [ROADMAP](ROADMAP.md) and
+the [v0.11](V0.11.0.md)/[v0.13](V0.13.0.md) contracts.

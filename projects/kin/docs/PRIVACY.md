@@ -1,6 +1,6 @@
 # Privacy
 
-**Status:** Current through v0.10.0. Local protected content is encrypted after verified migration. Sync is optional and uploads client-encrypted canonical event envelopes. The service receives no plaintext household event payloads or content keys, but it sees routing and traffic metadata; no anonymity or zero-knowledge claim is made.
+**Status:** Current through v0.10.3. Local protected content is encrypted after verified migration. Sync is optional and uploads client-encrypted canonical event envelopes. The service receives no plaintext household event payloads or content keys, but it sees routing and traffic metadata; no anonymity or zero-knowledge claim is made.
 
 v0.10 encrypts local canonical events, duplicated outbox content, protected metadata
 and private sync key material. Household drafts remain in unlocked memory only;
@@ -74,7 +74,7 @@ The planning design for these boundaries is documented in [Identity](IDENTITY.md
 
 ## Data lifecycle questions
 
-Event-oriented history is not an excuse to keep personal data indefinitely. The planning policy distinguishes routine archival, household deletion, device revocation, and member removal in [RETENTION](RETENTION.md), and specifies user-controlled portable copies in [PORTABILITY](PORTABILITY.md). Exact deletion propagation, durable-service backup windows, and relay metadata retention remain unresolved and are not implemented guarantees.
+Event-oriented history is not an excuse to keep personal data indefinitely. The planning policy distinguishes routine archival, household deletion, device revocation, and member removal in [RETENTION](RETENTION.md), and specifies user-controlled portable copies in [PORTABILITY](PORTABILITY.md). Exact deletion propagation, durable-service backup windows, and relay metadata retention remain unresolved and are not implemented guarantees. v0.12 is planned to define lifecycle/deletion/retention; v0.13 is planned to define recovery and household continuity after loss. The [roadmap](ROADMAP.md) places these before v0.14 UX/UI consolidation.
 
 ## Claims boundary
 

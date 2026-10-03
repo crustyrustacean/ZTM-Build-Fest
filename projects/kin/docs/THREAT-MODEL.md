@@ -1,6 +1,6 @@
 # Threat Model
 
-**Status:** Implemented through v0.10.3 for local incubation. Local authenticated encryption, credential/recovery root wrappers, locked startup, encrypted archives and signed transport-key migration complement encrypted sync. The identity service and relay remain in-memory. Independent security audit, cross-browser certification, durable service storage and server-identity recovery are not provided. This assessment is not a security certification.
+**Status:** Implemented through v0.10.3 for local incubation. Local authenticated encryption, credential/recovery root wrappers, locked startup, encrypted archives and signed transport-key migration complement encrypted sync. The identity service and relay remain in-memory. Independent security audit, cross-browser certification, durable service storage and server-identity recovery are not provided. The planned v0.11 line addresses durable service/deployment, v0.12 defines lifecycle/deletion and retention, and v0.13 defines recovery/continuity. None is implemented or certified by this assessment.
 
 ## v0.10 local-at-rest boundary
 

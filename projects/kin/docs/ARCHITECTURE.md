@@ -68,10 +68,15 @@ caches an explicit static-shell allowlist; API/user data cannot enter Cache Stor
 Offline startup uses the same lock boundary. See [PORTABILITY](PORTABILITY.md)
 and [V0.10.0](V0.10.0.md).
 
-v0.11 owns holistic navigation, visual and interaction refinement after these
-boundaries stabilize. Basic accessible lock, unsupported-unlock, recovery,
-migration and corruption states are required in v0.10. The architecture is not
-complete if v0.11 must redesign encryption, storage, commands or recovery.
+The post-v0.10 roadmap first closes platform gaps: v0.11 makes identity and relay
+state durable and defines deployment/restart behavior; v0.12 defines retention,
+deletion and event lifecycle; v0.13 defines recovery authority and continuity.
+Only then does v0.14 own holistic navigation, visual and interaction refinement.
+Basic accessible lock, unsupported-unlock, recovery, migration and corruption
+states remain required in v0.10. The architecture is not complete if v0.14 must
+redesign encryption, storage, commands, service durability, deletion or recovery.
+See [ROADMAP](ROADMAP.md) and the [v0.11](V0.11.0.md)–[v0.14](V0.14.0.md)
+planning contracts.
 
 ## v0.9.3 system shape (baseline)
 
@@ -134,7 +139,8 @@ The v0.9.3 baseline duplicated canonical layouts in browser code and read fields
 by fixed offsets. v0.10.0 moved command construction, codec validation and metadata
 to Rust through the narrow WASM adapter. Browser storage/sync pass canonical bytes
 and consume validated metadata. No remaining domain codec migration is assigned
-to v0.11.
+to the planned platform and UX lines; no remaining domain codec migration is
+assigned to a future release.
 
 v0.10.3 adds compact Rust-owned archive header/layout validation so opaque
 ciphertext does not cross WASM merely to be copied. KARC v1 bytes and existing

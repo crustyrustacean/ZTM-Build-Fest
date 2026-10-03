@@ -1,6 +1,6 @@
 # Synchronization Design
 
-**Status:** Implemented through v0.10.3 for the local incubation service. Existing encrypted envelopes and v8 canonical replay remain compatible. The local outbox, sync state, epoch secrets and private device keys are encrypted at rest and unavailable while locked. Signed device-key successors preserve verification history and repair entitled post-join epoch grants. The relay and identity service remain in-memory; acknowledgements are process-local, not durable.
+**Status:** Implemented through v0.10.3 for the local incubation service. Existing encrypted envelopes and v8 canonical replay remain compatible. The local outbox, sync state, epoch secrets and private device keys are encrypted at rest and unavailable while locked. Signed device-key successors preserve verification history and repair entitled post-join epoch grants. The relay and identity service remain in-memory; acknowledgements are process-local, not durable. The planned v0.11 line defines restart-safe durability without changing the service into a household source of truth.
 
 ## Intended direction
 
@@ -15,7 +15,9 @@ guards reject stale operations.
 **Stable archive decision: Option A, intentionally local-only recovery.** Restore
 does not establish membership, trusted-device enrollment or epoch entitlement.
 Sync reattachment requires a separately authorized future workflow and is not
-partially supported. v0.11 must preserve this boundary in its recovery UX.
+partially supported. v0.13 must make the archive/authority boundary an explicit
+recovery decision; v0.14 must present it without implying that an archive
+restores membership or device trust.
 
 Transport envelope/protocol v1 and canonical event protocols v1–v8 remain unchanged.
 Local canonical events/outbox copies, epoch records and device private serializations
