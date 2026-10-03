@@ -63,7 +63,7 @@ The intended technical direction is Rust compiled to WebAssembly, native Web Com
 - `v0.7.1` — Routine Correctness (`kin-v0.7.1`)
 - `v0.7.2` — Routine Resilience & Accessibility (`kin-v0.7.2`)
 - `v0.7.3` — Routine Hardening & Polish (`kin-v0.7.3`)
-- `v0.7.4` — Routine Stale-Action Correctness (prepared; tag pending validated release commit)
+- `v0.7.4` — Routine Stale-Action Correctness (`kin-v0.7.4`)
 - See the [changelog](CHANGELOG.md) for the completed release history.
 
 ## Install, build, and run

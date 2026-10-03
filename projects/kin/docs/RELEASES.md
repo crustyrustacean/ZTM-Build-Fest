@@ -1,6 +1,6 @@
 # Release Process
 
-**Status:** v0.7.4 Routine Stale-Action Correctness release gate. No capability is added. No push or kin-main merge is authorized.
+**Status:** v0.7.4 Routine Stale-Action Correctness release. No capability is added. The fork branch and tag are pushed; no upstream push or kin-main merge is authorized.
 
 ## Release sequence
 
@@ -77,4 +77,4 @@ Follow [V0.7.0](V0.7.0.md) for capability, correctness, resilience/accessibility
 
 ## v0.8.0 Household Pairing
 
-The v0.7.4 patch release is prepared and validated; create its annotated `kin-v0.7.4` tag only on the corresponding release commit. [V0.8.0](V0.8.0.md) is the current planning checkpoint for identity and pairing; do not tag or claim a v0.8.0 implementation until its authorization, recovery, cryptographic, ABI, storage, and compatibility gates are frozen and implemented.
+The v0.7.x line is complete at `kin-v0.7.4`, which points to validated release commit `a8ded079be6fdbedba8738a64a5f0fb753e7fdd6` and is pushed to the fork, not upstream. [V0.8.0](V0.8.0.md) is the current planning checkpoint for identity and pairing; do not tag or claim a v0.8.0 implementation until its authorization, recovery, cryptographic, ABI, storage, and compatibility gates are frozen and implemented.
