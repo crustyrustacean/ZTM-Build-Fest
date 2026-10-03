@@ -19,7 +19,15 @@ import {
 // Existing scenarios use a fixed explicit civil context; raw legacy fixtures stay unchanged.
 async function loadKinEngine(...args) {
   const engine = await loadCurrentEngine(...args);
-  return { applyEvents: (records, asOf, cursor = null, civilDate = 20261002) => engine.applyEvents(records, asOf, cursor, civilDate) };
+  return {
+    applyEvents: (
+      records,
+      asOf,
+      cursor = null,
+      civilDate = 20261002,
+      syncIdentity = null,
+    ) => engine.applyEvents(records, asOf, cursor, civilDate, syncIdentity),
+  };
 }
 
 const zeroId = new Uint8Array(16);
@@ -142,6 +150,114 @@ function emptyV7State() {
   };
 }
 
+test("protocol v8 resolves legacy identity bindings without rewriting records", async () => {
+  const wasm = await readFile(new URL("./kin_engine.wasm", import.meta.url));
+  const engine = await loadKinEngine(
+    `data:application/wasm;base64,${wasm.toString("base64")}`,
+  );
+  const first = legacyRecord(1, 1);
+  const second = legacyRecord(1, 2);
+  second.fill(0xdd, 20, 36);
+  second.fill(0xee, 36, 52);
+  second.fill(0xff, 52, 68);
+  second.fill(0x22, 88, 104);
+  new DataView(second.buffer).setBigUint64(76, 1n, true);
+  new DataView(first.buffer).setBigUint64(76, 1n, true);
+  const firstBytes = first.slice();
+  const secondBytes = second.slice();
+  const householdId = "99".repeat(16);
+  const syncIdentity = {
+    householdId,
+    bindings: [
+      {
+        legacyHouseholdId: "aa".repeat(16),
+        legacyActorId: "bb".repeat(16),
+        legacyDeviceId: "cc".repeat(16),
+        householdId,
+        actorId: "22".repeat(16),
+        deviceId: "02".repeat(16),
+      },
+      {
+        legacyHouseholdId: "dd".repeat(16),
+        legacyActorId: "ee".repeat(16),
+        legacyDeviceId: "ff".repeat(16),
+        householdId,
+        actorId: "33".repeat(16),
+        deviceId: "01".repeat(16),
+      },
+    ],
+  };
+
+  const state = engine.applyEvents(
+    [first, second],
+    0,
+    null,
+    20261002,
+    syncIdentity,
+  );
+  assert.deepEqual(
+    state.items.map((item) => item.createdBy),
+    ["33".repeat(16), "22".repeat(16)],
+  );
+  assert.deepEqual(first, firstBytes);
+  assert.deepEqual(second, secondBytes);
+  assert.throws(
+    () =>
+      engine.applyEvents([first], 0, null, 20261002, {
+        householdId,
+        bindings: [],
+      }),
+    (error) => error.code === 4,
+  );
+});
+
+test("protocol v8 replays 10,000 equal-time events through real WASM deterministically", async () => {
+  const wasm = await readFile(new URL("./kin_engine.wasm", import.meta.url));
+  const engine = await loadKinEngine(
+    `data:application/wasm;base64,${wasm.toString("base64")}`,
+  );
+  const id = (value) => value.toString(16).padStart(32, "0");
+  const idBytes = (value) =>
+    Uint8Array.from(
+      Array.from({ length: 16 }, (_, index) =>
+        Number.parseInt(id(value).slice(index * 2, index * 2 + 2), 16),
+      ),
+    );
+  const records = Array.from({ length: 10_000 }, (_, index) =>
+    encodeAddedRecord({
+      eventId: idBytes(index + 1),
+      householdId: new Uint8Array(16).fill(0xaa),
+      actorId: new Uint8Array(16).fill(0xbb),
+      deviceId: new Uint8Array(16).fill(0xcc),
+      timestamp: 1,
+      logicalTime: 7n,
+      itemId: idBytes(index + 10_001),
+      text: "x",
+      classification: "need",
+    }),
+  );
+  const householdId = "dd".repeat(16);
+  const syncIdentity = {
+    householdId,
+    bindings: [
+      {
+        legacyHouseholdId: "aa".repeat(16),
+        legacyActorId: "bb".repeat(16),
+        legacyDeviceId: "cc".repeat(16),
+        householdId,
+        actorId: "ee".repeat(16),
+        deviceId: "ff".repeat(16),
+      },
+    ],
+  };
+  const state = engine.applyEvents(records, 0, null, 20261002, syncIdentity);
+  assert.equal(state.items.length, 10_000);
+  assert.equal(state.items[0].createdBy, "ee".repeat(16));
+  assert.equal(state.summary.totalCount, 10_000);
+  assert.equal(state.summary.throughEventId, id(10_000));
+  assert.equal(state.summary.entries.length, 8);
+});
+
 async function rawEngine() {
   const { instance } = await WebAssembly.instantiate(
     await readFile(new URL("./kin_engine.wasm", import.meta.url)),
@@ -228,59 +344,56 @@ test("real WASM apply accepts only an exact live input allocation", async () => 
   }
 });
 
-test(
-  "bridge accepts KERR version 1 and rejects other or malformed versions",
-  async (context) => {
-    const instantiate = WebAssembly.instantiate;
-    let mutateError = () => {};
-    context.mock.method(WebAssembly, "instantiate", async (...args) => {
-      const { instance } = await instantiate(...args);
-      const abi = instance.exports;
-      return {
-        instance: {
-          exports: {
-            ...abi,
-            kin_apply_events(pointer, length) {
-              new DataView(abi.memory.buffer).setUint16(pointer + 4, 99, true);
-              const status = abi.kin_apply_events(pointer, length);
-              mutateError(
-                new Uint8Array(
-                  abi.memory.buffer,
-                  abi.kin_error_ptr(),
-                  abi.kin_error_len(),
-                ),
-              );
-              return status;
-            },
+test("bridge accepts KERR version 1 and rejects other or malformed versions", async (context) => {
+  const instantiate = WebAssembly.instantiate;
+  let mutateError = () => {};
+  context.mock.method(WebAssembly, "instantiate", async (...args) => {
+    const { instance } = await instantiate(...args);
+    const abi = instance.exports;
+    return {
+      instance: {
+        exports: {
+          ...abi,
+          kin_apply_events(pointer, length) {
+            new DataView(abi.memory.buffer).setUint16(pointer + 4, 99, true);
+            const status = abi.kin_apply_events(pointer, length);
+            mutateError(
+              new Uint8Array(
+                abi.memory.buffer,
+                abi.kin_error_ptr(),
+                abi.kin_error_len(),
+              ),
+            );
+            return status;
           },
         },
-      };
-    });
-    const wasm = await readFile(new URL("./kin_engine.wasm", import.meta.url));
-    const engine = await loadKinEngine(
-      `data:application/wasm;base64,${wasm.toString("base64")}`,
-    );
+      },
+    };
+  });
+  const wasm = await readFile(new URL("./kin_engine.wasm", import.meta.url));
+  const engine = await loadKinEngine(
+    `data:application/wasm;base64,${wasm.toString("base64")}`,
+  );
 
-    for (const [label, mutation, expectedCode] of [
-      ["version 1", () => {}, 3],
-      ["version 2", (bytes) => (bytes[4] = 2), 6],
-      ["version 7", (bytes) => (bytes[4] = 7), 6],
-      [
-        "malformed length",
-        (bytes) =>
-          new DataView(bytes.buffer, bytes.byteOffset).setUint32(8, 0, true),
-        6,
-      ],
-    ]) {
-      mutateError = mutation;
-      assert.throws(
-        () => engine.applyEvents([], 0),
-        (error) => error.code === expectedCode,
-        label,
-      );
-    }
-  },
-);
+  for (const [label, mutation, expectedCode] of [
+    ["version 1", () => {}, 3],
+    ["version 2", (bytes) => (bytes[4] = 2), 6],
+    ["version 7", (bytes) => (bytes[4] = 7), 6],
+    [
+      "malformed length",
+      (bytes) =>
+        new DataView(bytes.buffer, bytes.byteOffset).setUint32(8, 0, true),
+      6,
+    ],
+  ]) {
+    mutateError = mutation;
+    assert.throws(
+      () => engine.applyEvents([], 0),
+      (error) => error.code === expectedCode,
+      label,
+    );
+  }
+});
 
 test("real WASM ABI preserves exact v1 empty, active and completed results", async () => {
   const apply = await rawEngine();

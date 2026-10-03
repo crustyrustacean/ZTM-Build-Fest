@@ -1,6 +1,6 @@
 # Privacy
 
-**Status:** Current through v0.7.4 Routine Stale-Action Correctness; earlier version sections are historical contracts. See Pulse and v0.6.0 below.
+**Status:** Current through v0.9.3. Sync is optional and uploads client-encrypted canonical event envelopes. The service receives no plaintext household event payloads or content keys, but it sees routing and traffic metadata; no anonymity or zero-knowledge claim is made.
 
 The in-progress compose draft may be held in tab-scoped `sessionStorage` to survive a reload. It is not part of the event log, is not shared with another tab, and is cleared after successful save or explicit clear. Browser site-data controls remove both the event store and any draft.
 
@@ -8,7 +8,7 @@ Same-origin tabs may exchange the fixed `events-changed` notification over `Broa
 
 Since You Last Looked stores only a local event cursor and local timestamp in the existing `local_context` singleton. A cursor means that this installation explicitly advanced through a boundary; it does not identify a person or assert that a named member read anything. Viewing or marking the summary does not write a household event. The additional `view-state-changed` BroadcastChannel message is a fixed, content-free marker; it carries no cursor, IDs, count, text, actor, or device.
 
-Household information can be highly personal. Future implementation must minimize exposure and communicate clearly what is stored and shared.
+Household information can be highly personal. Sync remains disabled until an authenticated adult explicitly enables it. Local-only use continues without sync.
 
 ## Intended principles
 
@@ -17,9 +17,9 @@ Household information can be highly personal. Future implementation must minimiz
 - **No advertising and no sale of data:** These are product commitments for the intended direction.
 - **No household-content analytics:** Do not collect household content for analytics.
 - **No default AI processing:** Household content will not be sent to an AI service by default. Kin is not designed around an AI runtime.
-- **Encrypted synchronization later:** Sync, if introduced, should protect household content in transit and at rest on the service; the threat model and key design must be specified before claiming end-to-end confidentiality.
-- **Explicit device authorization:** Pairing or trusting a device must be intentional and understandable.
-- **Device revocation:** Future users should be able to revoke a device's access.
+- **Encrypted synchronization:** v0.9 encrypts canonical event bytes before upload and verifies device signatures on recipients. A compromised authorized browser/runtime can still read content.
+- **Explicit device authorization:** Pairing and local fingerprint comparison bind generated device keys before provisioning.
+- **Device revocation:** Sessions are invalidated and future epochs rotate; prior plaintext/keys cannot be recalled.
 - **Clear export and deletion controls:** These should be designed before meaningful household data is stored or synchronized.
 
 ## Local-first progression
@@ -38,7 +38,7 @@ Rust reconstructs state
 
 No remote sync exists in v0.1.0. Local-first describes where this release processes data; it is not a claim that browser storage alone is secure against device compromise, shared browser profiles, or malicious extensions.
 
-## Future encrypted sync concept
+## v0.9 Encrypted Sync Boundary
 
 ```text
 Parent A
@@ -58,17 +58,21 @@ Parent A
   Parent B
 ```
 
-This is a conceptual direction only. Passkeys, household keys, encryption, pairing, authorization, revocation, and sync are not yet implemented. A passkey is not itself a household encryption design. Key creation, backup/recovery, device enrollment, revocation, metadata exposure, and failure recovery all need an explicit threat model before implementation.
+The browser encrypts the exact canonical event bytes and signs envelopes with a device key. The service authorizes, stores, and forwards opaque envelopes; it does not reduce household semantics or hold plaintext epoch keys. Passkeys authenticate members and are not content keys. Full implementation details are in [V0.9.0](V0.9.0.md).
+
+The service still sees household/member/device/session IDs, event IDs, per-device sequences, key epochs, cursors, ciphertext sizes, event counts/timing, provisioning participants, revocation timing, IP addresses, and connection patterns. It can infer which devices share a household and when they synchronize. Encryption does not make traffic anonymous.
+
+The relay and identity service are process-memory only. Restart can lose server-side ciphertext/state, and acknowledgements are not durable. Local event bytes and cached exact envelopes remain on devices that hold them. New/replacement adults do not receive pre-join epoch keys in v0.9; missing history may be unavailable. All trusted-device/key loss can make content unrecoverable. See the [Threat Model](THREAT-MODEL.md).
 
 The planning design for these boundaries is documented in [Identity](IDENTITY.md), [Pairing](PAIRING.md), [Synchronization](SYNC.md), [Cryptography](CRYPTOGRAPHY.md), and the [Threat Model](THREAT-MODEL.md). These documents specify intended properties and open decisions; they do not establish implemented security guarantees.
 
 ## Data lifecycle questions
 
-Event-oriented history is not an excuse to keep personal data indefinitely. The planning policy distinguishes routine archival, household deletion, device revocation, and member removal in [RETENTION](RETENTION.md), and specifies user-controlled portable copies in [PORTABILITY](PORTABILITY.md). Exact deletion propagation, backup windows, and service metadata retention must be finalized before remote sync ships; the policy documents are not implemented guarantees.
+Event-oriented history is not an excuse to keep personal data indefinitely. The planning policy distinguishes routine archival, household deletion, device revocation, and member removal in [RETENTION](RETENTION.md), and specifies user-controlled portable copies in [PORTABILITY](PORTABILITY.md). Exact deletion propagation, durable-service backup windows, and relay metadata retention remain unresolved and are not implemented guarantees.
 
 ## Claims boundary
 
-Documentation describes intent, not verified security properties. Kin must not be described as encrypted, private-by-design in a technically verified sense, or safe for sensitive content until implementation and review support those claims.
+Kin implements client-side encrypted event sync, but it has not received independent security review or production operational hardening. Do not call the service zero-knowledge, anonymous, or robustly recoverable; do not imply cryptography protects a compromised unlocked browser/runtime.
 
 ## v0.5.0 Pulse
 

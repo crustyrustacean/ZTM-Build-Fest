@@ -1,6 +1,6 @@
 # Derived Household State
 
-**Status:** Current through v0.7.0 Routines; earlier version sections are historical contracts. See v0.7.0 below.
+**Status:** Current through v0.9.3. Rust remains the authoritative deterministic projection/replay engine; synchronized v8 replay resolves verified identities and orders equal-time concurrent events without changing canonical bytes.
 
 ## Projection pipeline
 
@@ -42,7 +42,7 @@ ItemState
 └── status: active | completed | archived
 ```
 
-Items are identified by stable item ID, never display text. Actor, household, and device IDs remain local placeholders. Schema-v1 `ITEM_ADDED` events normalize to `today`; schema-v2 events carry explicit classification. HandoffState contains handoff_id, text, created_by, created_at, and status (unacknowledged, acknowledged, archived). Acknowledgement actor/time remain in its source envelope. TalkState contains talk_id, text, created_by, created_at and open/resolved/archived status. Routine, Agreement, authentication, and remote device state remain future work.
+Items are identified by stable item ID, never display text. Pre-sync actor, household, and device IDs remain immutable local placeholders and are resolved only through the verified v8 identity-binding context. Schema-v1 `ITEM_ADDED` events normalize to `today`; schema-v2 events carry explicit classification. HandoffState contains handoff_id, text, created_by, created_at, and status (unacknowledged, acknowledged, archived). Acknowledgement actor/time remain in its source envelope. TalkState contains talk_id, text, created_by, created_at and open/resolved/archived status. Routines are implemented. Agreement remains unscheduled; authentication and trusted-device authorization stay service-owned rather than becoming household content projections.
 
 ## Validation and errors
 
@@ -82,9 +82,9 @@ Do not physically erase a domain entity's earlier events to represent routine re
 
 This does not override a person's right to request data deletion. Physical log compaction, household erasure, backup deletion, and cross-device deletion require a later privacy and synchronization design. No retention or erasure implementation exists yet.
 
-## Future sync boundary
+## v0.9 Distributed Sync Boundary
 
-A deterministic total event ordering makes projections reproducible; it does not decide which conflicting human intent wins. Semantic conflict rules, including archive versus complete, are separate future sync design work. v0.1.0 has one local append-ordered stream and no merge behavior.
+A deterministic v8 total ordering makes synchronized projections reproducible; it does not decide which conflicting human intent wins. The local v0.1-v0.8 stream remains append-ordered. v8 sorts a copy for state replay while preserving original local-arrival order for catch-up boundaries. Equal-time concurrent archive/mutation behavior is documented in the v0.9 release contract; no generic CRDT or wall-clock LWW is used.
 
 ## v0.4.0 Talk
 

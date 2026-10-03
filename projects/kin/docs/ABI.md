@@ -1,6 +1,6 @@
 # JavaScript–WASM ABI
 
-**Status:** Current through v0.7.4 Routine Stale-Action Correctness and ABI ownership hardening; earlier version sections are historical contracts.
+**Status:** Current through v0.9.3. Protocols v1-v7 remain compatible; synchronized clients use additive protocol v8. Earlier version sections are historical contracts.
 
 ## Target and exports
 
@@ -165,3 +165,30 @@ The v6 result header is exactly 52 bytes: `KINS`, version 6, reserved zero, Item
 ## v0.7.0 Routines
 
 Protocol v7 adds an explicit civil date: 44-byte KINE header and 56-byte KINS header, unchanged exports/ownership, schema-1 Routine kinds 14–17, 56-byte Routine result records and summary kinds 12–15. Current browser calls `applyEvents(records, asOf, cursorEventId, civilDate)` with required explicit context. v1–v6 retain exact layouts/behavior; KERR stays v1. See [V0.7.0](V0.7.0.md) for authoritative offsets, validation and bounds.
+
+## v0.9.0 Distributed replay
+
+Protocol v8 is additive; v1–v7 request/result layouts remain unchanged. A v8 request begins with the v7 44-byte header and appends:
+
+```text
+offset  size  field
+44      16    authenticated target household ID
+60      2     identity_binding_count (0..256)
+62      2     reserved = 0
+```
+
+Then come `identity_binding_count` fixed 96-byte records, before the unchanged 88-byte event records:
+
+```text
+size  field
+16    legacy household ID
+16    legacy actor ID
+16    legacy device ID
+16    authenticated household ID (must equal request target)
+16    authenticated member/actor ID
+16    authenticated trusted-device ID
+```
+
+All IDs are opaque 16-byte values. Duplicate legacy tuple mappings, conflicting/ambiguous bindings, a target-household mismatch, missing binding for an event from a different household, truncated binding, nonzero reserved bytes, or more than 256 bindings fail closed. The JS caller supplies only bindings already verified by the encrypted/signature-checked control record; the ABI itself is not a cryptographic verifier. Event header/payload bytes and `canonical_bytes` are never rewritten.
+
+For v8 only, equal logical times are valid. Rust creates an owned copy and sorts that copy for household state reduction by `(logical_time, effective device_id bytewise, event_id bytewise)`. The decoded request retains input/local-arrival order; summary `through_event_id` and the Since You Last Looked cursor use that original order, not the reducer's sort. The v8 KINS result has the same 56-byte header and record layout as v7, with `version=8`. The KERR layout/statuses, 10,000-event bound, and 64 MiB request/result bounds remain unchanged.

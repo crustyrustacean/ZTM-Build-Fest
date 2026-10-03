@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
+import { createHash, webcrypto } from "node:crypto";
 import test from "node:test";
 import {
   CLAIM_TTL_MS,
@@ -13,12 +13,40 @@ import {
 } from "./pairing-service.mjs";
 import { createKinServer } from "./server.mjs";
 import { CHALLENGE_TTL_MS, WebAuthn } from "./webauthn.mjs";
+import {
+  createDeviceAuthorizationCertificate,
+  deviceKeyFingerprint,
+} from "../web/sync/crypto.js";
+
+globalThis.crypto ??= webcrypto;
 
 const credential = (suffix) => ({
   id: `credential-${suffix}`,
   publicKey: `key-${suffix}`,
   algorithm: -7,
 });
+
+async function syncDeviceKeyPair() {
+  const [agreement, signing] = await Promise.all([
+    crypto.subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, false, [
+      "deriveBits",
+    ]),
+    crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, false, [
+      "sign",
+      "verify",
+    ]),
+  ]);
+  return {
+    keys: {
+      agreementPrivateKey: agreement.privateKey,
+      signingPrivateKey: signing.privateKey,
+    },
+    publicKeys: {
+      agreement: await crypto.subtle.exportKey("jwk", agreement.publicKey),
+      signing: await crypto.subtle.exportKey("jwk", signing.publicKey),
+    },
+  };
+}
 const setup = () => {
   let now = 1_000_000;
   const service = new PairingService({
@@ -175,9 +203,7 @@ function registrationAttestation(cose) {
   ]);
   return {
     id: base64url(credentialId),
-    attestationObject: base64url(
-      encodeCbor(new Map([["authData", authData]])),
-    ),
+    attestationObject: base64url(encodeCbor(new Map([["authData", authData]]))),
   };
 }
 function clientData(challenge, overrides = {}) {
@@ -544,6 +570,14 @@ test("HTTP member removal requires fresh action-bound passkey proof", async () =
       () => service.authorize(joined.sessionToken),
       (error) => error.code === "authentication_required",
     );
+    const revokedStatus = await apiRequest(server, "/api/status", {
+      cookie: `kin_session=${joined.sessionToken}; kin_device=${joined.deviceToken}`,
+    });
+    assert.equal((await revokedStatus.json()).identity, null);
+    assert.deepEqual(responseCookies(revokedStatus), [
+      "kin_session=",
+      "kin_device=",
+    ]);
     assert.equal(approved.state, "Confirmed");
   } finally {
     await server.close();
@@ -593,10 +627,205 @@ test("HTTP pairing approval binds the assertion credential to the signed-in adul
     assert.equal((await finish(valid.flow, "credential-a")).status, 200);
     assert.equal(service.households.get(adult.householdId).members.size, 2);
     assert.equal((await finish(valid.flow, "credential-a")).status, 410);
-    assert.equal(service.credentials.get("credential-other-adult").memberId, other.memberId);
+    assert.equal(
+      service.credentials.get("credential-other-adult").memberId,
+      other.memberId,
+    );
   } finally {
     await server.close();
   }
+});
+
+test("HTTP same-member device pairing claims, approves, and activates without adding an adult", async () => {
+  const { service, adult } = setup();
+  const inviterKeys = await syncDeviceKeyPair();
+  service.registerSyncPublicKeys(adult.sessionToken, inviterKeys.publicKeys);
+  const server = await startTestServer({ service });
+  const adultCookie = `kin_session=${adult.sessionToken}`;
+  try {
+    const invitationResponse = await apiRequest(
+      server,
+      "/api/devices/pairings",
+      { method: "POST", cookie: adultCookie, body: {} },
+    );
+    assert.equal(invitationResponse.status, 201);
+    const invitation = await invitationResponse.json();
+    assert.equal(invitation.purpose, "device");
+
+    const registrationOptions = await apiRequest(
+      server,
+      "/api/passkeys/register/options",
+      {
+        method: "POST",
+        body: {
+          purpose: "claim",
+          code: invitation.code,
+          deviceLabel: "Second device",
+        },
+      },
+    );
+    const registration = await registrationOptions.json();
+    assert.equal(registrationOptions.status, 200);
+    assert.equal(server.flows.get(registration.flow).purpose, "device-claim");
+    const claimantKeys = await syncDeviceKeyPair();
+    const claimResponse = await apiRequest(
+      server,
+      "/api/passkeys/register/finish",
+      {
+        method: "POST",
+        body: {
+          flow: registration.flow,
+          credential: { id: "credential-device-two", flow: registration.flow },
+          syncPublicKeys: claimantKeys.publicKeys,
+        },
+      },
+    );
+    assert.equal(claimResponse.status, 200);
+    const claim = await claimResponse.json();
+    const claimCookie = cookieValue(
+      responseCookies(claimResponse),
+      "kin_claim",
+    );
+    assert.equal(claim.purpose, "device");
+    const pendingPairing = service.pairings.get(invitation.pairingId);
+    const deviceCertificate = await createDeviceAuthorizationCertificate({
+      householdId: adult.householdId,
+      memberId: pendingPairing.claimant.memberId,
+      deviceId: pendingPairing.claimant.deviceId,
+      issuerDeviceId: adult.deviceId,
+      issuerFingerprint: await deviceKeyFingerprint(inviterKeys.publicKeys),
+      publicKeys: claimantKeys.publicKeys,
+      signingKey: inviterKeys.keys.signingPrivateKey,
+    });
+
+    const approvalOptionsResponse = await apiRequest(
+      server,
+      `/api/pairings/${invitation.pairingId}/approve/options`,
+      {
+        method: "POST",
+        cookie: adultCookie,
+        body: { expectedVersion: claim.version },
+      },
+    );
+    const approval = await approvalOptionsResponse.json();
+    const approved = await apiRequest(
+      server,
+      `/api/pairings/${invitation.pairingId}/approve/finish`,
+      {
+        method: "POST",
+        cookie: adultCookie,
+        body: {
+          flow: approval.flow,
+          credential: { id: "credential-a", flow: approval.flow },
+          deviceCertificate,
+        },
+      },
+    );
+    assert.equal(approved.status, 200);
+    assert.equal(service.households.get(adult.householdId).members.size, 1);
+    assert.equal(service.devices.size, 2);
+
+    const activationOptions = await apiRequest(
+      server,
+      "/api/claim/activate/options",
+      { method: "POST", cookie: `kin_claim=${claimCookie}`, body: {} },
+    );
+    const activation = await activationOptions.json();
+    const activated = await apiRequest(server, "/api/claim/activate/finish", {
+      method: "POST",
+      cookie: `kin_claim=${claimCookie}`,
+      body: {
+        flow: activation.flow,
+        credential: { id: "credential-device-two", flow: activation.flow },
+      },
+    });
+    assert.equal(activated.status, 200);
+    const cookies = responseCookies(activated);
+    const status = await apiRequest(server, "/api/status", {
+      cookie: cookies.join("; "),
+    });
+    const identity = (await status.json()).identity;
+    assert.equal(identity.memberId, adult.memberId);
+    assert.notEqual(identity.deviceId, adult.deviceId);
+    const directory = await apiRequest(server, "/api/sync/devices", {
+      cookie: cookies.join("; "),
+    });
+    const devices = (await directory.json()).devices;
+    assert.equal(
+      devices.find((device) => device.deviceId === adult.deviceId).certificate,
+      null,
+    );
+    assert.equal(
+      devices.find((device) => device.deviceId === identity.deviceId)
+        .certificate.issuerDeviceId,
+      adult.deviceId,
+    );
+  } finally {
+    await server.close();
+  }
+});
+
+test("same-member device pairing adds a trusted device without a second adult", () => {
+  const { service, adult } = setup();
+  const invitation = service.createDevicePairing(adult.sessionToken);
+  const claim = service.claimPairing({
+    code: invitation.code,
+    credential: credential("credential-a-device-two"),
+    deviceLabel: "A's second device",
+  });
+  assert.equal(claim.purpose, "device");
+  const pairing = service.pairings.get(invitation.pairingId);
+  assert.equal(pairing.memberId, adult.memberId);
+  assert.equal(pairing.confirmedDeviceId, undefined);
+  const approved = service.approvePairing(
+    adult.sessionToken,
+    invitation.pairingId,
+    claim.version,
+  );
+  assert.equal(approved.state, "Confirmed");
+  assert.equal(
+    service.activeMemberCount(service.households.get(adult.householdId)),
+    1,
+  );
+  assert.equal(service.members.get(adult.memberId).credentials.size, 2);
+  const activated = service.activateClaim(claim.claimToken);
+  assert.equal(activated.memberId, adult.memberId);
+  assert.notEqual(activated.deviceId, adult.deviceId);
+  assert.equal(
+    service.authorize(activated.sessionToken).member.id,
+    adult.memberId,
+  );
+  assert.equal(
+    service.devices.get(activated.deviceId).memberId,
+    adult.memberId,
+  );
+});
+
+test("trusted-device enrollment stops at the household device bound", () => {
+  const { service, adult, advance } = setup();
+  for (let index = 1; index < 16; index += 1) {
+    if (index > 1) advance(60_001);
+    const invitation = service.createDevicePairing(adult.sessionToken);
+    const claim = service.claimPairing({
+      code: invitation.code,
+      credential: credential(`device-${index}`),
+      deviceLabel: `Device ${index}`,
+    });
+    service.approvePairing(
+      adult.sessionToken,
+      invitation.pairingId,
+      claim.version,
+    );
+    service.activateClaim(claim.claimToken);
+  }
+  assert.equal(
+    service.activeTrustedDeviceCount(service.households.get(adult.householdId)),
+    16,
+  );
+  assert.throws(
+    () => service.createDevicePairing(adult.sessionToken),
+    (error) => error.code === "device_limit",
+  );
 });
 
 test("expired WebAuthn challenges are pruned without evicting active ones", () => {
@@ -658,7 +887,9 @@ test("malformed registration CBOR and COSE fail with controlled errors", () => {
   ];
   for (const attestationObject of [
     ...malformedAttestations.map(base64url),
-    ...malformedCose.map((cose) => registrationAttestation(cose).attestationObject),
+    ...malformedCose.map(
+      (cose) => registrationAttestation(cose).attestationObject,
+    ),
   ]) {
     const webauthn = new WebAuthn({
       rpId: "localhost",
@@ -834,7 +1065,7 @@ test("pairing preflight validates codes without claiming or exposing household d
   const invitation = service.createPairing(adult.sessionToken);
   assert.deepEqual(
     service.validatePairingCode(invitation.code, { rateKey: "preflight" }),
-    { valid: true },
+    { valid: true, purpose: "adult" },
   );
   assert.equal(service.pairings.get(invitation.pairingId).state, "Pending");
   assert.equal(service.pairings.get(invitation.pairingId).attempts, 0);
@@ -1149,7 +1380,11 @@ test("device revocation eagerly invalidates all of its sessions and is idempoten
     credential: credential("b"),
     deviceLabel: "B",
   });
-  service.approvePairing(adult.sessionToken, invitation.pairingId, claim.version);
+  service.approvePairing(
+    adult.sessionToken,
+    invitation.pairingId,
+    claim.version,
+  );
   const joined = service.activateClaim(claim.claimToken);
   const second = service.issueSession(joined.memberId, joined.deviceId);
 
@@ -1168,7 +1403,8 @@ test("device revocation eagerly invalidates all of its sessions and is idempoten
   );
 
   const eventCount = service.events.filter(
-    (event) => event.type === "device_revoked" && event.deviceId === joined.deviceId,
+    (event) =>
+      event.type === "device_revoked" && event.deviceId === joined.deviceId,
   ).length;
   assert.deepEqual(
     service.revokeDevice(adult.sessionToken, joined.deviceId),
@@ -1176,7 +1412,8 @@ test("device revocation eagerly invalidates all of its sessions and is idempoten
   );
   assert.equal(
     service.events.filter(
-      (event) => event.type === "device_revoked" && event.deviceId === joined.deviceId,
+      (event) =>
+        event.type === "device_revoked" && event.deviceId === joined.deviceId,
     ).length,
     eventCount,
   );
@@ -1190,7 +1427,11 @@ test("confirmed claim capabilities expire and terminal pairing records are colle
     credential: credential("b"),
     deviceLabel: "B",
   });
-  service.approvePairing(adult.sessionToken, invitation.pairingId, claim.version);
+  service.approvePairing(
+    adult.sessionToken,
+    invitation.pairingId,
+    claim.version,
+  );
   assert.equal(service.claimTokens.size, 1);
   advance(CLAIM_TTL_MS);
   service.prunePairingCapabilities();
@@ -1272,7 +1513,11 @@ test("a removed adult remains historical while a replacement joins", () => {
     credential: credential("b"),
     deviceLabel: "B",
   });
-  service.approvePairing(adult.sessionToken, invitation.pairingId, claim.version);
+  service.approvePairing(
+    adult.sessionToken,
+    invitation.pairingId,
+    claim.version,
+  );
   const joined = service.activateClaim(claim.claimToken);
 
   service.removeOtherAdult(adult.sessionToken, joined.memberId, adult.memberId);
@@ -1307,7 +1552,11 @@ test("an adult who leaves remains historical while a replacement joins", () => {
     credential: credential("b"),
     deviceLabel: "B",
   });
-  service.approvePairing(adult.sessionToken, invitation.pairingId, claim.version);
+  service.approvePairing(
+    adult.sessionToken,
+    invitation.pairingId,
+    claim.version,
+  );
   const joined = service.activateClaim(claim.claimToken);
 
   service.leaveHousehold(joined.sessionToken);

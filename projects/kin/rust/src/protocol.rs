@@ -1,7 +1,7 @@
 use crate::error::KinError;
 use crate::event::{
     valid_timestamp, ActorId, DeviceId, EventEnvelope, EventId, EventKind, HandoffId, HouseholdId,
-    ItemClassification, ItemId, PulseValue, RoutineId, TalkId,
+    IdentityBinding, ItemClassification, ItemId, PulseValue, RoutineId, TalkId,
 };
 use crate::recurrence::{Cadence, CivilDate};
 use crate::state::{
@@ -16,7 +16,8 @@ pub const PROTOCOL_V4: u16 = 4;
 pub const PROTOCOL_V5: u16 = 5;
 pub const PROTOCOL_V6: u16 = 6;
 pub const PROTOCOL_V7: u16 = 7;
-pub const PROTOCOL_VERSION: u16 = PROTOCOL_V7;
+pub const PROTOCOL_V8: u16 = 8;
+pub const PROTOCOL_VERSION: u16 = PROTOCOL_V8;
 pub const ERROR_PROTOCOL_VERSION: u16 = PROTOCOL_V1;
 pub const MAX_EVENT_COUNT: usize = 10_000;
 pub const MAX_PROTOCOL_BYTES: usize = 64 * 1024 * 1024;
@@ -28,6 +29,9 @@ const ITEM_HEADER_BYTES: usize = 48;
 const V6_REQUEST_HEADER_BYTES: usize = 40;
 const V6_RESULT_HEADER_BYTES: usize = 52;
 const SUMMARY_HEADER_BYTES: usize = 24;
+const V8_REQUEST_HEADER_BYTES: usize = 64;
+const V8_BINDING_BYTES: usize = 96;
+const MAX_IDENTITY_BINDINGS: usize = 256;
 
 pub fn decode_request(bytes: &[u8]) -> Result<(u16, Vec<EventEnvelope>, Option<i64>), KinError> {
     let request = decode_request_with_summary(bytes)?;
@@ -41,6 +45,8 @@ pub struct DecodedRequest {
     pub as_of: Option<i64>,
     pub summary_cursor: Option<EventId>,
     pub civil_date: Option<CivilDate>,
+    pub target_household_id: Option<HouseholdId>,
+    pub identity_bindings: Vec<IdentityBinding>,
 }
 
 pub fn decode_request_with_summary(bytes: &[u8]) -> Result<DecodedRequest, KinError> {
@@ -61,6 +67,7 @@ pub fn decode_request_with_summary(bytes: &[u8]) -> Result<DecodedRequest, KinEr
             | PROTOCOL_V5
             | PROTOCOL_V6
             | PROTOCOL_V7
+            | PROTOCOL_V8
     ) {
         return Err(KinError::UnsupportedVersion);
     }
@@ -99,16 +106,60 @@ pub fn decode_request_with_summary(bytes: &[u8]) -> Result<DecodedRequest, KinEr
     } else {
         None
     };
-    let civil_date = if version == PROTOCOL_V7 {
+    let civil_date = if version >= PROTOCOL_V7 {
         Some(CivilDate::from_encoded(read_u32(bytes, 40)?)?)
     } else {
         None
+    };
+    let (target_household_id, identity_bindings) = if version == PROTOCOL_V8 {
+        let target = HouseholdId(read_id(bytes, 44)?);
+        let binding_count = read_u16(bytes, 60)? as usize;
+        if binding_count > MAX_IDENTITY_BINDINGS || read_u16(bytes, 62)? != 0 {
+            return Err(if binding_count > MAX_IDENTITY_BINDINGS {
+                KinError::SizeLimit
+            } else {
+                KinError::MalformedProtocol
+            });
+        }
+        let mut bindings = Vec::new();
+        bindings
+            .try_reserve_exact(binding_count)
+            .map_err(|_| KinError::SizeLimit)?;
+        let mut offset = V8_REQUEST_HEADER_BYTES;
+        let mut seen = std::collections::BTreeSet::new();
+        for _ in 0..binding_count {
+            let record = bytes
+                .get(offset..offset + V8_BINDING_BYTES)
+                .ok_or(KinError::MalformedProtocol)?;
+            let binding = IdentityBinding {
+                legacy_household_id: HouseholdId(read_id(record, 0)?),
+                legacy_actor_id: ActorId(read_id(record, 16)?),
+                legacy_device_id: DeviceId(read_id(record, 32)?),
+                household_id: HouseholdId(read_id(record, 48)?),
+                actor_id: ActorId(read_id(record, 64)?),
+                device_id: DeviceId(read_id(record, 80)?),
+            };
+            let key = (
+                binding.legacy_household_id,
+                binding.legacy_actor_id,
+                binding.legacy_device_id,
+            );
+            if binding.household_id != target || !seen.insert(key) {
+                return Err(KinError::InvalidEvent);
+            }
+            bindings.push(binding);
+            offset += V8_BINDING_BYTES;
+        }
+        (Some(target), bindings)
+    } else {
+        (None, Vec::new())
     };
     let mut events = Vec::new();
     events
         .try_reserve_exact(event_count)
         .map_err(|_| KinError::SizeLimit)?;
     let mut offset = match version {
+        PROTOCOL_V8 => V8_REQUEST_HEADER_BYTES + identity_bindings.len() * V8_BINDING_BYTES,
         PROTOCOL_V7 => 44,
         PROTOCOL_V6 => V6_REQUEST_HEADER_BYTES,
         PROTOCOL_V5 => 20,
@@ -128,7 +179,21 @@ pub fn decode_request_with_summary(bytes: &[u8]) -> Result<DecodedRequest, KinEr
         let record = bytes
             .get(offset..record_end)
             .ok_or(KinError::MalformedProtocol)?;
-        events.push(decode_event(record, version)?);
+        let mut event = decode_event(record, version)?;
+        if let Some(target_household_id) = target_household_id {
+            if let Some(binding) = identity_bindings.iter().find(|binding| {
+                binding.legacy_household_id == event.household_id
+                    && binding.legacy_actor_id == event.actor_id
+                    && binding.legacy_device_id == event.device_id
+            }) {
+                event.household_id = binding.household_id;
+                event.actor_id = binding.actor_id;
+                event.device_id = binding.device_id;
+            } else if event.household_id != target_household_id {
+                return Err(KinError::InvalidEvent);
+            }
+        }
+        events.push(event);
         offset = record_end;
     }
     if offset != bytes.len() {
@@ -140,6 +205,8 @@ pub fn decode_request_with_summary(bytes: &[u8]) -> Result<DecodedRequest, KinEr
         as_of,
         summary_cursor,
         civil_date,
+        target_household_id,
+        identity_bindings,
     })
 }
 
@@ -332,6 +399,13 @@ pub fn encode_state_v7(
     encode_state_with_summary(state, summary, PROTOCOL_V7)
 }
 
+pub fn encode_state_v8(
+    state: &HouseholdState,
+    summary: &CatchUpSummary,
+) -> Result<Vec<u8>, KinError> {
+    encode_state_with_summary(state, summary, PROTOCOL_V8)
+}
+
 fn encode_state_with_summary(
     state: &HouseholdState,
     summary: &CatchUpSummary,
@@ -432,7 +506,7 @@ fn encode_state_with_summary(
     let result_length = V6_RESULT_HEADER_BYTES
         .checked_add(entity_bytes)
         .and_then(|length| {
-            length.checked_add(if version == PROTOCOL_V7 {
+            length.checked_add(if version >= PROTOCOL_V7 {
                 4 + routine_bytes.len()
             } else {
                 0
@@ -466,7 +540,7 @@ fn encode_state_with_summary(
             result.extend_from_slice(&[0; 16]);
         }
     }
-    if version == PROTOCOL_V7 {
+    if version >= PROTOCOL_V7 {
         push_u32(&mut result, state.routines.len() as u32);
     }
     result.extend_from_slice(&previous[24..]);
@@ -788,7 +862,7 @@ fn push_u32(bytes: &mut Vec<u8>, value: u32) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::state::{rebuild, rebuild_at, summarize};
+    use crate::state::{rebuild, rebuild_at, summarize, summarize_validated};
 
     fn request_with(record: &[u8], version: u16, count: u32) -> Vec<u8> {
         let mut bytes = b"KINE".to_vec();
@@ -856,6 +930,89 @@ mod tests {
         record
     }
 
+    fn distributed_record(
+        event_number: u32,
+        item_number: u32,
+        text: &[u8],
+        legacy_household: u8,
+        legacy_actor: u8,
+        legacy_device: u8,
+        logical_time: u64,
+    ) -> Vec<u8> {
+        let mut record = added_record_v2(event_number, item_number, text, 1);
+        record[20..36].fill(legacy_household);
+        record[36..52].fill(legacy_actor);
+        record[52..68].fill(legacy_device);
+        record[76..84].copy_from_slice(&logical_time.to_le_bytes());
+        record
+    }
+
+    fn distributed_item_action(
+        event_number: u32,
+        kind: u16,
+        item_number: u32,
+        legacy_household: u8,
+        legacy_actor: u8,
+        legacy_device: u8,
+        logical_time: u64,
+    ) -> Vec<u8> {
+        let mut record = vec![0; 104];
+        record[..2].copy_from_slice(&1u16.to_le_bytes());
+        record[2..4].copy_from_slice(&kind.to_le_bytes());
+        record[4..20].copy_from_slice(&numbered_id(event_number));
+        record[20..36].fill(legacy_household);
+        record[36..52].fill(legacy_actor);
+        record[52..68].fill(legacy_device);
+        record[68..76].copy_from_slice(&1i64.to_le_bytes());
+        record[76..84].copy_from_slice(&logical_time.to_le_bytes());
+        record[84..88].copy_from_slice(&16u32.to_le_bytes());
+        record[88..104].copy_from_slice(&numbered_id(item_number));
+        record
+    }
+
+    fn distributed_request(records: &[Vec<u8>], bindings: &[IdentityBinding]) -> Vec<u8> {
+        let mut bytes = b"KINE".to_vec();
+        bytes.extend_from_slice(&PROTOCOL_V8.to_le_bytes());
+        bytes.extend_from_slice(&0u16.to_le_bytes());
+        bytes.extend_from_slice(&(records.len() as u32).to_le_bytes());
+        bytes.extend_from_slice(&0i64.to_le_bytes());
+        bytes.extend_from_slice(&[0; 4]);
+        bytes.extend_from_slice(&[0; 16]);
+        bytes.extend_from_slice(&20261002u32.to_le_bytes());
+        bytes.extend_from_slice(&[0x99; 16]);
+        bytes.extend_from_slice(&(bindings.len() as u16).to_le_bytes());
+        bytes.extend_from_slice(&0u16.to_le_bytes());
+        for binding in bindings {
+            bytes.extend_from_slice(&binding.legacy_household_id.0);
+            bytes.extend_from_slice(&binding.legacy_actor_id.0);
+            bytes.extend_from_slice(&binding.legacy_device_id.0);
+            bytes.extend_from_slice(&binding.household_id.0);
+            bytes.extend_from_slice(&binding.actor_id.0);
+            bytes.extend_from_slice(&binding.device_id.0);
+        }
+        for record in records {
+            bytes.extend_from_slice(record);
+        }
+        bytes
+    }
+
+    fn identity_binding(
+        household: u8,
+        actor: u8,
+        device: u8,
+        member: u8,
+        target_device: u8,
+    ) -> IdentityBinding {
+        IdentityBinding {
+            legacy_household_id: HouseholdId([household; 16]),
+            legacy_actor_id: ActorId([actor; 16]),
+            legacy_device_id: DeviceId([device; 16]),
+            household_id: HouseholdId([0x99; 16]),
+            actor_id: ActorId([member; 16]),
+            device_id: DeviceId([target_device; 16]),
+        }
+    }
+
     #[test]
     fn empty_request_rebuilds_empty_state() {
         for version in [PROTOCOL_V1, PROTOCOL_V2] {
@@ -915,6 +1072,152 @@ mod tests {
         assert_eq!(read_u32(&result, 28), Ok(0));
         assert_eq!(result[32], 1);
         assert_eq!(&result[36..52], &[1; 16]);
+    }
+
+    #[test]
+    fn v8_resolves_signed_identity_context_without_changing_canonical_bytes() {
+        let first = distributed_record(3, 3, b"B", 0xdd, 0xee, 0xff, 5);
+        let second = distributed_record(2, 2, b"A", 0xaa, 0xbb, 0xcc, 5);
+        let bindings = [
+            identity_binding(0xaa, 0xbb, 0xcc, 0x11, 0x01),
+            identity_binding(0xdd, 0xee, 0xff, 0x22, 0x02),
+        ];
+        let request = distributed_request(&[first.clone(), second.clone()], &bindings);
+        let decoded = decode_request_with_summary(&request).unwrap();
+        assert_eq!(decoded.protocol_version, PROTOCOL_V8);
+        assert_eq!(decoded.target_household_id, Some(HouseholdId([0x99; 16])));
+        assert_eq!(decoded.identity_bindings, bindings);
+        assert_eq!(decoded.events[0].event_id, EventId(numbered_id(3)));
+        assert_eq!(decoded.events[0].device_id, DeviceId([0x02; 16]));
+        assert_eq!(&decoded.events[0].canonical_bytes[20..36], &[0xdd; 16]);
+        assert_eq!(decoded.events[1].event_id, EventId(numbered_id(2)));
+        assert_eq!(decoded.events[1].device_id, DeviceId([0x01; 16]));
+
+        let state = crate::state::rebuild_distributed_on(
+            &decoded.events,
+            0,
+            CivilDate::from_encoded(20261002).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(state.items[0].item_id.0, numbered_id(2));
+        assert_eq!(state.items[1].item_id.0, numbered_id(3));
+        let summary = summarize_validated(&decoded.events, None, &state).unwrap();
+        assert_eq!(summary.through_event_id, Some(EventId(numbered_id(2))));
+        let result = encode_state_v8(&state, &summary).unwrap();
+        assert_eq!(read_u16(&result, 4), Ok(PROTOCOL_V8));
+
+        let reversed =
+            decode_request_with_summary(&distributed_request(&[second, first], &bindings)).unwrap();
+        let reversed_state = crate::state::rebuild_distributed_on(
+            &reversed.events,
+            0,
+            CivilDate::from_encoded(20261002).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(state, reversed_state);
+    }
+
+    #[test]
+    fn v8_rejects_unbound_legacy_identity_and_malformed_binding_tables() {
+        let record = distributed_record(1, 1, b"A", 0xaa, 0xbb, 0xcc, 1);
+        assert_eq!(
+            decode_request_with_summary(&distributed_request(std::slice::from_ref(&record), &[],)),
+            Err(KinError::InvalidEvent)
+        );
+
+        let mut truncated_binding =
+            distributed_request(&[], &[identity_binding(0xaa, 0xbb, 0xcc, 0x11, 0x01)]);
+        truncated_binding.truncate(64 + 95);
+        assert_eq!(
+            decode_request_with_summary(&truncated_binding),
+            Err(KinError::MalformedProtocol)
+        );
+
+        let duplicate = identity_binding(0xaa, 0xbb, 0xcc, 0x11, 0x01);
+        assert_eq!(
+            decode_request_with_summary(&distributed_request(&[], &[duplicate, duplicate],)),
+            Err(KinError::InvalidEvent)
+        );
+    }
+
+    #[test]
+    fn v8_terminal_archive_wins_equal_time_concurrent_item_completion() {
+        let added = distributed_record(1, 7, b"Task", 0xaa, 0xbb, 0xcc, 5);
+        let archived = distributed_item_action(2, 4, 7, 0xaa, 0xbb, 0xcc, 6);
+        let completed = distributed_item_action(3, 2, 7, 0xdd, 0xee, 0xff, 6);
+        let canonical_completion = completed.clone();
+        let bindings = [
+            identity_binding(0xaa, 0xbb, 0xcc, 0x11, 0x01),
+            identity_binding(0xdd, 0xee, 0xff, 0x22, 0x02),
+        ];
+        let decoded = decode_request_with_summary(&distributed_request(
+            &[completed, archived, added],
+            &bindings,
+        ))
+        .unwrap();
+        let state = crate::state::rebuild_distributed_on(
+            &decoded.events,
+            0,
+            CivilDate::from_encoded(20261002).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(state.items[0].status, crate::state::ItemStatus::Archived);
+        assert!(decoded
+            .events
+            .iter()
+            .any(|event| event.canonical_bytes == canonical_completion));
+
+        let causally_later = distributed_item_action(4, 2, 7, 0xdd, 0xee, 0xff, 7);
+        let decoded = decode_request_with_summary(&distributed_request(
+            &[
+                distributed_record(1, 7, b"Task", 0xaa, 0xbb, 0xcc, 5),
+                distributed_item_action(2, 4, 7, 0xaa, 0xbb, 0xcc, 6),
+                causally_later,
+            ],
+            &bindings,
+        ))
+        .unwrap();
+        assert_eq!(
+            crate::state::rebuild_distributed_on(
+                &decoded.events,
+                0,
+                CivilDate::from_encoded(20261002).unwrap(),
+            ),
+            Err(KinError::InvalidEvent)
+        );
+    }
+
+    #[test]
+    fn v8_maximum_equal_time_history_replays_deterministically_with_arrival_boundary() {
+        let records: Vec<Vec<u8>> = (1..=10_000)
+            .map(|number| distributed_record(number, number, b"x", 0xaa, 0xbb, 0xcc, 7))
+            .collect();
+        let bindings = [identity_binding(0xaa, 0xbb, 0xcc, 0x11, 0x01)];
+        let request = distributed_request(&records, &bindings);
+        let decoded = decode_request_with_summary(&request).unwrap();
+        let date = CivilDate::from_encoded(20261002).unwrap();
+        let state = crate::state::rebuild_distributed_on(&decoded.events, 0, date).unwrap();
+        assert_eq!(state.items.len(), 10_000);
+        let mut expected_item_ids: Vec<[u8; 16]> = (1..=10_000).map(numbered_id).collect();
+        expected_item_ids.sort();
+        assert_eq!(
+            state
+                .items
+                .iter()
+                .map(|item| item.item_id.0)
+                .collect::<Vec<_>>(),
+            expected_item_ids
+        );
+        assert_eq!(
+            decoded.events.last().unwrap().event_id,
+            EventId(numbered_id(10_000))
+        );
+        assert_eq!(
+            summarize_validated(&decoded.events, None, &state)
+                .unwrap()
+                .through_event_id,
+            Some(EventId(numbered_id(10_000)))
+        );
     }
 
     #[test]

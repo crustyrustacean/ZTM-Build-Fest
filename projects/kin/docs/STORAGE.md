@@ -1,6 +1,6 @@
 # Local Event Storage
 
-**Status:** Current through v0.7.0 Routines; earlier version sections are historical contracts. See v0.7.0 below.
+**Status:** Current through v0.9.3. v0.1-v0.7 storage notes below are historical release records. Current database is schema 2, with unchanged canonical event bytes and additive sync stores.
 
 The compose input keeps a best-effort in-progress text and classification draft in the current tab's `sessionStorage`, retaining the existing text key for legacy drafts. This transient data is not an event or household-state source of truth, is cleared only when the exact submitted draft succeeds or the user clears text, and is unavailable across tabs.
 
@@ -8,7 +8,7 @@ The compose input keeps a best-effort in-progress text and classification draft 
 
 ```text
 database: kin
-version: 1
+version: 2
 
 object store: events
   keyPath: local_sequence
@@ -19,7 +19,19 @@ object store: local_context
   keyPath: key
   singleton: key = "installation"
     fields: household_id, actor_id, device_id, next_logical_time,
-      last_looked_event_id, last_looked_local_sequence, last_looked_at
+      last_looked_event_id, last_looked_local_sequence, last_looked_at,
+      sync_household_id, sync_member_id, sync_device_id,
+      sync_identity_bindings
+
+object store: sync_state
+  keyPath: key
+  singleton: key = "active"
+
+object store: sync_outbox
+  keyPath: event_id
+
+object store: sync_bindings
+  keyPath: legacy_key
 ```
 
 Use one object store for the ordered domain event history and one singleton context record for local IDs and the next logical-time counter. Those values are generated locally and do not represent accounts, verified members, or trusted devices. Do not store a second authoritative mutable household state.
@@ -31,9 +43,9 @@ Each `events` record contains:
 ```text
 local_sequence       IndexedDB-generated integer; local append/replay order
 event_id             16-byte stable event identifier; unique index
-household_id         16-byte local household placeholder
-actor_id             16-byte local actor placeholder
-device_id            16-byte local installation placeholder
+household_id         16-byte local placeholder before sync; authenticated household afterward
+actor_id              16-byte local placeholder before sync; authenticated member afterward
+device_id             16-byte local placeholder before sync; authenticated device afterward
 timestamp            signed UTC epoch milliseconds
 logical_time         unsigned 64-bit local logical order value
 kind                 Item 1–4, Handoff 5–7, Talk 8–11, Pulse 12–13 (see ABI)
@@ -44,6 +56,8 @@ encoded_event        exact canonical event bytes used for Rust replay
 The IndexedDB `local_sequence` orders this installation's events and is not a cross-device identity. `next_logical_time` starts at 1 and advances by one in the same transaction as each accepted event. Event IDs are generated independently using a browser cryptographic random source and do not derive from the auto-increment key. `encoded_event` preserves the exact validated event envelope/payload; its layout is defined in [ABI](ABI.md).
 
 `encoded_event` is the canonical record. The other fields are lookup/order metadata decoded from that envelope; the write transaction must keep them consistent. A mismatch on read is an integrity error and must not be silently resolved in favor of either representation. Existing v0.1.x schema-v1 add records remain unchanged and normalize to Today during Rust replay.
+
+Sync never rewrites pre-sync `encoded_event` bytes or regenerates history from projection. A signed/encrypted identity-binding control record maps a legacy placeholder tuple for in-memory v8 interpretation. New events encode authenticated household/member/device IDs. The schema-2 migration creates only sync stores/context fields; existing event rows and catch-up fields remain intact.
 
 ## Append and read behavior
 
@@ -89,3 +103,16 @@ Protocol v6 carries the stable cursor event ID; IndexedDB `local_sequence` stays
 ## v0.7.0 Routines
 
 Routine kinds 14–17 share schema-1 atomic event/counter transactions. Current-period writes first project saved bytes in Rust inside the transaction and compare the intent key; stale keys never retarget. No occurrence table or source-byte migration. `kin.routine.draft` is best-effort tab-local text/cadence, not household truth. See [V0.7.0](V0.7.0.md).
+
+## v0.9.x Encrypted Sync Storage
+
+The `kin` IndexedDB v1→v2 upgrade is additive and non-destructive:
+
+- `sync_state` keeps current/pending epoch, local relay cursor/high-water, device sequence, Lamport maximum, initialization state, pending signed rotation proposal and bounded queue count.
+- `sync_outbox` is keyed by stable event ID and retains the exact canonical event bytes, chosen key epoch, device sequence, exact encrypted envelope and acknowledgement state. Retries reuse the same envelope. Accepted envelopes remain cached so a lower relay cursor after process restart can requeue identical bytes.
+- `sync_bindings` stores encrypted control envelopes mapping legacy placeholder identities; it never replaces semantic event records. Verified binding context is separately retained in `local_context` for Rust v8 replay.
+- The separate `kin-crypto-keys` database (schema 3) stores non-extractable device `CryptoKey`s, AES-GCM-sealed epoch key bytes, and `trusted_devices` peer-key pins. A pin records the locally compared fingerprint/public key so later service-directory substitution is rejected. Raw household keys never go to localStorage, cookies, URLs, or service state.
+
+Each local append transaction covers `events`, `local_context`, `sync_state`, and `sync_outbox`; canonical bytes and the outbox record either both commit or both abort. On receive, authentication/decryption and v8 Rust replay happen before writes; exact canonical rows and transport cursor/high-water commit in one transaction. A pre-commit crash safely redelivers. The Since You Last Looked cursor remains independent and advances only through its own UI action.
+
+The app limits canonical history/outbox to 10,000 local events and relay storage to 100,000 household envelopes; network batches are at most 20 events. There is no compaction/checkpoint implementation. Relay acknowledgements are process-local: service restart can lose ciphertext, while local canonical history and cached envelopes remain. Sync does not silently delete local data when remote state is absent.

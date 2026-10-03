@@ -1,6 +1,6 @@
 # Support
 
-Kin currently has a local-first v0.3.x prototype. There are no accounts, remote service, staffed runtime support channel, or guaranteed response times.
+Kin v0.9.3 is an incubation prototype with passkey-authenticated pairing and optional encrypted cross-device event sync. Its same-origin identity and relay service is memory-only. There is no staffed runtime support channel or guaranteed response time.
 
 ## Questions and proposals
 

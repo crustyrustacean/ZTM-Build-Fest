@@ -4,6 +4,7 @@ import { pathToFileURL } from "node:url";
 import { createServer } from "node:http";
 import { randomBytes } from "node:crypto";
 import { PairingError, PairingService } from "./pairing-service.mjs";
+import { EncryptedSyncService } from "./sync-service.mjs";
 import { WebAuthn } from "./webauthn.mjs";
 
 const webRoot = normalize(join(import.meta.dirname, "..", "web"));
@@ -15,12 +16,17 @@ export function createKinServer(options = {}) {
   const host = options.host ?? process.env.KIN_HOST ?? "127.0.0.1";
   const origin =
     options.origin ?? process.env.KIN_ORIGIN ?? `http://localhost:${port}`;
+  assertSecureOrigin(host, origin);
   const service = options.service ?? new PairingService();
+  const syncService =
+    options.syncService ??
+    new EncryptedSyncService(service, { now: options.now });
   const webauthn =
     options.webauthn ??
     new WebAuthn({ rpId: new URL(origin).hostname, origin, now: options.now });
   const context = {
     service,
+    syncService,
     webauthn,
     flows: new Map(),
     now: options.now ?? (() => Date.now()),
@@ -44,6 +50,18 @@ export function createKinServer(options = {}) {
       }
       serve(response, url.pathname);
     } catch (error) {
+      if (
+        error instanceof PairingError &&
+        [
+          "authentication_required",
+          "device_not_trusted",
+          "membership_removed",
+        ].includes(error.code)
+      ) {
+        clearCookie(response, "kin_session", context.secureCookies);
+        if (error.code !== "authentication_required")
+          clearCookie(response, "kin_device", context.secureCookies);
+      }
       const safe =
         error instanceof PairingError
           ? error
@@ -52,11 +70,17 @@ export function createKinServer(options = {}) {
               "Kin could not complete that request.",
               500,
             );
-      if (!(error instanceof PairingError)) console.error(error);
       json(response, safe.status, { error: safe.code, message: safe.message });
     }
   });
-  return { server, service, webauthn, flows: context.flows, origin };
+  return {
+    server,
+    service,
+    syncService,
+    webauthn,
+    flows: context.flows,
+    origin,
+  };
 }
 
 if (
@@ -70,8 +94,27 @@ if (
   server.listen(port, host, () => console.log(`Kin is available at ${origin}`));
 }
 
+function assertSecureOrigin(host, origin) {
+  const external = new URL(origin);
+  const loopback = (value) =>
+    value === "localhost" ||
+    value.endsWith(".localhost") ||
+    value === "::1" ||
+    value === "[::1]" ||
+    /^127(?:\.\d{1,3}){3}$/.test(value);
+  if (!loopback(host))
+    throw new Error(
+      "Kin's built-in server must bind to loopback; use a trusted TLS proxy for external access.",
+    );
+  if (!loopback(external.hostname) && external.protocol !== "https:") {
+    throw new Error(
+      "Kin requires an HTTPS origin outside loopback development.",
+    );
+  }
+}
+
 async function api(request, response, url, context) {
-  const { service, webauthn, secureCookies } = context;
+  const { service, syncService, webauthn, secureCookies } = context;
   const body = ["POST", "PUT", "DELETE"].includes(request.method)
     ? await readJson(request)
     : {};
@@ -89,7 +132,17 @@ async function api(request, response, url, context) {
         memberId: auth.member.id,
         deviceId: auth.device.id,
       };
-    } catch {}
+    } catch {
+      if (session) clearCookie(response, "kin_session", secureCookies);
+      if (deviceToken) {
+        try {
+          service.trustedDevice(deviceToken);
+        } catch {
+          clearCookie(response, "kin_device", secureCookies);
+        }
+      }
+    }
+
     try {
       claim = claimToken ? service.pairingForClaim(claimToken) : null;
       if (["Expired", "Revoked"].includes(claim?.state))
@@ -105,10 +158,12 @@ async function api(request, response, url, context) {
     url.pathname === "/api/passkeys/register/options"
   ) {
     if (!["bootstrap", "claim"].includes(body.purpose)) throw badRequest();
+    let flowPurpose = body.purpose;
     if (body.purpose === "claim") {
-      service.validatePairingCode(body.code, {
+      const pairing = service.validatePairingCode(body.code, {
         rateKey: request.socket.remoteAddress ?? "unknown",
       });
+      if (pairing.purpose === "device") flowPurpose = "device-claim";
       if (claimToken) {
         service.clearClaim(claimToken);
         clearCookie(response, "kin_claim", secureCookies);
@@ -116,7 +171,7 @@ async function api(request, response, url, context) {
     }
     const flow = createFlow(
       {
-        purpose: body.purpose,
+        purpose: flowPurpose,
         code: body.code,
         deviceLabel: body.deviceLabel,
       },
@@ -138,6 +193,7 @@ async function api(request, response, url, context) {
       const result = service.bootstrap({
         credential,
         deviceLabel: flow.deviceLabel,
+        syncPublicKeys: body.syncPublicKeys,
       });
       cookie(response, "kin_session", result.sessionToken, secureCookies);
       cookie(
@@ -154,6 +210,7 @@ async function api(request, response, url, context) {
       code: flow.code,
       credential,
       deviceLabel: flow.deviceLabel,
+      syncPublicKeys: body.syncPublicKeys,
       rateKey: request.socket.remoteAddress ?? "unknown",
     });
     cookie(response, "kin_claim", result.claimToken, secureCookies);
@@ -194,6 +251,10 @@ async function api(request, response, url, context) {
   }
   if (request.method === "POST" && url.pathname === "/api/pairings") {
     json(response, 201, service.createPairing(session));
+    return;
+  }
+  if (request.method === "POST" && url.pathname === "/api/devices/pairings") {
+    json(response, 201, service.createDevicePairing(session));
     return;
   }
   const pairingMatch = url.pathname.match(/^\/api\/pairings\/([a-f0-9]{32})$/);
@@ -243,11 +304,19 @@ async function api(request, response, url, context) {
       body.credential?.id,
     );
     webauthn.verifyAuthentication(body.credential, body.flow, credential);
-    json(
-      response,
-      200,
-      service.approvePairing(session, flow.pairingId, flow.expectedVersion),
+    const approved = service.approvePairing(
+      session,
+      flow.pairingId,
+      flow.expectedVersion,
+      body.deviceCertificate,
     );
+    const pairing = service.pairings.get(flow.pairingId);
+    const device = service.devices.get(pairing?.confirmedDeviceId);
+    if (device?.syncPublicKeys && device.syncHistoryFromEpoch == null)
+      syncService.onDeviceAdded(auth.household.id, device.id, {
+        historyFromEpoch: pairing.purpose === "device" ? 1 : undefined,
+      });
+    json(response, 200, approved);
     return;
   }
   if (request.method === "GET" && url.pathname === "/api/claim") {
@@ -312,7 +381,108 @@ async function api(request, response, url, context) {
   }
   const deviceMatch = url.pathname.match(/^\/api\/devices\/([a-f0-9]{32})$/);
   if (request.method === "DELETE" && deviceMatch) {
+    const target = service.devices.get(deviceMatch[1]);
+    const alreadyRevoked = Boolean(target?.revokedAt);
     json(response, 200, service.revokeDevice(session, deviceMatch[1]));
+    if (target && !alreadyRevoked)
+      syncService.onAccessChange(target.householdId, [target.id]);
+    return;
+  }
+  if (request.method === "POST" && url.pathname === "/api/sync/device-keys") {
+    const auth = service.authorize(session);
+    const keyedDevices = [...service.devices.values()].filter(
+      (device) =>
+        device.householdId === auth.household.id &&
+        !device.revokedAt &&
+        device.syncPublicKeys,
+    ).length;
+    const result = service.registerSyncPublicKeys(session, body.publicKeys);
+    if (result.registered && keyedDevices > 0)
+      syncService.onDeviceAdded(auth.household.id, auth.device.id, {
+        historyFromEpoch: 1,
+      });
+    json(response, 200, result);
+    return;
+  }
+  if (request.method === "GET" && url.pathname === "/api/sync/status") {
+    json(response, 200, syncService.status(session));
+    return;
+  }
+  if (request.method === "POST" && url.pathname === "/api/sync/enable") {
+    json(response, 200, syncService.enable(session));
+    return;
+  }
+  if (request.method === "GET" && url.pathname === "/api/sync/devices") {
+    json(response, 200, { devices: syncService.deviceDirectory(session) });
+    return;
+  }
+  if (request.method === "POST" && url.pathname === "/api/sync/events") {
+    json(response, 200, syncService.push(session, body.events));
+    return;
+  }
+  if (request.method === "GET" && url.pathname === "/api/sync/events") {
+    json(
+      response,
+      200,
+      syncService.pull(
+        session,
+        url.searchParams.get("cursor") ?? "",
+        url.searchParams.get("limit") ?? "20",
+      ),
+    );
+    return;
+  }
+  if (request.method === "POST" && url.pathname === "/api/sync/bindings") {
+    json(response, 200, syncService.pushBindings(session, body.bindings));
+    return;
+  }
+  if (request.method === "GET" && url.pathname === "/api/sync/bindings") {
+    json(
+      response,
+      200,
+      syncService.pullBindings(session, url.searchParams.get("cursor") ?? ""),
+    );
+    return;
+  }
+  if (
+    request.method === "POST" &&
+    url.pathname === "/api/sync/provisioning/grants"
+  ) {
+    json(response, 201, syncService.createProvisioningGrant(session, body));
+    return;
+  }
+  const provisioningUpload = url.pathname.match(
+    /^\/api\/sync\/provisioning\/grants\/([a-f0-9]{32})$/,
+  );
+  if (request.method === "POST" && provisioningUpload) {
+    json(
+      response,
+      200,
+      syncService.submitProvisioning(
+        session,
+        provisioningUpload[1],
+        body.package,
+      ),
+    );
+    return;
+  }
+  if (request.method === "GET" && url.pathname === "/api/sync/provisioning") {
+    json(response, 200, { grants: syncService.pendingProvisioning(session) });
+    return;
+  }
+  const provisioningAck = url.pathname.match(
+    /^\/api\/sync\/provisioning\/([a-f0-9]{32})\/ack$/,
+  );
+  if (request.method === "POST" && provisioningAck) {
+    json(
+      response,
+      200,
+      syncService.acknowledgeProvisioning(session, provisioningAck[1]),
+    );
+    return;
+  }
+  if (request.method === "POST" && url.pathname === "/api/sync/epochs") {
+    json(response, 200, syncService.rotateEpoch(session, body));
     return;
   }
   if (request.method === "GET" && url.pathname === "/api/household") {
@@ -356,11 +526,15 @@ async function api(request, response, url, context) {
         401,
       );
     webauthn.verifyAuthentication(body.credential, body.flow, credential);
+    const excludedDevices = [...service.devices.values()]
+      .filter((device) => device.memberId === flow.targetMemberId)
+      .map((device) => device.id);
     const result = service.removeOtherAdult(
       session,
       flow.targetMemberId,
       auth.member.id,
     );
+    syncService.onAccessChange(auth.household.id, excludedDevices);
     json(response, 200, result);
     return;
   }
@@ -374,7 +548,12 @@ async function api(request, response, url, context) {
         "Authenticate with your passkey again before removing another adult.",
         401,
       );
+    const auth = service.authorize(session);
+    const excludedDevices = [...service.devices.values()]
+      .filter((device) => device.memberId === auth.member.id)
+      .map((device) => device.id);
     const result = service.leaveHousehold(session);
+    syncService.onAccessChange(auth.household.id, excludedDevices);
     clearCookie(response, "kin_session", secureCookies);
     json(response, 200, result);
     return;

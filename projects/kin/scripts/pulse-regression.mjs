@@ -145,7 +145,10 @@ export async function pulseRegressions() {
   );
   check((await count()) === beforeExpiry, "expiry appends nothing");
   await app.savePulse({ type: "clear-pulse" });
-  check(app.store.database.version === 1, "schema unchanged");
+  check(
+    app.store.database.version === 2,
+    "sync stores are additive to the event schema",
+  );
   return "PASS Pulse fixed values, actor projection, set/replace/clear, timer expiry, original retry and repeated refresh recovery";
 }
 
@@ -195,6 +198,7 @@ export async function pulsePeerRegressions(first, second, until) {
     0,
     "missed invalidation leaves old view until lifecycle refresh",
   );
+  await second.send("Page.bringToFront");
   await second.evaluate(`window.dispatchEvent(new Event('focus'))`);
   await until(() =>
     second.evaluate(

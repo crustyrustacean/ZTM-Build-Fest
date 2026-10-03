@@ -1,6 +1,6 @@
 # Release Process
 
-**Status:** v0.8.8 Active-Member Slot Correctness. Capacity is derived from active memberships at invitation creation and final approval while inactive historical membership records remain retained. The v0.8.x line remains at its product-feedback gate; encrypted sync requires separate authorization.
+**Status:** Current implementation/release: v0.9.3 Encrypted Event Sync Stabilization. The v0.9.x line ends at its encrypted-sync stabilization gate. The next planned development line is v0.10.x — Portable Core / Architectural Consolidation — before v1.0.0. Sync is opt-in and encrypted, but identity/relay state remains process-memory only; accepted relay data is not durable.
 
 ## Release sequence
 
@@ -77,4 +77,4 @@ Follow [V0.7.0](V0.7.0.md) for capability, correctness, resilience/accessibility
 
 ## v0.8.0 Household Pairing
 
-The v0.7.x line is complete at `kin-v0.7.4`, which points to validated release commit `a8ded079be6fdbedba8738a64a5f0fb753e7fdd6` and is pushed to the fork, not upstream. The v0.8.x implementation and stabilization record is in [V0.8.0](V0.8.0.md). `kin-v0.8.8` corrects active-member slot accounting without adding pairing scope. Stop after `kin-v0.8.8` for product feedback; encrypted sync remains a separately authorized future capability.
+The v0.7.x line is complete at `kin-v0.7.4`, which points to validated release commit `a8ded079be6fdbedba8738a64a5f0fb753e7fdd6` and is pushed to the fork, not upstream. The v0.8.x implementation and stabilization record is in [V0.8.0](V0.8.0.md). `kin-v0.8.8` corrected active-member slot accounting. The v0.9.x sync contract and release record is in [V0.9.0](V0.9.0.md). Stop after `kin-v0.9.3`; next plan v0.10.x, and do not begin v1.0 implementation until its readiness criteria are met.

@@ -1,6 +1,6 @@
 # Development Workflow
 
-**Status:** Current through v0.8.8 Active-Member Slot Correctness; earlier version sections are historical contracts.
+**Status:** Current through v0.9.3 Encrypted Event Sync stabilization; earlier version sections are historical contracts.
 
 ## Build and run
 
@@ -48,7 +48,7 @@ No npm dependency tree or framework runtime is planned. If static serving later 
 
 ## Browser capabilities
 
-The application requires WebAssembly, ES modules, Custom Elements, IndexedDB, `CustomEvent`, text encoders/decoders, and secure-context browser APIs. WebAuthn is used for passkey identity and authorization; Web Crypto for encrypted household content remains future sync work. Browser validation is recorded per release and does not certify the full browser support target.
+The application requires WebAssembly, ES modules, Custom Elements, IndexedDB, `CustomEvent`, text encoders/decoders, and secure-context browser APIs. WebAuthn is used for identity and authorization; Web Crypto implements opt-in encrypted event sync and key wrapping. Browser validation is recorded per release and does not certify the full browser support target.
 
 ## Development data
 

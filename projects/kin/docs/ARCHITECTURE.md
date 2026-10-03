@@ -1,6 +1,6 @@
 # Architecture
 
-**Status:** Current through v0.7.0 Routines; earlier version sections are historical contracts. See v0.7.0 below.
+**Status:** Current through v0.9.3 encrypted sync. JavaScript owns Web Crypto, local key persistence, pairing/device transport, and IndexedDB v2 outbox/cursor integration. Rust owns protocol v8 identity resolution, deterministic distributed replay, and domain state. The same-origin service authorizes and relays opaque encrypted records but remains in-memory.
 
 ## System shape
 
@@ -30,7 +30,7 @@ JavaScript owns browser integration and presentation:
 
 - DOM, Web Components, rendering, and browser events
 - IndexedDB and persistence lifecycle
-- WebAuthn and Web Crypto if future releases need them
+- WebAuthn authentication and Web Crypto encryption/key wrapping
 - Networking and synchronization transport
 - Browser lifecycle and accessibility interactions
 - Loading the WebAssembly module and passing data across the boundary
@@ -45,7 +45,7 @@ Rust owns deterministic domain behavior:
 - State transitions and reconstruction by replay
 - Recurrence rules when routines are introduced
 - Diffing and useful search/indexing where justified
-- Synchronization reconciliation when sync is introduced
+- Distributed v8 event ordering and deterministic domain replay
 
 Rust must not manipulate the DOM. It should be possible to test domain behavior independently from browser rendering and storage.
 
@@ -56,6 +56,12 @@ The v0.1.0 implementation targets `wasm32-unknown-unknown` and uses the explicit
 A manual ABI is implemented for v0.1.0 in [ABI](ABI.md), including exported function signatures, versioned request/result encoding, ownership and lifetimes, errors, bounds, and repeated-call behavior. JavaScript allocates/copies input and decodes output; Rust reads validated input ranges and returns a well-defined result. The browser layer retains ownership of DOM, storage, cryptographic APIs, networking, and lifecycle integration.
 
 The manual boundary keeps the interface visible and avoids convenience bindings before a demonstrated need. A later requirement may justify revisiting that choice through an explicit architecture decision; the v0.1.0 implementation must follow the current contract.
+
+## Deferred v0.10.x architectural debt
+
+JavaScript currently participates in constructing canonical domain-event layouts while Rust independently decodes and validates them. This duplicates wire-format knowledge across the boundary. In addition, browser-side storage and sync code reads canonical fields directly from fixed byte offsets, including logical time at offset 76. Outside a narrow Wasm/codec adapter, browser subsystems should not depend on hard-coded canonical event offsets.
+
+The v0.10.x line should establish one Rust-owned codec/metadata boundary. Options include exposing validated metadata through the Wasm API, storing validated structured metadata alongside authoritative canonical bytes, or providing an explicit Rust-owned codec API. Until then, canonical bytes remain authoritative; this debt does not justify changing v0.9.3 event bytes or moving Web Crypto, networking, IndexedDB, or DOM behavior into Rust.
 
 ## Local-first progression
 
@@ -71,13 +77,13 @@ IndexedDB event log
 Rust reconstructs household state
 ```
 
-Remote sync remains future work. Its trust and protocol design is documented before implementation in [SYNC](SYNC.md), with identity, pairing, cryptographic properties, and threats specified in [IDENTITY](IDENTITY.md), [PAIRING](PAIRING.md), [CRYPTOGRAPHY](CRYPTOGRAPHY.md), and [THREAT-MODEL](THREAT-MODEL.md):
+Opt-in encrypted sync now extends the local-first event store. The browser encrypts the exact canonical event bytes, the authenticated service stores/forwards opaque envelopes, and Rust validates/replays decrypted canonical records on each authorized device:
 
 ```text
 Device A <---- encrypted event sync ----> Service <---- encrypted event sync ----> Device B
 ```
 
-The service is intended as an authenticated encrypted-event relay, not a household source of truth or plaintext domain processor. Its protocol, conflict classes, and cryptographic design remain future implementation work. Design is documented in v0.0.5; sync is not part of v0.1.0.
+The service is not a household source of truth or plaintext domain processor. It still sees routing/membership metadata, event timing/count/size, cursors, and traffic patterns; it controls availability. Identity and relay records are process-memory only, so acknowledgement is not durable. The implementation and limitations are documented in [SYNC](SYNC.md), [IDENTITY](IDENTITY.md), [CRYPTOGRAPHY](CRYPTOGRAPHY.md), and [THREAT-MODEL](THREAT-MODEL.md).
 
 ## Future capability leverage
 
@@ -92,8 +98,8 @@ The v0.1.x core is intended to be extended, not treated as proof that later feat
 | Since You Last Looked | Ordered immutable event history                      | Implemented in v0.6.0                  | Stabilization through v0.6.3                                          |
 | Routines              | Event infrastructure and explicit civil context      | Implemented in v0.7.0                  | Correctness/resilience/hardening audits in v0.7.1–v0.7.4              |
 | Pairing               | Household/member/device identity fields              | Yes                                    | Authentication, authorization, pairing, recovery, and device trust    |
-| Offline sync          | Random event IDs and immutable canonical event bytes | Yes                                    | Multi-device transport and conflict/reconciliation policy             |
-| Encrypted sync        | Deterministic, versioned event representation        | Yes                                    | Reviewed cryptographic protocol and key lifecycle                     |
+| Offline sync          | Random event IDs and immutable canonical event bytes | Implemented in v0.9.2                  | Bounded to current relay/storage limits; restart is not durable       |
+| Encrypted sync        | Versioned canonical events and browser Web Crypto    | Implemented through v0.9.3             | Independent audit, durable relay, all-device recovery, broader UX     |
 | Export/import         | Versioned event representation and preserved history | Yes                                    | Portable container, validation, and recovery UX                       |
 
 “Yes” means the existing infrastructure can be extended; it does not mean the capability is implemented, secure, or ready to ship without its listed domain and validation work.

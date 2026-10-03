@@ -1,18 +1,18 @@
 # Persistent Contract Versioning
 
-**Status:** Current through v0.7.0 Routines; earlier version sections are historical contracts. See v0.7.0 below.
+**Status:** Current through v0.9.3; earlier version sections are historical contracts. See the v0.9.x compatibility record below.
 
 ## Independent version axes
 
 Kin version numbers describe product releases; they do not version every persistent or transport contract.
 
-| Version axis             | Example                                  | Governs                                                                  |
-| ------------------------ | ---------------------------------------- | ------------------------------------------------------------------------ |
-| Application version      | `v0.1.0`, `v0.2.0`                       | A Kin product release, source snapshot, and namespaced Git tag.          |
-| Event schema version     | `event_version = 1`                      | The payload/envelope interpretation for one persisted event kind.        |
-| ABI/protocol version     | `protocol_version = 1, 2, 3, 4, 5, or 6` | The byte-level JavaScript ↔ WASM request/result contract.                |
-| IndexedDB schema version | database `version = 1`                   | Object stores, indexes, and local record structure managed by IndexedDB. |
-| Export format version    | `format_version = 1`                     | The portable archive manifest and event-container representation.        |
+| Version axis             | Example                   | Governs                                                                  |
+| ------------------------ | ------------------------- | ------------------------------------------------------------------------ |
+| Application version      | `v0.1.0`, `v0.2.0`        | A Kin product release, source snapshot, and namespaced Git tag.          |
+| Event schema version     | `event_version = 1`       | The payload/envelope interpretation for one persisted event kind.        |
+| ABI/protocol version     | `protocol_version = 1..8` | The byte-level JavaScript ↔ WASM request/result contract.                |
+| IndexedDB schema version | database `version = 2`    | Object stores, indexes, and local record structure managed by IndexedDB. |
+| Export format version    | `format_version = 1`      | The portable archive manifest and event-container representation.        |
 
 These numbers evolve independently. An application release may keep the same event, protocol, storage, or export version; a contract may change between application versions. Never infer compatibility from equal version numbers or silently bump one axis as a proxy for another.
 
@@ -50,7 +50,7 @@ This separates durable history from evolving in-memory types and enables old his
 
 ## Backward and forward guarantees
 
-Kin has published v0.1.x event history. v0.2.0 explicitly reads schema-v1 legacy item events, normalizes them in memory, and preserves their exact bytes; it writes schema-v2 `ITEM_ADDED` and schema-v1 lifecycle events. Protocols v1/v2/v3/v4/v5/v6 are supported, with v6 written by current clients. Protocols v1/v2 reject Handoff history rather than return lossy state. IndexedDB remains schema 1. A client with no decoder for a future event must preserve it and fail closed, not pretend it has derived complete household state.
+Kin has published v0.1.x event history. v0.2.0 explicitly reads schema-v1 legacy item events, normalizes them in memory, and preserves their exact bytes; it writes schema-v2 `ITEM_ADDED` and schema-v1 lifecycle events. Protocols v1-v8 are supported. Local-only clients continue to write v7; synchronized clients use v8 for verified identity mappings and distributed replay. Protocols v1/v2 reject Handoff history rather than return lossy state. IndexedDB schema 2 adds only sync stores/context metadata; existing event rows and bytes are unchanged. A client with no decoder for a future event must preserve it and fail closed, not pretend it has derived complete household state.
 
 ## v0.4.0 Talk
 
@@ -67,3 +67,7 @@ Supported protocols 1–6; current writer v6. Protocol v6 preserves explicit v5 
 ## v0.7.0 Routines
 
 Supported protocols 1–7; current writer v7. New Routine kinds 14–17 use event schema 1. Old event kinds/schemas and bytes are unchanged; old protocols fail closed for Routine history. IndexedDB stays schema 1. See [V0.7.0](V0.7.0.md).
+
+## v0.9.x Encrypted Sync
+
+Protocol v8 is additive. It appends an authenticated target household ID and up to 256 fixed 96-byte legacy identity bindings to the v7 request header, followed by the same immutable 88-byte event records. v8 validates original canonical bytes, resolves effective identity for projection, sorts a copy for distributed state replay, and preserves original input/local-arrival order for catch-up boundaries. Protocols v1-v7 retain their original behavior. IndexedDB schema 2 adds sync state/outbox/binding stores; pre-sync event rows and bytes remain unchanged. Cryptographic envelopes, key wrapping, relay, migration, and historical entitlement are documented in [V0.9.0](V0.9.0.md).
