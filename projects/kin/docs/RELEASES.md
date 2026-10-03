@@ -74,3 +74,7 @@ Create dedicated validated commits and annotated `kin-v0.6.0` through `kin-v0.6.
 ## v0.7.x Routines
 
 Follow [V0.7.0](V0.7.0.md) for capability, correctness, resilience/accessibility and hardening gates. Release protocol v7 and new schema-1 kinds 14–17 without altering older contracts. Keep IndexedDB schema 1. Each completed milestone gets its own validated commit and annotated tag.
+
+## v0.8.0 Household Pairing
+
+The v0.7.x line is complete at `kin-v0.7.3`. [V0.8.0](V0.8.0.md) is the current planning checkpoint for identity and pairing; do not tag or claim a v0.8.0 implementation until its authorization, recovery, cryptographic, ABI, storage, and compatibility gates are frozen and implemented.

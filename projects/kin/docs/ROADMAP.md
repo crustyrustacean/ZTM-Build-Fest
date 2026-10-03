@@ -182,7 +182,7 @@ Audit ABI/allocation/maximum replay, privacy and documentation consistency; rest
 
 ### `v0.8.0` — Household Pairing
 
-Begin multi-user household identity. Explore one household with two adult members, QR pairing, a short-lived pairing code, passkeys, and trusted devices. Define authorization and recovery before shipping pairing.
+Begin multi-user household identity. Explore one household with two adult members, QR pairing, a short-lived pairing code, passkeys, and trusted devices. The planning contract is [V0.8.0](V0.8.0.md); authorization and recovery must be defined before shipping pairing.
 
 ### `v0.9.0` — Encrypted Sync
 

@@ -118,6 +118,7 @@ Kin is nested in the ZTM Build Fest repository. Its community files and template
 - [Synchronization design](docs/SYNC.md)
 - [Cryptographic posture](docs/CRYPTOGRAPHY.md)
 - [Threat model](docs/THREAT-MODEL.md)
+- [v0.8.0 Household Pairing contract](docs/V0.8.0.md)
 - [Implementation layout and responsibilities](docs/IMPLEMENTATION.md)
 - [JavaScript/WASM ABI](docs/ABI.md)
 - [IndexedDB storage contract](docs/STORAGE.md)
