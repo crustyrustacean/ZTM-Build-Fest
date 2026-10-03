@@ -1,6 +1,6 @@
 # Testing Contracts
 
-**Status:** v0.11.4 durable-service implementation candidate; awaiting human review. Earlier version sections are historical release gates. See [V0.10.0](V0.10.0.md) for prior milestone and patch evidence and [V0.11.0](V0.11.0.md) for the current service contract.
+**Status:** v0.11.5 durable-service implementation candidate; awaiting human review. Earlier version sections are historical release gates. See [V0.10.0](V0.10.0.md) for prior milestone and patch evidence and [V0.11.0](V0.11.0.md) for the current service contract.
 
 ## v0.11 durable-service gate
 
@@ -26,6 +26,14 @@ rollback and retry after stale-writer conflicts, fatal store failures, bounded
 durable cursor pagination, actionable stale-lock errors, admin exclusion and
 cleanup, invalid restore sources, and preservation of old WAL/SHM state. See
 [V0.11.0](V0.11.0.md#pr-17-pre-merge-hardening-evidence-2026-10-03) for gate results.
+
+Semantic-integrity fixtures first create normal API state, then directly mutate
+synthetic SQLite databases while retaining physical/foreign-key validity.
+They cover normalized JSON/envelope mismatches, impossible identity limits and
+ownership, grant/package/rotation contradictions, relay/device sequences, audit
+structure, failed startup, readiness before household access, and backup/restore
+rejection before publication/replacement. Valid historical state and bounded
+relay pages remain covered. See [v0.11.5 evidence](V0.11.0.md#v0115-semantic-integrity-evidence-2026-10-03).
 
 The production smoke process also takes an exclusive service lock. A test or
 operator restoring a database must stop that process first. The lock is

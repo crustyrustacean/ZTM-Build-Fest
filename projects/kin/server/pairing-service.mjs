@@ -6,6 +6,8 @@ import {
   timingSafeEqual,
   verify as verifySignature,
 } from "node:crypto";
+import { MAX_TRUSTED_DEVICES } from "./identity-limits.mjs";
+export { MAX_TRUSTED_DEVICES } from "./identity-limits.mjs";
 
 export const PAIRING_TTL_MS = 10 * 60_000;
 export const CLAIM_TTL_MS = 15 * 60_000;
@@ -13,7 +15,6 @@ export const MAX_CODE_ATTEMPTS = 8;
 export const RATE_WINDOW_MS = 60_000;
 export const RATE_LIMIT = 12;
 export const MAX_RATE_BUCKETS = 4096;
-export const MAX_TRUSTED_DEVICES = 16;
 export const SESSION_TTL_MS = 12 * 60 * 60_000;
 export const TERMINAL_PAIRING_RETENTION_MS = 24 * 60 * 60_000;
 export const PAIRING_CODE_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";

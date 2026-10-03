@@ -1,6 +1,6 @@
 # Development Workflow
 
-**Status:** v0.11.4 durable-service implementation candidate; awaiting human review. Earlier version sections remain historical contracts.
+**Status:** v0.11.5 durable-service implementation candidate; awaiting human review. Earlier version sections remain historical contracts.
 
 ## Build and run
 
@@ -96,6 +96,14 @@ restore does not initialize a new database from an invalid backup. A database
 backup can roll identity and authorization state backward (including revocation
 and key epochs); it is not a rollback-proof recovery mechanism. Keep service
 backups separate from local encrypted browser archives.
+
+Startup and every `/readiness` check validate SQLite structure and Kin's durable
+identity, routing, sequence and epoch invariants across all households. Semantic
+corruption stops startup or returns readiness HTTP 503 without exposing rows or
+paths; `/health` remains liveness. Backup source/copy and restore source use the
+same validator. Kin does not automatically repair inconsistent authorization.
+Validation pages relay history but runs synchronously, so readiness latency
+grows with stored history; see [measurements](V0.11.0.md#v0115-semantic-integrity-evidence-2026-10-03).
 
 ## v0.5.0 Pulse
 

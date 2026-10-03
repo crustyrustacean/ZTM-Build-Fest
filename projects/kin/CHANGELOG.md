@@ -2,10 +2,10 @@
 
 This file records completed Kin releases. The `v0.0.x` releases are planning and documentation milestones; they do not represent implemented application features. The first implementation milestone remains `v0.1.0`.
 
-## Unreleased — v0.11.0–v0.11.4 Durable Service & Deployment candidate
+## Unreleased — v0.11.0–v0.11.5 Durable Service & Deployment candidate
 
-The implementation candidate and pre-merge hardening patch are tagged
-`kin-v0.11.4` for human review. The original `kin-v0.11.3` tag is preserved.
+The implementation candidate with durable semantic validation is tagged
+`kin-v0.11.5` for human review. The `kin-v0.11.3` and `kin-v0.11.4` tags are preserved.
 These are review candidates, not published product releases.
 
 ### v0.11.0 — Durable Identity & Relay Foundation
@@ -64,6 +64,27 @@ WASM, product/security-storage/security-UI/WebAuthn-PRF browser gates, npm audit
 version checks and PowerShell/POSIX launcher smoke tests. The POSIX launcher
 used Windows Node through WSL; native Linux Node and macOS remain unverified.
 See [the hardening evidence](docs/V0.11.0.md#pr-17-pre-merge-hardening-evidence-2026-10-03).
+
+### v0.11.5 — Durable Semantic Integrity
+
+Durable startup, readiness, backup and restore now share schema, SQLite and
+Kin semantic validation. Cross-check normalized routing/authorization columns
+against grant JSON, device JSON and canonical opaque envelopes; reject
+impossible membership/device limits, credential ownership, sequence and
+epoch/rotation state before readiness. Backup validates both source and copy;
+restore validates read-only before replacement. No automatic repair or whole-
+database tamper resistance is claimed. Expired grants, retained historical
+authority and accepted certificate encodings remain supported. Strict input
+identity checks prevent malformed grants/proposals from committing invalid state.
+
+Passed 281 Node/real-WASM tests (207 server, 100 new regressions), 118 Rust tests
+on both Windows and WSL, formatting, Clippy, release WASM, the product browser
+gate, 313 security-storage assertions, 97 security-UI assertions and 18 virtual
+WebAuthn/PRF assertions. npm ci/audit, version checks and PowerShell/POSIX
+build/launcher smoke gates passed. POSIX used Windows Node through WSL;
+native Linux Node and macOS remain unverified. Server schema v1, sync envelope
+v1, client/domain formats and backup format remain unchanged. See
+[semantic-integrity evidence and measurements](docs/V0.11.0.md#v0115-semantic-integrity-evidence-2026-10-03).
 
 ## [0.10.3] — Bounded Storage/Archive Hardening & Architecture Closure
 

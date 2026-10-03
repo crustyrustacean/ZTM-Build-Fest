@@ -15,23 +15,25 @@ import {
 } from "node:fs";
 import { dirname, isAbsolute, resolve } from "node:path";
 import { randomBytes } from "node:crypto";
+import {
+  CANONICAL_ENVELOPE_FIELDS,
+  isDurableGrantValid,
+  isDurableRotationValid,
+  isEventEnvelopeValid,
+  MAX_BINDINGS,
+  MAX_HOUSEHOLD_EVENTS,
+  MAX_KEY_EPOCHS,
+} from "./sync-contract.mjs";
+import { MAX_ACTIVE_MEMBERS, MAX_TRUSTED_DEVICES } from "./identity-limits.mjs";
+import {
+  validCredentialId,
+  validStoredCredential,
+  validStoredDevice,
+} from "./durable-identity.mjs";
 
 const SERVER_SCHEMA_VERSION = 1;
 const MAX_AUDIT_ROWS = 10_000;
 const BUSY_TIMEOUT_MS = 5_000;
-const CANONICAL_ENVELOPE_FIELDS = [
-  "protocolVersion",
-  "envelopeVersion",
-  "eventId",
-  "householdId",
-  "deviceId",
-  "deviceSequence",
-  "logicalTime",
-  "keyEpoch",
-  "nonce",
-  "ciphertext",
-  "signature",
-];
 
 export class DurableStoreError extends Error {
   constructor(message, options) {
@@ -143,7 +145,10 @@ function decodeCanonicalEnvelope(value) {
     )
   )
     throw new DurableStoreError("Kin encrypted relay data is invalid.");
-  return Object.fromEntries(pairs);
+  const envelope = Object.fromEntries(pairs);
+  if (!isEventEnvelopeValid(envelope))
+    throw new DurableStoreError("Kin encrypted relay data is invalid.");
+  return envelope;
 }
 
 function validateEventRow(row, householdId) {
@@ -151,9 +156,12 @@ function validateEventRow(row, householdId) {
   if (
     envelope.eventId !== row.event_id ||
     envelope.householdId !== householdId ||
+    row.household_id !== householdId ||
     envelope.deviceId !== row.device_id ||
     envelope.deviceSequence !== row.device_sequence ||
-    envelope.keyEpoch !== row.key_epoch
+    envelope.keyEpoch !== row.key_epoch ||
+    !Number.isSafeInteger(row.relay_sequence) ||
+    row.relay_sequence < 1
   )
     throw new DurableStoreError("Kin encrypted relay data is invalid.");
   return {
@@ -210,27 +218,12 @@ export class DurableStore {
         throw new DurableStoreError(
           "The Kin restore source must be an existing database file.",
         );
-      // Restore must never create or migrate an absent/empty backup into a new
-      // household database, or modify an unsupported source before rejecting it.
-      const sourceInspection = new Database(source, {
+      // The same startup validator checks the source without creating,
+      // migrating or changing it before replacement.
+      sourceStore = new DurableStore(source, {
+        acquireProcessLock: false,
         readonly: true,
-        fileMustExist: true,
       });
-      try {
-        if (
-          sourceInspection.pragma("user_version", { simple: true }) !==
-          SERVER_SCHEMA_VERSION
-        )
-          throw new DurableStoreError(
-            "The Kin restore source uses an unsupported server schema version.",
-          );
-        if (sourceInspection.pragma("integrity_check", { simple: true }) !== "ok")
-          throw new DurableStoreError("The Kin restore source did not validate.");
-      } finally {
-        sourceInspection.close();
-      }
-      sourceStore = new DurableStore(source, { acquireProcessLock: false });
-      sourceStore.validate();
       await sourceStore.backup(temporary, { maintenanceLockHeld: true });
 
       if (exists(target)) {
@@ -282,7 +275,7 @@ export class DurableStore {
 
   constructor(
     databasePath,
-    { migrationFault, acquireProcessLock = true } = {},
+    { migrationFault, acquireProcessLock = true, readonly = false } = {},
   ) {
     this.databasePath =
       databasePath === ":memory:" ? databasePath : resolve(databasePath);
@@ -290,11 +283,11 @@ export class DurableStore {
     this.closed = false;
 
     this.releaseProcessLock =
-      acquireProcessLock && this.databasePath !== ":memory:"
+      acquireProcessLock && !readonly && this.databasePath !== ":memory:"
         ? acquireDatabaseProcessLock(this.databasePath)
         : null;
     this.processLockAcquired = Boolean(this.releaseProcessLock);
-    if (this.databasePath !== ":memory:") {
+    if (!readonly && this.databasePath !== ":memory:") {
       try {
         mkdirSync(dirname(this.databasePath), {
           recursive: true,
@@ -312,19 +305,19 @@ export class DurableStore {
     }
 
     try {
-      this.db = new Database(this.databasePath);
+      this.db = new Database(this.databasePath, { readonly, fileMustExist: readonly });
       this.db.pragma("foreign_keys = ON");
       this.db.pragma(`busy_timeout = ${BUSY_TIMEOUT_MS}`);
       this.db.pragma("trusted_schema = OFF");
-      if (this.databasePath !== ":memory:") {
+      if (!readonly && this.databasePath !== ":memory:") {
         this.db.pragma("journal_mode = WAL");
         this.db.pragma("synchronous = FULL");
       }
-      this.migrate(migrationFault);
-      this.verify();
-      if (this.databasePath !== ":memory:" && process.platform !== "win32")
+      if (!readonly) this.migrate(migrationFault);
+      if (!readonly && this.databasePath !== ":memory:" && process.platform !== "win32")
         chmodSync(this.databasePath, 0o600);
       this.prepareStatements();
+      this.validate();
     } catch (error) {
       this.db?.close();
       this.releaseProcessLock?.();
@@ -527,7 +520,19 @@ export class DurableStore {
   }
 
   verify() {
-    const integrity = this.db.pragma("quick_check", { simple: true });
+    if (this.db.pragma("user_version", { simple: true }) !== SERVER_SCHEMA_VERSION)
+      throw new DurableStoreError("Kin server schema metadata is invalid.");
+    const migrations = this.db
+      .prepare("SELECT version, applied_at FROM server_migrations ORDER BY version")
+      .all();
+    if (
+      migrations.length !== SERVER_SCHEMA_VERSION ||
+      migrations[0]?.version !== SERVER_SCHEMA_VERSION ||
+      !Number.isSafeInteger(migrations[0]?.applied_at) ||
+      migrations[0].applied_at < 0
+    )
+      throw new DurableStoreError("Kin server migration metadata is invalid.");
+    const integrity = this.db.pragma("integrity_check", { simple: true });
     if (integrity !== "ok")
       throw new DurableStoreError("Kin server database integrity check failed.");
     if (this.db.pragma("foreign_key_check").length)
@@ -552,7 +557,7 @@ export class DurableStore {
         "SELECT COUNT(*) AS count FROM sync_events WHERE household_id = ?",
       ),
       eventsAfter: this.db.prepare(
-        "SELECT relay_sequence, event_id, device_id, device_sequence, key_epoch, canonical_envelope FROM sync_events WHERE household_id = ? AND relay_sequence > ? ORDER BY relay_sequence LIMIT ?",
+        "SELECT household_id, relay_sequence, event_id, device_id, device_sequence, key_epoch, canonical_envelope FROM sync_events WHERE household_id = ? AND relay_sequence > ? ORDER BY relay_sequence LIMIT ?",
       ),
       eventAfterExists: this.db.prepare(
         "SELECT 1 FROM sync_events WHERE household_id = ? AND relay_sequence > ? LIMIT 1",
@@ -591,6 +596,8 @@ export class DurableStore {
       const members = new Map();
       const credentials = new Map();
       const devices = new Map();
+      const activeMemberCounts = new Map();
+      const trustedDeviceCounts = new Map();
       for (const row of this.db.prepare("SELECT * FROM households").all()) {
         if (
           !isId(row.id) ||
@@ -609,9 +616,10 @@ export class DurableStore {
         if (
           !isId(row.id) ||
           !isId(row.household_id) ||
-          !Number.isSafeInteger(row.active) ||
+          ![0, 1].includes(row.active) ||
           !Array.isArray(credentialIds) ||
-          credentialIds.some((id) => typeof id !== "string" || !id.length)
+          credentialIds.some((id) => !validCredentialId(id)) ||
+          new Set(credentialIds).size !== credentialIds.length
         )
           throw new DurableStoreError("Kin server membership data is invalid.");
         const member = {
@@ -625,14 +633,17 @@ export class DurableStore {
         if (!household)
           throw new DurableStoreError("Kin server membership data is invalid.");
         household.members.add(member.id);
+        const activeCount =
+          (activeMemberCounts.get(household.id) ?? 0) + row.active;
+        if (activeCount > MAX_ACTIVE_MEMBERS)
+          throw new DurableStoreError("Kin server membership data is invalid.");
+        activeMemberCounts.set(household.id, activeCount);
       }
       for (const row of this.db.prepare("SELECT * FROM credentials").all()) {
         const credential = parseStoredJson(row.credential_json);
         if (
-          !credential ||
-          typeof row.id !== "string" ||
-          !Number.isSafeInteger(credential.algorithm) ||
-          !credential.publicKey ||
+          !validStoredCredential(credential) ||
+          !validCredentialId(row.id) ||
           credential.id !== row.id ||
           credential.memberId !== row.member_id ||
           !members.get(row.member_id)?.credentials.has(row.id)
@@ -643,7 +654,7 @@ export class DurableStore {
       for (const row of this.db.prepare("SELECT * FROM devices").all()) {
         const device = parseStoredJson(row.device_json);
         if (
-          !device ||
+          !validStoredDevice(device) ||
           !isId(row.id) ||
           !isId(row.household_id) ||
           !isId(row.member_id) ||
@@ -651,10 +662,26 @@ export class DurableStore {
           device.memberId !== row.member_id ||
           device.householdId !== row.household_id ||
           device.tokenHash !== row.token_hash ||
-          device.revokedAt !== row.revoked_at
+          device.revokedAt !== row.revoked_at ||
+          !households.has(row.household_id) ||
+          members.get(row.member_id)?.householdId !== row.household_id
         )
           throw new DurableStoreError("Kin server device data is invalid.");
         devices.set(row.id, device);
+        const trustedCount =
+          (trustedDeviceCounts.get(row.household_id) ?? 0) +
+          Number(row.revoked_at === null);
+        if (trustedCount > MAX_TRUSTED_DEVICES)
+          throw new DurableStoreError("Kin server device data is invalid.");
+        trustedDeviceCounts.set(row.household_id, trustedCount);
+      }
+      for (const device of devices.values()) {
+        const certificate = device.deviceAuthorizationCertificate;
+        if (
+          certificate &&
+          devices.get(certificate.issuerDeviceId)?.householdId !== device.householdId
+        )
+          throw new DurableStoreError("Kin server device data is invalid.");
       }
       for (const member of members.values())
         for (const credentialId of member.credentials)
@@ -750,10 +777,53 @@ export class DurableStore {
     });
   }
 
-  loadSyncState(householdId) {
+  loadSyncState(householdId, identity) {
     this.assertAvailable();
     try {
+      if (
+        !isId(householdId) ||
+        !(identity?.households.has(householdId) ??
+          Boolean(this.statements.getHousehold.get(householdId)))
+      )
+        throw new DurableStoreError("Kin synchronization data is invalid.");
+      const devices = new Map();
+      const getDevice = (deviceId) => {
+        if (devices.has(deviceId)) return devices.get(deviceId);
+        const stored = identity ? null : this.statements.getDevice.get(deviceId);
+        const device = identity
+          ? identity.devices.get(deviceId)
+          : stored && parseStoredJson(stored.device_json);
+        const member = device && (identity
+          ? identity.members.get(device.memberId)
+          : this.statements.getMember.get(device.memberId));
+        if (
+          !device ||
+          !member ||
+          device.id !== deviceId ||
+          device.householdId !== householdId ||
+          (identity ? member.householdId : member.household_id) !== householdId ||
+          (!identity &&
+            (stored.household_id !== householdId ||
+              stored.member_id !== device.memberId))
+        )
+          throw new DurableStoreError("Kin synchronization data is invalid.");
+        devices.set(deviceId, device);
+        return device;
+      };
       const row = this.statements.getSyncHousehold.get(householdId);
+      if (
+        row &&
+        (row.household_id !== householdId ||
+          !Number.isSafeInteger(row.current_epoch) ||
+          row.current_epoch < 1 ||
+          row.current_epoch > MAX_KEY_EPOCHS ||
+          ![0, 1].includes(row.enabled) ||
+          ![0, 1].includes(row.rotation_pending) ||
+          !Number.isSafeInteger(row.next_sequence) ||
+          row.next_sequence < 1 ||
+          row.next_sequence > MAX_HOUSEHOLD_EVENTS + 1)
+      )
+        throw new DurableStoreError("Kin synchronization state is invalid.");
       const state = {
         currentEpoch: row?.current_epoch ?? 1,
         enabled: Boolean(row?.enabled ?? false),
@@ -765,39 +835,59 @@ export class DurableStore {
         deviceSequence: new Map(),
         grants: new Map(),
         bindings: new Map(),
-        lastRotation: row?.last_rotation_json
+        lastRotation: row && row.last_rotation_json !== null
           ? parseJson(row.last_rotation_json)
           : null,
         grantRequests: new Map(),
       };
       for (const value of this.db
         .prepare(
-          "SELECT device_id, last_sequence FROM sync_device_sequences WHERE household_id = ?",
+          "SELECT household_id, device_id, last_sequence FROM sync_device_sequences WHERE household_id = ?",
         )
-        .all(householdId))
+        .iterate(householdId)) {
+        if (
+          value.household_id !== householdId ||
+          !isId(value.device_id) ||
+          !Number.isSafeInteger(value.last_sequence) ||
+          value.last_sequence < 0 ||
+          value.last_sequence > MAX_HOUSEHOLD_EVENTS ||
+          !getDevice(value.device_id)
+        )
+          throw new DurableStoreError("Kin synchronization data is invalid.");
         state.deviceSequence.set(value.device_id, value.last_sequence);
+      }
       for (const value of this.db
         .prepare(
-          "SELECT grant_id, grant_json FROM provisioning_grants WHERE household_id = ?",
+          "SELECT * FROM provisioning_grants WHERE household_id = ?",
         )
-        .all(householdId)) {
+        .iterate(householdId)) {
         const grant = parseJson(value.grant_json);
-        if (!grant || grant.grantId !== value.grant_id)
+        if (!isDurableGrantValid(grant, value, state.currentEpoch, getDevice))
           throw new DurableStoreError("Kin provisioning data is invalid.");
         state.grants.set(value.grant_id, grant);
-        if (grant.requestId)
+        if (grant.requestId != null) {
+          if (state.grantRequests.has(`${grant.senderDeviceId}:${grant.requestId}`))
+            throw new DurableStoreError("Kin provisioning data is invalid.");
           state.grantRequests.set(
             `${grant.senderDeviceId}:${grant.requestId}`,
             grant.grantId,
           );
+        }
       }
       for (const value of this.db
         .prepare(
-          "SELECT event_id, canonical_envelope FROM sync_bindings WHERE household_id = ?",
+          "SELECT household_id, event_id, canonical_envelope FROM sync_bindings WHERE household_id = ?",
         )
-        .all(householdId)) {
+        .iterate(householdId)) {
         const binding = decodeCanonicalEnvelope(value.canonical_envelope);
-        if (binding.eventId !== value.event_id)
+        if (
+          binding.eventId !== value.event_id ||
+          binding.householdId !== value.household_id ||
+          binding.householdId !== householdId ||
+          binding.keyEpoch > state.currentEpoch ||
+          binding.keyEpoch < (getDevice(binding.deviceId).syncHistoryFromEpoch ?? 1) ||
+          state.bindings.size >= MAX_BINDINGS
+        )
           throw new DurableStoreError("Kin identity-binding data is invalid.");
         state.bindings.set(value.event_id, {
           canonical: value.canonical_envelope,
@@ -805,10 +895,16 @@ export class DurableStore {
         });
       }
       if (
-        state.currentEpoch < 1 ||
-        state.currentEpoch > 128 ||
-        !Number.isSafeInteger(state.nextSequence) ||
-        state.nextSequence !== state.eventCount + 1
+        !Number.isSafeInteger(state.eventCount) ||
+        state.eventCount < 0 ||
+        state.eventCount > MAX_HOUSEHOLD_EVENTS ||
+        state.nextSequence !== state.eventCount + 1 ||
+        !isDurableRotationValid(
+          state.lastRotation,
+          householdId,
+          state.currentEpoch,
+          getDevice,
+        )
       )
         throw new DurableStoreError("Kin synchronization state is invalid.");
       return state;
@@ -999,19 +1095,31 @@ export class DurableStore {
   }
 
   health() {
-    this.assertAvailable();
-    if (this.db.pragma("quick_check", { simple: true }) !== "ok") {
-      this.failed = true;
-      throw new DurableStoreError("Kin server database integrity check failed.");
-    }
-    return true;
+    return this.validate();
   }
 
   validate() {
-    this.health();
-    const { households } = this.loadIdentity();
-    for (const householdId of households.keys()) {
-      const state = this.loadSyncState(householdId);
+    this.assertAvailable();
+    try {
+      // One read transaction gives all cross-table checks the same snapshot,
+      // even during an online backup while another connection is committing.
+      return this.db.transaction(() => this.validateSnapshot())();
+    } catch (error) {
+      this.failed = true;
+      if (error instanceof DurableStoreError) throw error;
+      throw new DurableStoreError("Kin durable service data is invalid.", {
+        cause: error,
+      });
+    }
+  }
+
+  validateSnapshot() {
+    this.verify();
+    const identity = this.loadIdentity();
+    const currentEpochs = new Map();
+    for (const householdId of identity.households.keys()) {
+      const state = this.loadSyncState(householdId, identity);
+      currentEpochs.set(householdId, state.currentEpoch);
       let cursor = 0;
       let scanned = 0;
       let nextRelaySequence = 1;
@@ -1021,14 +1129,18 @@ export class DurableStore {
         if (!rows.length) break;
         for (const row of rows) {
           const { envelope, sequence } = validateEventRow(row, householdId);
-          if (sequence !== nextRelaySequence++) {
-            this.failed = true;
+          const device = identity.devices.get(envelope.deviceId);
+          if (
+            sequence !== nextRelaySequence++ ||
+            device?.householdId !== householdId ||
+            envelope.keyEpoch > state.currentEpoch ||
+            envelope.keyEpoch < (device.syncHistoryFromEpoch ?? 1)
+          ) {
             throw new DurableStoreError("Kin encrypted relay data is invalid.");
           }
           const expectedDeviceSequence =
             (deviceSequences.get(envelope.deviceId) ?? 0) + 1;
           if (envelope.deviceSequence !== expectedDeviceSequence) {
-            this.failed = true;
             throw new DurableStoreError("Kin encrypted relay data is invalid.");
           }
           deviceSequences.set(envelope.deviceId, envelope.deviceSequence);
@@ -1039,15 +1151,40 @@ export class DurableStore {
       if (
         scanned !== state.eventCount ||
         state.nextSequence !== nextRelaySequence ||
-        state.deviceSequence.size !== deviceSequences.size ||
+        [...state.deviceSequence].some(
+          ([deviceId, sequence]) => (deviceSequences.get(deviceId) ?? 0) !== sequence,
+        ) ||
         [...deviceSequences].some(
           ([deviceId, sequence]) =>
             state.deviceSequence.get(deviceId) !== sequence,
         )
       ) {
-        this.failed = true;
         throw new DurableStoreError("Kin encrypted relay data is invalid.");
       }
+    }
+    for (const device of identity.devices.values()) {
+      const currentEpoch = currentEpochs.get(device.householdId);
+      if (
+        (device.syncHistoryFromEpoch ?? 1) > currentEpoch + 1 ||
+        device.syncProvisionedEpochs?.some((epoch) => epoch > currentEpoch)
+      )
+        throw new DurableStoreError("Kin synchronization data is invalid.");
+    }
+    for (const row of this.db
+      .prepare("SELECT * FROM security_audit ORDER BY sequence")
+      .iterate()) {
+      const details = parseJson(row.details_json);
+      if (
+        !identity.households.has(row.household_id) ||
+        !Number.isSafeInteger(row.sequence) ||
+        row.sequence < 1 ||
+        !Number.isSafeInteger(row.created_at) ||
+        row.created_at < 0 ||
+        typeof row.event_type !== "string" ||
+        !/^[a-z][a-z0-9_]{0,63}$/.test(row.event_type) ||
+        !validAuditDetails(details)
+      )
+        throw new DurableStoreError("Kin security audit data is invalid.");
     }
     return true;
   }
@@ -1073,17 +1210,11 @@ export class DurableStore {
       let createdTarget = false;
       try {
         await this.db.backup(temporary);
-        const verification = new Database(temporary, { readonly: true });
-        try {
-          if (
-            verification.pragma("integrity_check", { simple: true }) !== "ok" ||
-            verification.pragma("user_version", { simple: true }) !==
-              SERVER_SCHEMA_VERSION
-          )
-            throw new DurableStoreError("The Kin backup did not validate.");
-        } finally {
-          verification.close();
-        }
+        const verification = new DurableStore(temporary, {
+          acquireProcessLock: false,
+          readonly: true,
+        });
+        verification.close();
         if (process.platform !== "win32") chmodSync(temporary, 0o600);
         linkSync(temporary, target);
         createdTarget = true;
@@ -1163,6 +1294,19 @@ function stringifyStored(value) {
 function auditDetails(event) {
   const { type, at, persisted, ...details } = event;
   return details;
+}
+
+function validAuditDetails(details) {
+  // Audit details are a bounded metadata object, never arbitrary household
+  // content. Permit optional fields without coupling validation to event types.
+  if (!details || typeof details !== "object" || Array.isArray(details)) return false;
+  const entries = Object.entries(details);
+  return entries.length <= 32 && entries.every(([key, value]) =>
+    /^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(key) &&
+    (value === null || typeof value === "boolean" ||
+      (typeof value === "string" && value.length <= 1024) ||
+      (typeof value === "number" && Number.isSafeInteger(value))),
+  );
 }
 
 function isId(value) {

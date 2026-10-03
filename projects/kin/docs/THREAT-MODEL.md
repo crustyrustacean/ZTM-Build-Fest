@@ -1,6 +1,6 @@
 # Threat Model
 
-**Status:** v0.11.4 implementation candidate; awaiting human review. Local authenticated encryption, credential/recovery root wrappers, locked startup, encrypted archives and signed transport-key migration complement encrypted sync. The candidate adds durable service storage, an exclusive service-process lock, and verified service database backup/restore. Independent security audit, cross-browser certification, and general rollback protection are not provided. v0.12 defines lifecycle/deletion and retention, and v0.13 defines recovery/continuity; neither is implemented or certified by this assessment.
+**Status:** v0.11.5 implementation candidate; awaiting human review. Local authenticated encryption, credential/recovery root wrappers, locked startup, encrypted archives and signed transport-key migration complement encrypted sync. The candidate adds durable service storage, an exclusive service-process lock, and verified service database backup/restore. Independent security audit, cross-browser certification, and general rollback protection are not provided. v0.12 defines lifecycle/deletion and retention, and v0.13 defines recovery/continuity; neither is implemented or certified by this assessment.
 
 ## v0.10 local-at-rest boundary
 

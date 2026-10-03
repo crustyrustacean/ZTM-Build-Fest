@@ -1,6 +1,6 @@
 # Roadmap
 
-Last published release: `v0.10.3 — Bounded Storage/Archive Hardening & Architecture Closure`. The `v0.11.4` Durable Service & Deployment implementation candidate is complete and tagged `kin-v0.11.4` for human review; it is not a published release. Do not begin v0.12.
+Last published release: `v0.10.3 — Bounded Storage/Archive Hardening & Architecture Closure`. The `v0.11.5` Durable Service & Deployment implementation candidate is complete and tagged `kin-v0.11.5` for human review; it is not a published release. Do not begin v0.12.
 
 ```text
 v0.9.3 — Encrypted Event Sync Stabilization

@@ -39,6 +39,7 @@ export function createKinServer(options = {}) {
         new DurableStore(databasePath, {
           acquireProcessLock: options.acquireProcessLock,
         }));
+  if (options.store) store.validate();
   const service =
     options.service ?? new PairingService({ now: options.now, store });
   if (options.service && store && !service.store) {

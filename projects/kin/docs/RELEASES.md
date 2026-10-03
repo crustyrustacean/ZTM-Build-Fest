@@ -1,6 +1,6 @@
 # Release Process
 
-**Status:** Last published implementation: v0.10.3 Bounded Storage/Archive Hardening & Architecture Closure. The v0.11.4 Durable Service & Deployment candidate is committed and tagged `kin-v0.11.4` for human review; it is not a published release. No v0.12 work is in scope.
+**Status:** Last published implementation: v0.10.3 Bounded Storage/Archive Hardening & Architecture Closure. The v0.11.5 Durable Service & Deployment candidate is committed and tagged `kin-v0.11.5` for human review; it is not a published release. No v0.12 work is in scope.
 
 ## Release sequence
 
@@ -8,7 +8,7 @@ The completed progression is `kin-v0.9.3` → `kin-v0.10.0` (Portable Core + Loc
 Data Security) → `kin-v0.10.1` (Security Lifecycle & Sync Recovery Correctness) →
 `kin-v0.10.2` (Local Root Rotation & Recovery Lifecycle) →
 `kin-v0.10.3` (Bounded Storage/Archive Hardening & Architecture Closure). The
-current review candidate completes the v0.11.0 through v0.11.4 Durable
+current review candidate completes the v0.11.0 through v0.11.5 Durable
 Service & Deployment gates and stops for human review. Its annotated tag
 identifies the candidate commit and does not represent a published release.
 The remaining planned,
