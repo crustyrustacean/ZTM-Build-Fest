@@ -94,3 +94,26 @@ test("logout invalidates only the session and preserves device trust", () => {
   assert.throws(() => service.authorize(adult.sessionToken), error => error.code === "authentication_required");
   assert.equal(service.devices.get(adult.deviceId).revokedAt, null);
 });
+
+test("membership removal revokes every target device and active session", () => {
+  const { service, adult } = setup();
+  const invitation = service.createPairing(adult.sessionToken);
+  const claim = service.claimPairing({ code: invitation.code, credential: credential("b"), deviceLabel: "B" });
+  service.approvePairing(adult.sessionToken, invitation.pairingId, claim.version);
+  const joined = service.activateClaim(claim.claimToken);
+  service.removeOtherAdult(adult.sessionToken, joined.memberId);
+  assert.throws(() => service.authorize(joined.sessionToken), error => error.code === "authentication_required");
+  assert.ok(service.devices.get(joined.deviceId).revokedAt);
+  assert.equal(service.events.at(-1).type, "membership_removed");
+});
+
+test("the last adult cannot leave, while a joined adult can leave without removing the household", () => {
+  const { service, adult } = setup();
+  assert.throws(() => service.leaveHousehold(adult.sessionToken), error => error.code === "last_adult");
+  const invitation = service.createPairing(adult.sessionToken);
+  const claim = service.claimPairing({ code: invitation.code, credential: credential("b"), deviceLabel: "B" });
+  service.approvePairing(adult.sessionToken, invitation.pairingId, claim.version);
+  const joined = service.activateClaim(claim.claimToken);
+  assert.equal(service.leaveHousehold(joined.sessionToken).removed, true);
+  assert.equal(service.authorize(adult.sessionToken).member.id, adult.memberId);
+});

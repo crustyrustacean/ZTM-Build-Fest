@@ -2,7 +2,7 @@
 
 > A private, lightweight household coordination app for the little things families need to know, remember, hand off, or discuss.
 
-**Current status: `v0.8.1` — Pairing Hardening and Failure Recovery.** Kin can establish a two-adult household through a short-lived, single-use pairing code, passkey-backed identities, and explicit approval by the existing adult. Joining-device activation now requires a post-approval passkey assertion, so approval cannot silently authorize a browser that has lost its credential. Pairing, membership, credentials, sessions, and trusted devices remain separate server-side concepts.
+**Current status: `v0.8.2` — Trusted Devices, Authorization, and Security UX.** Kin separates adult membership, passkey credentials, browser sessions, trusted devices, and pairing sessions. Adults can inspect/revoke devices, log out without revoking a device, leave when another adult remains, or remove the other adult and revoke that adult's devices. Security errors describe safe next steps without revealing household details to an unapproved claimant.
 
 ## The problem
 
@@ -66,6 +66,7 @@ The intended technical direction is Rust compiled to WebAssembly, native Web Com
 - `v0.7.4` — Routine Stale-Action Correctness (`kin-v0.7.4`)
 - `v0.8.0` — Household Pairing Foundation (`kin-v0.8.0`)
 - `v0.8.1` — Pairing Hardening and Failure Recovery (`kin-v0.8.1`)
+- `v0.8.2` — Trusted Devices, Authorization, and Security UX (`kin-v0.8.2`)
 - See the [changelog](CHANGELOG.md) for the completed release history.
 
 ## Install, build, and run

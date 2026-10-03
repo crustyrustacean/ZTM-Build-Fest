@@ -1,6 +1,6 @@
 # Identity and Trusted Devices
 
-**Status:** Current through v0.7.4 Routine Stale-Action Correctness; design specification for future releases. No accounts, credentials, device registry, authentication, or trusted-device implementation exists. Pairing, sync, and cryptographic boundaries are specified in [PAIRING](PAIRING.md), [SYNC](SYNC.md), and [CRYPTOGRAPHY](CRYPTOGRAPHY.md).
+**Status:** Current through v0.8.2. Household/member identity, passkey credentials, sessions, and trusted-device inspection/revocation are implemented by the same-origin in-memory service. Encrypted sync and content-key management remain future work.
 
 ## Separate identities
 

@@ -1,6 +1,6 @@
 # Pairing and Device Enrollment
 
-**Status:** Current through the v0.8.0 Household Pairing planning checkpoint; pairing remains conceptual and unimplemented. QR generation, pairing codes, identity, device trust, and key exchange are not implemented. Identity distinctions are in [IDENTITY](IDENTITY.md); key handling is in [CRYPTOGRAPHY](CRYPTOGRAPHY.md).
+**Status:** Current through v0.8.2. Manual short-lived pairing codes, invitation URLs, passkey identity, explicit approval, and trusted-device revocation are implemented. QR, key exchange, encrypted sync, and durable service storage are not implemented.
 
 ## Distinct operations
 

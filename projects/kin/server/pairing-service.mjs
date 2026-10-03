@@ -220,6 +220,37 @@ export class PairingService {
     return [...this.devices.values()].filter(device => device.householdId === household.id).map(({ id, memberId, label, trustedAt, revokedAt }) => ({ id, memberId, label, trustedAt, revokedAt }));
   }
 
+  householdView(sessionToken) {
+    const { member, household } = this.authorize(sessionToken);
+    return {
+      householdId: household.id,
+      currentMemberId: member.id,
+      members: [...household.members].map(memberId => ({ id: memberId, current: memberId === member.id, active: this.members.get(memberId)?.active === true })),
+    };
+  }
+
+  leaveHousehold(sessionToken) {
+    const { member, household } = this.authorize(sessionToken);
+    const remaining = [...household.members].filter(memberId => memberId !== member.id && this.members.get(memberId)?.active);
+    if (!remaining.length) throw new PairingError("last_adult", "The only active adult cannot leave. Household deletion and recovery are not available.", 409);
+    return this.removeMembership(household, member.id, member.id);
+  }
+
+  removeOtherAdult(sessionToken, memberId) {
+    const { member, household } = this.authorize(sessionToken);
+    if (memberId === member.id) throw new PairingError("use_leave", "Use Leave household to remove your own membership.", 409);
+    if (!household.members.has(memberId) || !this.members.get(memberId)?.active) throw new PairingError("not_found", "That household member is unavailable.", 404);
+    return this.removeMembership(household, memberId, member.id);
+  }
+
+  removeMembership(household, memberId, actorId) {
+    const target = this.members.get(memberId); target.active = false; household.version += 1;
+    for (const device of this.devices.values()) if (device.memberId === memberId && !device.revokedAt) { device.revokedAt = this.now(); this.audit("device_revoked", { householdId: household.id, memberId, deviceId: device.id }); }
+    for (const [sessionHash, session] of this.sessions) if (session.memberId === memberId) this.sessions.delete(sessionHash);
+    this.audit("membership_removed", { householdId: household.id, memberId, actorId });
+    return { memberId, removed: true };
+  }
+
   revokeDevice(sessionToken, deviceId) {
     const { household, device: actingDevice } = this.authorize(sessionToken);
     const device = this.devices.get(deviceId);

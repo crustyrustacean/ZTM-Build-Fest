@@ -95,6 +95,11 @@ async function api(request, response, url) {
   if (request.method === "GET" && url.pathname === "/api/devices") { json(response, 200, { devices: service.listDevices(session) }); return; }
   const deviceMatch = url.pathname.match(/^\/api\/devices\/([a-f0-9]{32})$/);
   if (request.method === "DELETE" && deviceMatch) { json(response, 200, service.revokeDevice(session, deviceMatch[1])); return; }
+  if (request.method === "GET" && url.pathname === "/api/household") { json(response, 200, service.householdView(session)); return; }
+  if (request.method === "DELETE" && url.pathname === "/api/household/membership") {
+    const result = body.memberId ? service.removeOtherAdult(session, body.memberId) : service.leaveHousehold(session);
+    if (!body.memberId) clearCookie(response, "kin_session"); json(response, 200, result); return;
+  }
   throw new PairingError("not_found", "That endpoint is unavailable.", 404);
 }
 

@@ -2,6 +2,10 @@
 
 This file records completed Kin releases. The `v0.0.x` releases are planning and documentation milestones; they do not represent implemented application features. The first implementation milestone remains `v0.1.0`.
 
+## [0.8.2] — Trusted Devices, Authorization, and Security UX
+
+Make device trust inspectable and revocable, add logout with session-only semantics, define leaving and other-adult removal, revoke all target sessions/devices on membership removal, and prohibit the last active adult from leaving without a supported deletion/recovery path. Add an authorization matrix and actionable passkey, expiry, revocation, trust, and recovery messages without exposing household details before approval.
+
 ## [0.8.1] — Pairing Hardening and Failure Recovery
 
 Separate membership approval from joining-device activation: after atomic approval, the joining adult must prove continued possession of the enrolled passkey before receiving a session. Lost-passkey, response-loss, duplicate approval, revoke/approve, server-time expiry, simultaneous invitation, replay, logout, and device-revocation paths fail closed or retry idempotently. Logout invalidates a session without conflating it with device trust.
