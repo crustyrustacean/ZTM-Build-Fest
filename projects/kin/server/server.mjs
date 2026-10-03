@@ -165,8 +165,31 @@ if (
       origin,
       acquireProcessLock: true,
     });
-    application.server.on("error", () => {
-      console.error(JSON.stringify({ event: "startup_failed", outcome: "listen_failed" }));
+    application.server.on("error", (error) => {
+      const code =
+        typeof error.code === "string" && /^[A-Z][A-Z0-9_]{0,63}$/.test(error.code)
+          ? error.code
+          : "UNKNOWN";
+      const guidance = {
+        EADDRINUSE:
+          "Another process is already listening on this address. Stop that process or choose a different KIN_PORT, then retry.",
+        EACCES:
+          "The operating system denied access to this address or port. Check port reservations and permissions, or choose a different KIN_PORT, then retry.",
+        EADDRNOTAVAIL:
+          "The configured KIN_HOST is unavailable on this computer. Choose an available loopback address and retry.",
+      };
+      console.error(
+        JSON.stringify({
+          event: "startup_failed",
+          outcome: "listen_failed",
+          code,
+          host,
+          port,
+          message:
+            guidance[code] ??
+            "Kin could not listen on the configured address. Check KIN_HOST and KIN_PORT, then retry.",
+        }),
+      );
       application.store?.close();
       process.exitCode = 1;
     });
@@ -175,6 +198,7 @@ if (
     });
     installShutdown(application);
   } catch (error) {
+    application?.store?.close();
     console.error(
       JSON.stringify({
         event: "startup_failed",

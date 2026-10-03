@@ -1,6 +1,6 @@
 # JavaScript–WASM ABI
 
-**Status:** v0.11.6 implementation candidate; awaiting human review. v0.10 added portable commands, metadata and archive operations. Canonical event schemas and replay protocols v1-v8 remain byte-compatible. Earlier version sections are historical contracts.
+**Status:** v0.11.7 implementation candidate; awaiting human review. v0.10 added portable commands, metadata and archive operations. Canonical event schemas and replay protocols v1-v8 remain byte-compatible. Earlier version sections are historical contracts.
 
 ## Target and exports
 
