@@ -1,6 +1,6 @@
 # Roadmap
 
-Current release: `v0.6.1 — Summary Correctness`. The authorized catch-up stabilization line is v0.6.0–v0.6.3; stop after v0.6.3 for evaluation.
+Current release: `v0.6.2 — Summary Resilience & Accessibility`. The authorized catch-up stabilization line is v0.6.0–v0.6.3; stop after v0.6.3 for evaluation.
 
 ## Planning releases
 
@@ -158,7 +158,7 @@ Completed: audited empty and cursor-position cases, duplicate/conflicting event 
 
 ### `v0.6.2` — Summary Resilience & Accessibility
 
-Audit storage failures, cross-tab convergence and accessibility without adding capability.
+Completed: audited cursor write failures/abort, refresh recovery, pending-write reconnect, missed invalidation, cross-tab orderings, Pulse timer refresh, keyboard/focus and accessibility modes. No new capability.
 
 ### `v0.6.3` — Summary Hardening & Polish
 

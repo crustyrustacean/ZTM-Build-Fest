@@ -1,6 +1,6 @@
 # v0.1.0 Testing Contract
 
-**Status:** Current through v0.6.1 Summary Correctness; earlier version sections are historical contracts. See v0.6.0 below.
+**Status:** Current through v0.6.2 Summary Resilience & Accessibility; earlier version sections are historical contracts. See v0.6.0 below.
 
 ## Rust domain tests
 
@@ -138,3 +138,7 @@ Do not claim Firefox, Safari, native desktop zoom, NVDA, or VoiceOver coverage u
 ## v0.6.1 Summary Correctness
 
 The correctness-only suite covers an empty event stream; cursor at first, middle, and latest event; missing cursor; first occurrence of an exact duplicate; conflicting event IDs; Pulse events between meaningful changes; exact eight/nine/many counts and omitted entries; summary order and through-boundary; append after render; stale tab writes; requested boundaries beyond the frozen snapshot; malformed/partial local metadata preservation; and strict v6 cursor/reserved fields. No capability was added.
+
+## v0.6.2 Summary Resilience & Accessibility
+
+The browser suite injects cursor quota failure and transaction abort, verifies event/cursor/logical-counter rollback and retry, preserves the displayed summary through repeated refresh failures, and keeps a pending mark busy through reconnect. It exercises cross-tab convergence after `view-state-changed`, recovery after a missed notification, both stale/new write orders, and Pulse expiry refresh while the summary remains visible. Keyboard/focus, semantic structure, feedback roles, target size, narrow reflow, forced colors, text spacing, reduced motion, and page-scale zoom remain part of the complete browser gate.

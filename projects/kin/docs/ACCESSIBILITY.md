@@ -1,6 +1,6 @@
 # Accessibility Contract
 
-**Status:** Current through v0.6.0 Since You Last Looked; earlier version sections are historical contracts. See Pulse and v0.6.0 below.
+**Status:** Current through v0.6.2 Summary Resilience & Accessibility; earlier version sections are historical contracts. See v0.6.0 below.
 
 ## Baseline requirements
 
@@ -74,3 +74,7 @@ Passed 67 Rust and 24 Node/real-WASM tests, fmt, Clippy, release WASM, version c
 ## v0.6.0 Since You Last Looked
 
 The catch-up section uses a semantic heading and unordered list, a visible native “Caught up” button, a textual empty state, and no color-only state or per-entry timestamps. Enter/Space operate the button natively; focus moves to the heading if the button disappears after clearing. The global status is polite and cursor-write/refresh errors are assertive. Browser regressions check the 48px target, 320px reflow, forced colors, increased text spacing, reduced motion, focus and 200% page-scale emulation. Screen-reader certification and native desktop zoom are not claimed without direct testing.
+
+## v0.6.2 resilience and accessibility evidence
+
+Catch-up quota and transaction-abort tests preserve the cursor and restore focus to the visible control; repeated refresh failure retains the summary and retry state. A pending mark remains busy through reconnect. Keyboard activation, semantic section/heading/list, polite completion and assertive error feedback, textual empty state, focus restoration, 48px target, 320px reflow, forced colors, increased text spacing, reduced motion and 200% Chromium page-scale emulation are checked. No native desktop zoom or assistive-technology certification is claimed.

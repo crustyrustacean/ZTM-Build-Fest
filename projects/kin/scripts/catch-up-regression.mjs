@@ -330,6 +330,204 @@ export async function catchUpRegressions() {
   );
   await writeContext(validContext);
   await app.refreshFromEvents();
+
+  const addPendingChange = async (text) => {
+    await app.store.append(
+      { type: "add", text, classification: "need" },
+      app.engine,
+    );
+    await app.refreshFromEvents();
+  };
+  await addPendingChange("Catch-up quota recovery");
+  const quotaCursor = await context();
+  const quotaCount = await count();
+  const quotaCounter = quotaCursor.next_logical_time;
+  const quotaSummary = JSON.stringify(app.state.summary);
+  const originalPut = IDBObjectStore.prototype.put;
+  IDBObjectStore.prototype.put = function (value, ...args) {
+    if (
+      this.name === "local_context" &&
+      value?.last_looked_local_sequence > quotaCursor.last_looked_local_sequence
+    ) {
+      throw new DOMException("Synthetic quota", "QuotaExceededError");
+    }
+    return originalPut.call(this, value, ...args);
+  };
+  try {
+    app.catchUp.button.click();
+    await idle();
+  } finally {
+    IDBObjectStore.prototype.put = originalPut;
+  }
+  let afterFailure = await context();
+  check(
+    !app.alert.hidden &&
+      app.retryAction &&
+      afterFailure.last_looked_local_sequence ===
+        quotaCursor.last_looked_local_sequence &&
+      (await count()) === quotaCount &&
+      afterFailure.next_logical_time === quotaCounter &&
+      JSON.stringify(app.state.summary) === quotaSummary,
+    "quota failure preserves cursor, events, logical counter, and rendered summary",
+  );
+  app.retryButton.click();
+  await idle();
+  afterFailure = await context();
+  check(
+    afterFailure.last_looked_local_sequence ===
+      app.snapshotBoundary.localSequence && app.state.summary.totalCount === 0,
+    "explicit retry commits the captured catch-up boundary after quota recovery",
+  );
+
+  await addPendingChange("Catch-up abort recovery");
+  const abortCursor = await context();
+  const abortCount = await count();
+  const abortCounter = abortCursor.next_logical_time;
+  IDBObjectStore.prototype.put = function (value, ...args) {
+    const transaction = this.transaction;
+    const request = originalPut.call(this, value, ...args);
+    if (
+      this.name === "local_context" &&
+      value?.last_looked_local_sequence > abortCursor.last_looked_local_sequence
+    ) {
+      request.addEventListener("success", () => transaction.abort());
+    }
+    return request;
+  };
+  try {
+    app.catchUp.button.click();
+    await idle();
+  } finally {
+    IDBObjectStore.prototype.put = originalPut;
+  }
+  const afterAbort = await context();
+  check(
+    !app.alert.hidden &&
+      afterAbort.last_looked_local_sequence ===
+        abortCursor.last_looked_local_sequence &&
+      (await count()) === abortCount &&
+      afterAbort.next_logical_time === abortCounter,
+    "aborted cursor transaction preserves the previous local state",
+  );
+  app.retryButton.click();
+  await idle();
+
+  await addPendingChange("Catch-up refresh recovery");
+  const refreshCursor = await context();
+  const refreshSummary = JSON.stringify(app.state.summary);
+  const originalSnapshotRead = app.store.getCatchUpState.bind(app.store);
+  app.store.getCatchUpState = async () => {
+    throw new Error("Synthetic catch-up refresh failure");
+  };
+  try {
+    await app.refreshFromEvents();
+    await app.refreshFromEvents();
+  } finally {
+    app.store.getCatchUpState = originalSnapshotRead;
+  }
+  check(
+    !app.alert.hidden &&
+      app.retryAction === app.retryRefresh &&
+      (await context()).last_looked_local_sequence ===
+        refreshCursor.last_looked_local_sequence &&
+      JSON.stringify(app.state.summary) === refreshSummary,
+    "repeated snapshot-read failures preserve cursor and displayed summary",
+  );
+  app.retryButton.click();
+  await idle();
+  check(
+    app.retryAction === null &&
+      (await context()).last_looked_local_sequence ===
+        refreshCursor.last_looked_local_sequence,
+    "refresh retry recovers the canonical summary without advancing the cursor",
+  );
+
+  await app.store.append(
+    { type: "add", text: "Catch-up reconnect pending", classification: "need" },
+    app.engine,
+  );
+  await app.refreshFromEvents();
+  const pendingBoundary = structuredClone(app.snapshotBoundary);
+  const pendingCount = await count();
+  const pendingCounter = (await context()).next_logical_time;
+  const mark = app.store.markCaughtUpThrough.bind(app.store);
+  let releaseMark;
+  const markGate = new Promise((resolve) => {
+    releaseMark = resolve;
+  });
+  app.store.markCaughtUpThrough = async (boundary) => {
+    await markGate;
+    return mark(boundary);
+  };
+  app.catchUp.button.focus();
+  app.catchUp.button.click();
+  check(
+    app.busy && app.main.getAttribute("aria-busy") === "true",
+    "catch-up write exposes busy state",
+  );
+  const parent = app.parentNode;
+  const nextSibling = app.nextSibling;
+  try {
+    app.remove();
+    parent.insertBefore(app, nextSibling);
+    check(app.busy, "reconnect does not unlock pending catch-up write");
+  } finally {
+    releaseMark();
+    app.store.markCaughtUpThrough = mark;
+  }
+  await idle();
+  await app.refreshFromEvents();
+  const afterReconnect = await context();
+  check(
+    afterReconnect.last_looked_local_sequence ===
+      pendingBoundary.localSequence &&
+      (await count()) === pendingCount &&
+      afterReconnect.next_logical_time === pendingCounter &&
+      app.state.summary.totalCount === 0,
+    "pending caught-up write commits once through its frozen boundary after reconnect",
+  );
+
+  await app.store.append(
+    { type: "add", text: "Summary remains visible during Pulse expiry", classification: "need" },
+    app.engine,
+  );
+  await app.refreshFromEvents();
+  const visibleSummary = structuredClone(app.state.summary);
+  const pulseStartedAt = Date.now();
+  await app.savePulse({
+    type: "set-pulse",
+    value: "okay",
+    timestamp: pulseStartedAt,
+    expiresAt: pulseStartedAt + 250,
+  });
+  const pulseEventCount = await count();
+  const pulseDeadline = Date.now() + 3000;
+  while (
+    app.state.pulses[0]?.status !== "expired" &&
+    Date.now() < pulseDeadline
+  ) {
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  const pulseExpired = app.state.pulses[0]?.status === "expired";
+  const summaryStayedVisible =
+    JSON.stringify({
+      entries: app.state.summary.entries,
+      totalCount: app.state.summary.totalCount,
+    }) === JSON.stringify({
+      entries: visibleSummary.entries,
+      totalCount: visibleSummary.totalCount,
+    });
+  const pulseTimerEventCount = await count();
+  check(
+    pulseExpired && summaryStayedVisible && pulseTimerEventCount === pulseEventCount,
+    `Pulse timer preserves the visible summary without adding history: ${JSON.stringify({
+      pulseExpired,
+      summaryStayedVisible,
+      pulseEventCountUnchanged: pulseTimerEventCount === pulseEventCount,
+    })}`,
+  );
+  await app.savePulse({ type: "clear-pulse" });
+
   finalSnapshot = await app.store.getCatchUpState();
   sessionStorage.setItem(
     "kin.test.catchUpCursor",
@@ -389,7 +587,68 @@ export async function catchUpPeerRegressions(first, second, until) {
   await second.evaluate(`document.querySelector('kin-app').channel.removeEventListener(
     'message',window.catchUpListener
   )`);
+
+  await first.evaluate(`document.querySelector('kin-app').handleAddItem({
+    detail: { text: 'Missed cursor notification', classification: 'need' }
+  })`);
+  await until(() => second.evaluate(`document.querySelector('kin-app').state.summary.entries.some(
+    entry => entry.text === 'Missed cursor notification'
+  )`));
+  await second.evaluate(`(()=>{
+    const app=document.querySelector('kin-app');
+    app.channel.removeEventListener('message',app.onPeerMessage);
+  })()`);
+  await first.evaluate(`document.querySelector('kin-app').catchUp.button.click()`);
+  await until(() => first.evaluate(`document.querySelector('kin-app').state.summary.totalCount===0`));
+  assert.equal(
+    await second.evaluate(`document.querySelector('kin-app').state.summary.totalCount`),
+    1,
+    "a tab that missed view-state invalidation keeps its old local projection until recovery",
+  );
+  await second.evaluate(`document.dispatchEvent(new Event('visibilitychange'))`);
+  await until(() => second.evaluate(`document.querySelector('kin-app').state.summary.totalCount===0`));
+  await second.evaluate(`(()=>{
+    const app=document.querySelector('kin-app');
+    app.channel.addEventListener('message',app.onPeerMessage);
+  })()`);
+
+  const readBoundary = async (client) => client.evaluate(`(async()=>{
+    const snapshot=await document.querySelector('kin-app').store.getCatchUpState();
+    return {
+      eventId:snapshot.through.eventId,
+      localSequence:snapshot.through.localSequence,
+      snapshotThroughEventId:snapshot.through.eventId,
+      snapshotThroughLocalSequence:snapshot.through.localSequence,
+    };
+  })()`);
+  const appendChange = async (client, text) => client.evaluate(`(async()=>{
+    const app=document.querySelector('kin-app');
+    await app.store.append({type:'add',text:${JSON.stringify(text)},classification:'need'},app.engine);
+  })()`);
+  const markBoundary = async (client, boundary) => client.evaluate(`document.querySelector('kin-app').store.markCaughtUpThrough(${JSON.stringify(boundary)})`);
+  const readCursor = async (client) => client.evaluate(`(async()=>{
+    const cursor=(await document.querySelector('kin-app').store.getCatchUpState()).cursor;
+    return cursor;
+  })()`);
+
+  const olderA = await readBoundary(first);
+  await appendChange(first, "Second tab newer boundary");
+  const newerB = await readBoundary(second);
+  await markBoundary(second, newerB);
+  await markBoundary(first, olderA);
+  assert.deepEqual(await readCursor(first), await readCursor(second));
+  assert.equal((await readCursor(first)).localSequence, newerB.localSequence);
+
+  const olderB = await readBoundary(second);
+  await appendChange(second, "First tab newer boundary");
+  const newerA = await readBoundary(first);
+  await markBoundary(first, olderB);
+  await markBoundary(second, newerA);
+  assert.deepEqual(await readCursor(first), await readCursor(second));
+  assert.equal((await readCursor(second)).localSequence, newerA.localSequence);
+  await first.evaluate("document.querySelector('kin-app').refreshFromEvents()");
+  await second.evaluate("document.querySelector('kin-app').refreshFromEvents()");
   console.log(
-    "PASS content-free cross-tab catch-up invalidation and canonical convergence",
+    "PASS content-free cross-tab invalidation, missed-notification recovery, and both stale/new cursor write orders",
   );
 }
