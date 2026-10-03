@@ -1144,11 +1144,20 @@ test("10,000 mixed v5 events grow memory and retain copied results across succes
 
 test("v6 copied result bytes outlive subsequent success error and empty calls", async () => {
   const apply = await rawEngine(),
-    copy = apply(5, [pulseRecord(1)], 0, 1999),
+    copy = apply(6, [legacyRecord(1, 1), pulseRecord(2)], 0, 1999),
     snapshot = copy.slice();
+  const header = new DataView(copy.buffer);
+  assert.equal(header.getUint16(4, true), 6);
+  assert.equal(
+    header.getUint32(24, true),
+    1,
+    "copied v6 result has a summary record",
+  );
+  assert.equal(header.getUint32(28, true), 1);
+  assert.equal(new TextDecoder().decode(copy.subarray(-4)), "Milk");
   for (let n = 0; n < 8; n++) {
-    apply(5, [pulseRecord(1)], 0, 2000);
-    apply(5, [pulseRecord(1, "good", 1000)], 4);
+    apply(6, [pulseRecord(1)], 0, 2000);
+    apply(6, [pulseRecord(1, "good", 1000)], 4);
     assert.equal(apply(6, []).length, 52);
     assert.deepEqual(copy, snapshot);
   }

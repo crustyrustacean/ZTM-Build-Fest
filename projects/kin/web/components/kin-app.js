@@ -483,8 +483,12 @@ class KinApp extends HTMLElement {
     this.setBusy(true);
     this.clearAlert();
     this.setStatus("Saving catch-up state…");
+    let committed = false;
     try {
       await this.store.markCaughtUpThrough(boundary);
+      committed = true;
+      // Peers must learn about the commit even if this tab cannot reload it.
+      this.broadcastViewStateChange();
       const snapshot = await this.store.getCatchUpState();
       this.applyCatchUpSnapshot(snapshot);
       this.renderState();
@@ -493,12 +497,13 @@ class KinApp extends HTMLElement {
           ? "Caught up."
           : "Catch-up summary updated.",
       );
-      this.broadcastViewStateChange();
     } catch (error) {
       this.showAlert(
-        error.userMessage ??
-          "Kin could not update this browser's catch-up position. Your saved household information was not deleted.",
-        () => this.handleCaughtUp(),
+        committed
+          ? "Your catch-up position was saved, but Kin could not refresh the summary. Try again to reload it."
+          : error.userMessage ??
+            "Kin could not update this browser's catch-up position. Your saved household information was not deleted.",
+        committed ? this.retryRefresh : () => this.handleCaughtUp(),
       );
       this.setStatus("");
     } finally {

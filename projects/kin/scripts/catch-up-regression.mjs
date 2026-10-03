@@ -338,6 +338,12 @@ export async function catchUpRegressions() {
     );
     await app.refreshFromEvents();
   };
+  const originalBroadcast = app.broadcastViewStateChange.bind(app);
+  let cursorBroadcasts = 0;
+  app.broadcastViewStateChange = () => {
+    cursorBroadcasts += 1;
+    originalBroadcast();
+  };
   await addPendingChange("Catch-up quota recovery");
   const quotaCursor = await context();
   const quotaCount = await count();
@@ -370,8 +376,10 @@ export async function catchUpRegressions() {
       JSON.stringify(app.state.summary) === quotaSummary,
     "quota failure preserves cursor, events, logical counter, and rendered summary",
   );
+  check(cursorBroadcasts === 0, "failed quota write does not broadcast a commit");
   app.retryButton.click();
   await idle();
+  check(cursorBroadcasts === 1, "quota retry broadcasts its committed write");
   afterFailure = await context();
   check(
     afterFailure.last_looked_local_sequence ===
@@ -379,6 +387,7 @@ export async function catchUpRegressions() {
     "explicit retry commits the captured catch-up boundary after quota recovery",
   );
 
+  cursorBroadcasts = 0;
   await addPendingChange("Catch-up abort recovery");
   const abortCursor = await context();
   const abortCount = await count();
@@ -409,9 +418,12 @@ export async function catchUpRegressions() {
       afterAbort.next_logical_time === abortCounter,
     "aborted cursor transaction preserves the previous local state",
   );
+  check(cursorBroadcasts === 0, "aborted write does not broadcast a commit");
   app.retryButton.click();
   await idle();
 
+  check(cursorBroadcasts === 1, "abort retry broadcasts its committed write");
+  app.broadcastViewStateChange = originalBroadcast;
   await addPendingChange("Catch-up refresh recovery");
   const refreshCursor = await context();
   const refreshSummary = JSON.stringify(app.state.summary);
@@ -596,6 +608,88 @@ export async function catchUpPeerRegressions(first, second, until) {
   await second.evaluate(`document.querySelector('kin-app').channel.removeEventListener(
     'message',window.catchUpListener
   )`);
+
+  await first.evaluate(`document.querySelector('kin-app').handleAddItem({
+    detail: { text: 'Committed cursor refresh recovery', classification: 'need' }
+  })`);
+  await until(() => second.evaluate(`document.querySelector('kin-app').state.summary.entries.some(
+    entry => entry.text === 'Committed cursor refresh recovery'
+  )`));
+  await second.evaluate(`window.catchUpMessages=[];
+    document.querySelector('kin-app').channel.addEventListener('message',window.catchUpListener);`);
+  try {
+    await first.evaluate(`(async()=>{
+      const app=document.querySelector('kin-app');
+      window.commitRecovery={
+        read:app.store.getCatchUpState.bind(app.store),
+        mark:app.store.markCaughtUpThrough.bind(app.store),
+        state:JSON.stringify(app.state),
+        rendered:app.catchUp.list.textContent,
+        boundary:structuredClone(app.snapshotBoundary),
+        cursor:structuredClone(app.catchUpCursor),
+        writes:0,
+      };
+      const saved=window.commitRecovery;
+      app.store.markCaughtUpThrough=async boundary=>{
+        saved.writes++;
+        return saved.mark(boundary);
+      };
+      app.store.getCatchUpState=async()=>{
+        throw new Error('Synthetic post-commit snapshot failure');
+      };
+      await app.handleCaughtUp();
+    })()`);
+    await until(() => second.evaluate(`window.catchUpMessages.length===1 &&
+      document.querySelector('kin-app').state.summary.totalCount===0`));
+    assert.deepEqual(await second.evaluate('window.catchUpMessages'), [
+      { type: 'view-state-changed' },
+    ]);
+    assert.equal(await first.evaluate(`(async()=>{
+      const app=document.querySelector('kin-app'), saved=window.commitRecovery;
+      const snapshot=await saved.read();
+      return snapshot.cursor.localSequence===saved.boundary.localSequence &&
+        snapshot.cursor.localSequence>saved.cursor.localSequence &&
+        JSON.stringify(app.state)===saved.state &&
+        app.catchUp.list.textContent===saved.rendered &&
+        JSON.stringify(app.snapshotBoundary)===JSON.stringify(saved.boundary) &&
+        JSON.stringify(app.catchUpCursor)===JSON.stringify(saved.cursor) &&
+        !app.alert.hidden && app.alert.textContent.includes('position was saved') &&
+        !app.retryButton.hidden && app.retryAction===app.retryRefresh && saved.writes===1;
+    })()`), true, 'committed cursor survives reload failure while local projection and refresh retry are preserved');
+    await first.evaluate(`(async()=>{
+      const app=document.querySelector('kin-app'), saved=window.commitRecovery;
+      await app.store.append({type:'add',text:'Unseen after committed cursor',classification:'need'},app.engine);
+      app.store.getCatchUpState=saved.read;
+      app.retryButton.click();
+    })()`);
+    await until(() => first.evaluate(`!document.querySelector('kin-app').busy`));
+    assert.equal(await first.evaluate(`(async()=>{
+      const app=document.querySelector('kin-app'), saved=window.commitRecovery;
+      const snapshot=await saved.read();
+      return saved.writes===1 && app.retryAction===null && app.alert.hidden &&
+        snapshot.cursor.localSequence===saved.boundary.localSequence &&
+        app.catchUpCursor.localSequence===snapshot.cursor.localSequence &&
+        app.state.summary.totalCount===1 &&
+        app.state.summary.entries[0].text==='Unseen after committed cursor' &&
+        app.catchUp.list.textContent.includes('Unseen after committed cursor');
+    })()`), true, 'retry reloads canonical state without another cursor write or hiding later events');
+    assert.deepEqual(await second.evaluate('window.catchUpMessages'), [
+      { type: 'view-state-changed' },
+    ], 'refresh retry does not broadcast another cursor commit');
+  } finally {
+    await first.evaluate(`(()=>{
+      const app=document.querySelector('kin-app'), saved=window.commitRecovery;
+      app.store.getCatchUpState=saved.read;
+      app.store.markCaughtUpThrough=saved.mark;
+      delete window.commitRecovery;
+    })()`);
+    await second.evaluate(`document.querySelector('kin-app').channel.removeEventListener(
+      'message',window.catchUpListener
+    )`);
+  }
+  await first.evaluate("document.querySelector('kin-app').handleCaughtUp()");
+  await until(() => second.evaluate("document.querySelector('kin-app').state.summary.totalCount===0"));
+  console.log('PASS committed cursor with failed refresh preserves local summary, invalidates peers, and retries without writing');
 
   await first.evaluate(`document.querySelector('kin-app').handleAddItem({
     detail: { text: 'Missed cursor notification', classification: 'need' }

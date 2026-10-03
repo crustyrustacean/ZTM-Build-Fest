@@ -4,6 +4,8 @@ This file records completed Kin releases. The `v0.0.x` releases are planning and
 
 ## [0.6.3] — Summary Hardening & Polish
 
+Pre-merge hardening fixes committed catch-up cursor recovery after a failed snapshot reload, with immediate content-free peer invalidation and refresh-only retry. Added two-tab recovery coverage and explicit no-broadcast checks for quota/abort failures; corrected the raw copied-result test to use a v6 summary result. Revalidation passed 82 Rust tests, 31 Node/real-WASM tests, the complete Chrome runner (12 initial scenarios and 21 PASS groups), and the established release checks and PowerShell/WSL HTTP smokes. Moved the misplaced v0.6.2 validation paragraph to its proper section.
+
 No new capability. Added malformed v6 summary record/count/classification/UTF-8/length/trailing-byte coverage, every truncated v6 summary-result boundary, and a 10,000-event real-WASM v6 summary replay with memory-growth and copied-result lifetime checks. Completed the summary privacy and UI polish audit. Passed 82 Rust and 31 Node/real-WASM tests, fmt, Clippy, release WASM, version check, PowerShell/WSL build-run HTTP smokes and complete Chrome 154.0.8037.95 browser regressions. Firefox, Safari, macOS, native zoom, NVDA and VoiceOver remain unverified; no screen-reader certification is claimed. Full environment details are in [V0.6.0](docs/V0.6.0.md).
 
 ## [0.6.2] — Summary Resilience & Accessibility
