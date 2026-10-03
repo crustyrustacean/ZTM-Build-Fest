@@ -1,6 +1,6 @@
 # Release Process
 
-**Status:** v0.7.1 Routine Correctness release gate. No capability is added. No push or kin-main merge is authorized.
+**Status:** v0.7.2 Routine Resilience & Accessibility release gate. No capability is added. No push or kin-main merge is authorized.
 
 ## Release sequence
 

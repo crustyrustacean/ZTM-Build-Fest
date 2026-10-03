@@ -2,6 +2,10 @@
 
 This file records completed Kin releases. The `v0.0.x` releases are planning and documentation milestones; they do not represent implemented application features. The first implementation milestone remains `v0.1.0`.
 
+## [0.7.2] — Routine Resilience & Accessibility
+
+No capability added. Validated suspended-tab, midnight, focus and visibility reprojection; stale-tab convergence; failed-write rollback and retry; keyboard focus restoration; semantic routine controls; narrow reflow, forced colors, text spacing and reduced motion. The full Rust, bridge, launcher and Chrome gates passed. See [V0.7.0](docs/V0.7.0.md).
+
 ## [0.7.1] — Routine Correctness
 
 No capability added. Audited mixed legacy/Routine replay, civil-date context validation, duplicate/conflicting IDs, logical ordering over wall-clock timestamps, cursor boundaries, historical compatibility and v7 malformed input. Passed 105 Rust tests plus the existing bridge and browser gates. See [V0.7.0](docs/V0.7.0.md).
