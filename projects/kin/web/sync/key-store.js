@@ -91,65 +91,6 @@ export class SyncKeyStore {
     });
   }
 
-  async pinTrustedDevice({
-    householdId,
-    deviceId,
-    memberId,
-    publicKeys,
-    fingerprint,
-  }) {
-    if ((await deviceKeyFingerprint(publicKeys)) !== fingerprint)
-      throw new SyncKeyStoreError(
-        "Kin could not match this trusted device's key fingerprint.",
-      );
-    const key = `${householdId}:${deviceId}`;
-    const transaction = this.database.transaction(
-      TRUSTED_DEVICE_STORE,
-      "readwrite",
-    );
-    const store = transaction.objectStore(TRUSTED_DEVICE_STORE);
-    const request = store.get(key);
-    return transactionResult(transaction, (finish) => {
-      request.onsuccess = () => {
-        const existing = request.result;
-        if (existing && existing.fingerprint !== fingerprint) {
-          abortWith(
-            transaction,
-            new SyncKeyStoreError(
-              "Kin detected that a trusted device key changed.",
-            ),
-          );
-          return;
-        }
-        const pin = {
-          key,
-          householdId,
-          deviceId,
-          memberId,
-          fingerprint,
-          publicKeys: structuredClone(publicKeys),
-        };
-        if (!existing) store.add(pin);
-        finish(existing ?? pin);
-      };
-      request.onerror = () => abortWith(transaction, request.error);
-    });
-  }
-
-  getPinnedDevice(householdId, deviceId) {
-    const transaction = this.database.transaction(
-      TRUSTED_DEVICE_STORE,
-      "readonly",
-    );
-    const request = transaction
-      .objectStore(TRUSTED_DEVICE_STORE)
-      .get(`${householdId}:${deviceId}`);
-    return transactionResult(transaction, (finish) => {
-      request.onsuccess = () => finish(request.result ?? null);
-      request.onerror = () => abortWith(transaction, request.error);
-    });
-  }
-
   pinTrustedDevice({
     householdId,
     deviceId,

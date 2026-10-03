@@ -16,6 +16,21 @@ export async function syncStorageRegressions(client) {
       deviceKeys:pendingDevice.keys,
     });
     await keyStore.saveEpoch({householdId:keyHousehold,keyEpoch:1,...epochMaterial});
+    const conflictingEpochMaterial=await createHouseholdEpochKey({
+      householdId:keyHousehold,
+      keyEpoch:1,
+      deviceKeys:pendingDevice.keys,
+    });
+    if(conflictingEpochMaterial.fingerprint===epochMaterial.fingerprint)
+      throw Error('Distinct epoch key material received the same fingerprint');
+    let conflictingEpochRejected=false;
+    try{
+      await keyStore.saveEpoch({householdId:keyHousehold,keyEpoch:1,...conflictingEpochMaterial});
+    }catch(error){
+      conflictingEpochRejected=error?.message==='Kin found conflicting key material for this household epoch.';
+    }
+    if(!conflictingEpochRejected)
+      throw Error('Conflicting household epoch key material was not rejected');
     keyStore.close();
     const reopenedKeyStore=await SyncKeyStore.open();
     const reopenedDevice=await reopenedKeyStore.getDevice('pending');

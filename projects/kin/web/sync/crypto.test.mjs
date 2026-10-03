@@ -139,7 +139,11 @@ test("sealed household key provisions to the fingerprint-bound device only", asy
   const recipientPublicKeys = await exportDevicePublicKeys(recipientKeys);
   const recipientFingerprint = await deviceKeyFingerprint(recipientPublicKeys);
   const householdId = identity("6");
-  const { householdKey, sealed } = await createHouseholdEpochKey({
+  const {
+    householdKey,
+    sealed,
+    fingerprint: senderFingerprint,
+  } = await createHouseholdEpochKey({
     householdId,
     keyEpoch: 1,
     deviceKeys: senderKeys,
@@ -176,6 +180,7 @@ test("sealed household key provisions to the fingerprint-bound device only", asy
     now: 1_000,
   });
   assert.equal(received.householdKey.extractable, false);
+  assert.equal(received.fingerprint, senderFingerprint);
 
   const originalEnvelope = await encryptEvent({
     eventId: identity("1"),

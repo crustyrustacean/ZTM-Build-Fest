@@ -6,6 +6,8 @@ This file records completed Kin releases. The `v0.0.x` releases are planning and
 
 Completed the v0.9 recovery, metadata, logging, corruption, storage-bound, and UX audit. Added same-member trusted-device pairing, fingerprint-confirmed approval, exact-envelope retry after relay cursor reset, and explicit process-local acknowledgement semantics. An exact identity-binding retry remains idempotent at the 256-record capacity boundary; conflicting or new bindings remain rejected, and rejected batches do not partially commit. Canonical IndexedDB event bytes remain authoritative. The identity service and relay remain memory-only; there is no all-device recovery, durable remote history, independent security audit, or cross-browser certification. Ready for product feedback only after the complete release gates pass.
 
+Final pre-merge correction: fixed provisioned epoch-key fingerprint calculation before raw-key zeroization, added cross-device fingerprint and conflicting-key regression coverage, and removed duplicate trusted-device pinning helpers.
+
 ## [0.9.2] — Offline Reconciliation and Conflict Semantics
 
 Added the separate transport cursor/high-water, atomic remote canonical-event/replay/cursor commit, local device sequence and Lamport advancement, additive Rust v8 identity-binding interpretation, deterministic equal-time reducer order, and persistent exact-envelope outbox. Archive wins over an equal-time concurrent mutation from another device; accepted bytes remain stored and a later causally invalid mutation pauses replay. Catch-up remains arrival-ordered and independent of transport progress.

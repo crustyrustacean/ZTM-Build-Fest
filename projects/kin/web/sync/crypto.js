@@ -308,32 +308,31 @@ export async function unwrapEpochKey({
         wrappedKey,
       ),
     );
-    if (rawKey.length !== 32) {
-      rawKey.fill(0);
-      throw new SyncCryptoError(
-        "provisioning_key_invalid",
-        "The household key could not be provisioned.",
+    try {
+      if (rawKey.length !== 32) {
+        throw new SyncCryptoError(
+          "provisioning_key_invalid",
+          "The household key could not be provisioned.",
+        );
+      }
+      const householdKey = await crypto.subtle.importKey(
+        "raw",
+        rawKey,
+        { name: "AES-GCM" },
+        false,
+        ["encrypt", "decrypt"],
       );
+      const sealed = await sealKeyBytes({
+        rawKey,
+        householdId,
+        keyEpoch: keyPackage.keyEpoch,
+        deviceKeys,
+      });
+      const fingerprint = await fingerprintKey(rawKey);
+      return { householdKey, sealed, fingerprint };
+    } finally {
+      rawKey.fill(0);
     }
-    const householdKey = await crypto.subtle.importKey(
-      "raw",
-      rawKey,
-      { name: "AES-GCM" },
-      false,
-      ["encrypt", "decrypt"],
-    );
-    const sealed = await sealKeyBytes({
-      rawKey,
-      householdId,
-      keyEpoch: keyPackage.keyEpoch,
-      deviceKeys,
-    });
-    rawKey.fill(0);
-    return {
-      householdKey,
-      sealed,
-      fingerprint: await fingerprintKey(rawKey),
-    };
   } finally {
     sharedSecret.fill(0);
   }
