@@ -1,6 +1,6 @@
 # Threat Model
 
-**Status:** Current through v0.8.3. The local incubation service implements pairing, passkeys, sessions, membership and device authorization. Content encryption and sync remain future work. This document guides design; it is not a security audit or guarantee.
+**Status:** Current through v0.8.6. The local incubation service implements pairing, passkeys, trusted-device-bound reauthentication, fresh-auth membership removal, and bounded short-lived authorization flows. Content encryption and sync remain future work. Auth cookies add `Secure` when the configured `KIN_ORIGIN` is HTTPS; TLS deployments must set that trusted external origin explicitly. The service does not trust forwarded-protocol headers. This document guides design; it is not a security audit or guarantee.
 
 ## Assets and boundaries
 

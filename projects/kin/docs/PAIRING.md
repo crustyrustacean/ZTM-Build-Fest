@@ -1,6 +1,6 @@
 # Pairing and Device Enrollment
 
-**Status:** Current through v0.8.3. Manual short-lived pairing codes, invitation URLs, passkey identity, explicit approval, and trusted-device revocation are implemented. QR, key exchange, encrypted sync, and durable service storage are not implemented.
+**Status:** Current through v0.8.6. Manual pairing codes/invitation URLs, passkey identity and reauthentication, explicit approval/activation, trusted-device controls, terminal-claim recovery, and fresh-auth member removal are implemented. QR, key exchange, encrypted sync, and durable service storage are not implemented.
 
 ## Distinct operations
 
@@ -18,7 +18,7 @@ Create household
 Start invitation session
         |
         v
-Display short-lived QR / pairing code
+Display short-lived pairing code or invitation URL
         |
         v
 Member B scans or enters code
@@ -48,7 +48,7 @@ The pairing invitation must not itself be a durable login credential or contain 
 - Bind confirmation to the exact key-exchange transcript. Both devices should show matching human-readable verification information (such as a short fingerprint/word sequence derived using a standard protocol) before approval. The representation and usability must be security-reviewed; it is not an ad hoc cryptographic primitive.
 - Show the inviter and invitee which household and member/device are being added, and require clear confirmation from both.
 
-The exact expiry, cryptographic exchange, and server state machine remain implementation decisions informed by threat modeling. These requirements are not executable protocol code.
+The v0.8.6 implementation uses a ten-minute Pending invitation and starts a separate fifteen-minute approval window after a successful claim. It validates a code before returning WebAuthn registration options. Cryptographic key exchange, household content encryption, and sync remain future work; see [V0.8.0](V0.8.0.md).
 
 ## Add a device for an existing member
 
@@ -92,3 +92,5 @@ Revocation should immediately mark the device unauthorized at the service, rejec
 Revocation cannot erase plaintext, screenshots, exports, or encryption keys already copied to a lost/compromised device. To provide forward confidentiality, the household content key must be rotated after revocation and new events encrypted under the new key. Existing history may need controlled re-encryption for remaining devices; the exact policy, recovery, and effects on backups are open decisions. Do not promise retroactive erasure.
 
 Member removal and device revocation are different actions. Removing a member must revoke that member's devices and initiate key rotation, but still cannot reclaim data already downloaded.
+
+In v0.8.6, removing another adult requires a fresh passkey assertion bound to the actor, current trusted device, and target member. A session or confirmation dialog alone is insufficient.

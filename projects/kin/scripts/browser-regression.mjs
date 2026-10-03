@@ -8,7 +8,11 @@ import {
 } from "./pulse-regression.mjs";
 import { talkRegressions, talkPeerRegressions } from "./talk-regression.mjs";
 import assert from "node:assert/strict";
-import { routineRegressions, routinePeerRegressions, routineKeyboardRegressions } from "./routine-regression.mjs";
+import {
+  routineRegressions,
+  routinePeerRegressions,
+  routineKeyboardRegressions,
+} from "./routine-regression.mjs";
 import {
   handoffRegressions,
   handoffPeerRegressions,
@@ -304,12 +308,22 @@ async function regressions() {
   const replayRecords = (await app.store.loadEvents()).map(
     (event) => event.encoded_event,
   );
-  const replayBeforeFailure = app.engine.applyEvents(replayRecords, 0, null, 20261002);
+  const replayBeforeFailure = app.engine.applyEvents(
+    replayRecords,
+    0,
+    null,
+    20261002,
+  );
   const malformedRecord = new Uint8Array(replayRecords.at(-1));
   new DataView(malformedRecord.buffer).setUint16(0, 3, true);
   let replayFailureCode;
   try {
-    app.engine.applyEvents([...replayRecords.slice(0, -1), malformedRecord], 0, null, 20261002);
+    app.engine.applyEvents(
+      [...replayRecords.slice(0, -1), malformedRecord],
+      0,
+      null,
+      20261002,
+    );
   } catch (error) {
     replayFailureCode = error.code;
   }
@@ -351,7 +365,12 @@ async function regressions() {
       classification: index % 2 === 0 ? "need" : "today",
     }),
   );
-  const workloadState = app.engine.applyEvents(workloadRecords, 0, null, 20261002);
+  const workloadState = app.engine.applyEvents(
+    workloadRecords,
+    0,
+    null,
+    20261002,
+  );
   check(
     workloadState.items.length === 10_000,
     "WASM replays maximum event count",
@@ -810,6 +829,65 @@ async function regressions() {
   sessionStorage.removeItem(classificationKey);
   sessionStorage.setItem("kin.test.expectedState", JSON.stringify(app.state));
   passed.push("sessionStorage denial does not prevent persistence");
+
+  history.replaceState(null, "", "/pair?code=F7KM-Q2DX");
+  const household = document.createElement("kin-household");
+  document.body.append(household);
+  for (
+    let attempt = 0;
+    attempt < 100 && !household.querySelector('input[name="code"]');
+    attempt++
+  )
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  check(
+    location.pathname === "/pair" && location.search === "",
+    "invitation code must be removed from browser history immediately",
+  );
+  check(
+    household.querySelector('input[name="code"]')?.value === "F7KM-Q2DX",
+    "invitation code must prefill after URL cleanup",
+  );
+
+  for (const [state, expected] of [
+    ["Expired", "expired"],
+    ["Revoked", "revoked"],
+    ["Rejected", "rejected"],
+  ]) {
+    household.claim = { state };
+    household.render();
+    check(
+      household.claim === null,
+      `${state} claim must be cleared from component state`,
+    );
+    check(
+      household.querySelector('input[name="code"]'),
+      `${state} claim must allow a new code`,
+    );
+    check(
+      household
+        .querySelector(".household-message")
+        ?.textContent.toLowerCase()
+        .includes(expected),
+      `${state} claim must explain why entry is available again`,
+    );
+  }
+  household.querySelector('input[name="code"]').value = "ABCD-Q2DX";
+  check(
+    household.querySelector('input[name="code"]').value === "ABCD-Q2DX",
+    "new code entry must remain editable after a terminal claim",
+  );
+  history.replaceState(null, "", "/");
+  household.render();
+  check(
+    [...household.querySelectorAll("button")].some(
+      (button) => button.textContent === "Log in with passkey",
+    ),
+    "existing members need a login action after logout",
+  );
+  household.remove();
+  passed.push(
+    "pairing URL secret cleanup, terminal claim recovery, and passkey login entry",
+  );
   return passed;
 }
 
@@ -1415,7 +1493,9 @@ try {
         getComputedStyle(ui.cadence).outlineWidth==='3px' &&
         [...ui.querySelectorAll('button,select,input')].every(control=>control.getBoundingClientRect().height>=48) &&
         app.status.getAttribute('aria-live')==='polite' && app.alert.getAttribute('role')==='alert';
-    })()`), true, "Routine semantics, labels, textual state, focus and targets in forced colors",
+    })()`),
+    true,
+    "Routine semantics, labels, textual state, focus and targets in forced colors",
   );
   const spacingResult = await first.evaluate(`(()=>{
     const sheet=[...document.styleSheets].find(candidate=>candidate.href?.endsWith('/styles/app.css'));
@@ -1433,8 +1513,16 @@ try {
   // Keep optional visual evidence under ignored project build output.
   if (process.env.KIN_VISUAL_CHECK === "1") {
     await first.send("Emulation.setEmulatedMedia", { features: [] });
-    await first.evaluate("document.querySelector('kin-app').routines.scrollIntoView({block:'start'})");
-    await writeFile(resolve(webRoot, "../target/routines-320.png"), Buffer.from((await first.send("Page.captureScreenshot", { format: "png" })).data, "base64"));
+    await first.evaluate(
+      "document.querySelector('kin-app').routines.scrollIntoView({block:'start'})",
+    );
+    await writeFile(
+      resolve(webRoot, "../target/routines-320.png"),
+      Buffer.from(
+        (await first.send("Page.captureScreenshot", { format: "png" })).data,
+        "base64",
+      ),
+    );
     await first.evaluate(
       `(async()=>{const a=document.querySelector('kin-app'),timestamp=Date.now();await a.savePulse({type:'set-pulse',value:'need-quiet',timestamp,expiresAt:timestamp+14400000});a.pulse.scrollIntoView({block:'center'});})()`,
     );

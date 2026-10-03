@@ -1,6 +1,6 @@
 # Development Workflow
 
-**Status:** Current through v0.7.4 Routine Stale-Action Correctness; earlier version sections are historical contracts. See Pulse and v0.6.0 below.
+**Status:** Current through v0.8.6 Pairing Feedback-Gate Corrections; earlier version sections are historical contracts.
 
 ## Build and run
 
@@ -17,7 +17,7 @@ install rustup/Cargo and the wasm32-unknown-unknown target
 build the Rust/WASM module using the project-local manifest
         |
         v
-serve the static web files from localhost
+        serve HTML, assets, and same-origin APIs from the Kin Node server
         |
         v
         open the supported browser and exercise Today + Needs + Handoff + Talk + Pulse + catch-up
@@ -41,16 +41,14 @@ Windows developers should be able to use PowerShell and standard Rust tooling. m
 
 - Rust toolchain (`rustup`, `cargo`) and the `wasm32-unknown-unknown` target
 - A modern browser with the platform APIs in [IMPLEMENTATION](IMPLEMENTATION.md)
-- A lightweight static-file server bound to localhost during development
-- Python 3 for the launchers' static server; this is not an application runtime dependency
-- Optional Node.js for the built-in bridge regression tests; no npm packages are required
-- Python 3.11 or later for the built-in TOML-based version consistency check
+- Node.js 22 or later for the same-origin application/API server and built-in tests
+- Python 3.11 or later for version checks and launcher smoke tests; it is not needed to serve the app
 
 No npm dependency tree or framework runtime is planned. If static serving later requires a helper, prefer a minimal cross-platform option with a clear security/update story.
 
 ## Browser capabilities
 
-The application requires WebAssembly, ES modules, Custom Elements, IndexedDB, `CustomEvent`, text encoders/decoders, and secure-context browser APIs. WebAuthn and Web Crypto for content security remain future identity/sync work. Browser validation is recorded per release and does not certify the full browser support target.
+The application requires WebAssembly, ES modules, Custom Elements, IndexedDB, `CustomEvent`, text encoders/decoders, and secure-context browser APIs. WebAuthn is used for passkey identity and authorization; Web Crypto for encrypted household content remains future sync work. Browser validation is recorded per release and does not certify the full browser support target.
 
 ## Development data
 

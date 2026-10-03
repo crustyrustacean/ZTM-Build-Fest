@@ -1,6 +1,6 @@
 # Cryptographic Posture
 
-**Status:** Current through v0.8.3. Pairing uses platform cryptographic randomness, HMAC-SHA-256 code verifiers, SHA-256 WebAuthn checks, and ES256/RS256 passkey verification. Household content encryption, key exchange, rotation, and encrypted sync remain unimplemented and unreviewed.
+**Status:** Current through v0.8.6. Pairing uses platform cryptographic randomness with rejection sampling over its code alphabet, HMAC-SHA-256 code verifiers, SHA-256 WebAuthn checks, and ES256/RS256 passkey verification. Household content encryption, key exchange, rotation, and encrypted sync remain unimplemented and unreviewed.
 
 ## Non-negotiable rule
 
