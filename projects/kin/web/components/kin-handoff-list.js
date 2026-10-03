@@ -1,4 +1,3 @@
-const DRAFT_KEY = "kin.handoff.draft";
 
 class KinHandoffList extends HTMLElement {
   constructor() {
@@ -36,8 +35,6 @@ class KinHandoffList extends HTMLElement {
     this.message.id = "handoff-message";
     this.message.className = "compose-message";
     this.message.setAttribute("role", "alert");
-    try { this.input.value = sessionStorage.getItem(DRAFT_KEY) ?? ""; }
-    catch { /* Capture remains available when draft storage is denied. */ }
     this.input.addEventListener("input", () => this.saveDraft());
     form.addEventListener("submit", event => {
       event.preventDefault();
@@ -72,10 +69,7 @@ class KinHandoffList extends HTMLElement {
   }
 
   saveDraft() {
-    try {
-      if (this.input.value) sessionStorage.setItem(DRAFT_KEY, this.input.value);
-      else sessionStorage.removeItem(DRAFT_KEY);
-    } catch { /* Best-effort tab-scoped draft. */ }
+    // Keep drafts only in the unlocked input.
   }
 
   clearIfMatches({ text }) {

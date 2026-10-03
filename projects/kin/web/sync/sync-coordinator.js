@@ -1,7 +1,8 @@
 import {
   createHouseholdEpochKey,
   createProvisionedHouseholdEpoch,
-  decryptEvent,
+  decryptWithDeviceHistory,
+  verifiedDeviceKeyHistory,
   decryptIdentityBinding,
   deviceKeyFingerprint,
   encryptEvent,
@@ -24,22 +25,31 @@ export class SyncCoordinator {
     this.store = store;
     this.engine = engine;
     this.identity = identity;
-    this.onState = onState;
+    this.onState = value => {
+      if (this.stopped) return;
+      try { this.keyStore?.vault.assertUnlocked(); } catch { return; }
+      onState(value);
+    };
     this.keyStore = null;
     this.deviceKeys = null;
     this.timer = null;
     this.running = null;
     this.stopped = false;
+    this.abortController = new AbortController();
   }
 
   async start() {
     if (!this.identity) return;
-    this.stopped = false;
-    this.keyStore ??= await SyncKeyStore.open();
-    this.deviceKeys = await this.keyStore.getDevice(this.identity.deviceId);
+    if (this.stopped) return;
+    const keyStore = this.keyStore ?? await SyncKeyStore.open();
+    if (this.stopped) { keyStore.close(); return; }
+    this.keyStore = keyStore;
+    const deviceKeys = await keyStore.getDevice(this.identity.deviceId);
+    if (this.stopped) return;
+    this.deviceKeys = deviceKeys;
     if (!this.deviceKeys) {
       const pending = await this.keyStore.getOrCreatePendingDevice();
-      await api("/api/sync/device-keys", {
+      await this.request("/api/sync/device-keys", {
         method: "POST",
         body: JSON.stringify({ publicKeys: pending.publicKeys }),
       });
@@ -49,7 +59,9 @@ export class SyncCoordinator {
         memberId: this.identity.memberId,
       });
     }
+    if (this.stopped) return;
     await this.syncNow();
+    if (this.stopped) return;
     this.timer = setInterval(() => void this.syncNow(), 5_000);
   }
 
@@ -58,6 +70,7 @@ export class SyncCoordinator {
     if (this.running) return this.running;
     this.running = this.runOnce()
       .catch((error) => {
+        if (this.stopped) return;
         this.onState({
           state: "paused",
           message: error.message || "Device sync is paused.",
@@ -70,7 +83,14 @@ export class SyncCoordinator {
   }
 
   async runOnce() {
-    let status = await api("/api/sync/status");
+    this.keyStore.vault.assertUnlocked();
+    if (this.deviceKeys.pendingTransition) {
+      const device = await this.keyStore.completePendingTransition(this.identity.deviceId, { signal: this.abortController.signal });
+      if (this.stopped) return;
+      this.deviceKeys = device;
+    }
+    if (this.stopped) return;
+    let status = await this.request("/api/sync/status");
     if (!status.enabled) {
       this.onState({ state: "disabled", message: "Device sync is off." });
       return;
@@ -80,7 +100,7 @@ export class SyncCoordinator {
     this.onState({ state: "syncing", message: "Syncing this device…" });
     let devices = await this.loadDeviceDirectory();
     await this.receiveProvisioning(devices);
-    status = await api("/api/sync/status");
+    status = await this.request("/api/sync/status");
     await this.store.updateSyncServerState(status);
 
     const storedSyncState = await this.store.getSyncState();
@@ -154,7 +174,7 @@ export class SyncCoordinator {
     }
     if (status.rotationPending && currentKey) {
       await this.commitRotation(status, devices);
-      status = await api("/api/sync/status");
+      status = await this.request("/api/sync/status");
       await this.store.updateSyncServerState(status);
       devices = await this.loadDeviceDirectory();
       currentKey = await this.keyStore.getEpoch(
@@ -216,13 +236,14 @@ export class SyncCoordinator {
       await this.store.installIdentityBindings(remoteBindings, this.identity);
     }
 
+    await this.provisionMemberHistory(status.currentEpoch, devices);
     await this.pushIdentityBindings();
     await this.pushPendingEvents();
     let passes = 0;
     let hasMore = true;
     while (hasMore && passes < MAX_PULL_PASSES) {
       const syncStateBefore = await this.store.getSyncState();
-      const page = await api(
+      const page = await this.request(
         `/api/sync/events?cursor=${encodeURIComponent(syncStateBefore.syncCursor)}&limit=${MAX_PUSH_BATCH}`,
       );
       const verified = [];
@@ -251,11 +272,10 @@ export class SyncCoordinator {
           throw new Error(
             `This device is missing key epoch ${envelope.keyEpoch}; sync is paused.`,
           );
-        const signerKeys = await importDevicePublicKeys(signer.publicKeys);
-        const encodedEvent = await decryptEvent({
+        const encodedEvent = await decryptWithDeviceHistory({
+          device: signer,
           envelope,
           householdKey: epoch.householdKey,
-          signingKey: signerKeys.signing,
         });
         validateCanonicalIdentity({
           encodedEvent,
@@ -263,6 +283,7 @@ export class SyncCoordinator {
           signer,
           householdId: this.identity.householdId,
           bindings: remoteBindings.map((record) => record.binding),
+          engine: this.engine,
         });
         verified.push({ encodedEvent });
       }
@@ -296,7 +317,7 @@ export class SyncCoordinator {
   }
 
   async loadDeviceDirectory() {
-    const { devices } = await api("/api/sync/devices");
+    const { devices } = await this.request("/api/sync/devices");
     const byId = new Map(devices.map((device) => [device.deviceId, device]));
     const verified = new Set();
     const checking = new Set();
@@ -321,6 +342,8 @@ export class SyncCoordinator {
         throw new Error(
           "A trusted device key does not match its approved fingerprint.",
         );
+      const keyHistory = await verifiedDeviceKeyHistory(device);
+      device.verifiedKeyHistory = keyHistory;
       if (deviceId === this.identity.deviceId) {
         if (
           device.memberId !== this.identity.memberId ||
@@ -339,11 +362,13 @@ export class SyncCoordinator {
       if (pin) {
         if (
           pin.memberId !== device.memberId ||
-          pin.fingerprint !== device.fingerprint
+          !keyHistory.some(entry => entry.fingerprint === pin.fingerprint)
         )
           throw new Error(
             "A trusted device key changed after it was approved.",
           );
+        if (pin.fingerprint !== device.fingerprint)
+          await this.keyStore.advanceTrustedDevice({ ...pin, publicKeys: device.publicKeys, fingerprint: device.fingerprint }, pin.fingerprint);
         verified.add(deviceId);
         return;
       }
@@ -355,11 +380,13 @@ export class SyncCoordinator {
         );
       checking.add(deviceId);
       await verify(issuer.deviceId);
+      const issuerKey = issuer.verifiedKeyHistory.find(entry => entry.fingerprint === certificate.issuerFingerprint);
+      if (!issuerKey) throw new Error("The device approval issuer key is not in its verified history.");
       await verifyDeviceAuthorizationCertificate({
         certificate,
-        issuerPublicKeys: issuer.publicKeys,
+        issuerPublicKeys: issuerKey.publicKeys,
         issuerDeviceId: issuer.deviceId,
-        device,
+        device: { ...device, ...keyHistory[0] },
       });
       checking.delete(deviceId);
       verified.add(deviceId);
@@ -372,7 +399,7 @@ export class SyncCoordinator {
 
   async receiveProvisioning(devices) {
     while (true) {
-      const { grants } = await api("/api/sync/provisioning");
+      const { grants } = await this.request("/api/sync/provisioning");
       if (grants.length === 0) return;
       for (const grant of grants) {
         const sender = devices.find(
@@ -382,21 +409,23 @@ export class SyncCoordinator {
           throw new Error(
             "A key transfer came from an unknown trusted device.",
           );
-        const signer = await importDevicePublicKeys(sender.publicKeys);
-        const received = await unwrapEpochKey({
-          package: grant.package,
-          deviceKeys: this.deviceKeys.keys,
-          householdId: this.identity.householdId,
-          deviceId: this.identity.deviceId,
-          deviceFingerprint: this.deviceKeys.fingerprint,
-          senderSigningKey: signer.signing,
-        });
+        let received;
+        for (const entry of [...sender.verifiedKeyHistory].reverse()) {
+          const signer = await importDevicePublicKeys(entry.publicKeys);
+          try {
+            received = await unwrapEpochKey({ package: grant.package, deviceKeys: this.deviceKeys.keys,
+              householdId: this.identity.householdId, deviceId: this.identity.deviceId,
+              deviceFingerprint: this.deviceKeys.fingerprint, senderSigningKey: signer.signing });
+            break;
+          } catch (error) { if (error.code !== "provisioning_signature_invalid") throw error; }
+        }
+        if (!received) throw new Error("A household key transfer has no valid historical signer.");
         await this.keyStore.saveEpoch({
           householdId: this.identity.householdId,
           keyEpoch: grant.keyEpoch,
           ...received,
         });
-        await api(`/api/sync/provisioning/${grant.grantId}/ack`, {
+        await this.request(`/api/sync/provisioning/${grant.grantId}/ack`, {
           method: "POST",
           body: "{}",
         });
@@ -446,7 +475,7 @@ export class SyncCoordinator {
         packages: rotation.packages,
       });
     }
-    const result = await api("/api/sync/epochs", {
+    const result = await this.request("/api/sync/epochs", {
       method: "POST",
       body: JSON.stringify({
         expectedEpoch: pending.expectedEpoch,
@@ -476,18 +505,18 @@ export class SyncCoordinator {
   }
 
   async provisionMemberHistory(currentEpoch, devices) {
+    let prepared = 0;
     for (const recipient of devices) {
       if (
         recipient.deviceId === this.identity.deviceId ||
         recipient.revokedAt ||
-        recipient.memberId !== this.identity.memberId ||
-        (recipient.historyFromEpoch ?? 1) >= currentEpoch ||
+        (recipient.historyFromEpoch ?? 1) > currentEpoch ||
         !recipient.publicKeys
       )
         continue;
       for (
         let keyEpoch = recipient.historyFromEpoch ?? 1;
-        keyEpoch < currentEpoch;
+        keyEpoch <= currentEpoch;
         keyEpoch += 1
       ) {
         if (recipient.provisionedEpochs?.includes(keyEpoch)) continue;
@@ -495,16 +524,18 @@ export class SyncCoordinator {
           recipient.deviceId,
           keyEpoch,
         );
-        if (request.accepted) continue;
+        if (request.accepted && request.package?.expiresAt > Date.now() &&
+            request.package.recipientFingerprint === recipient.fingerprint &&
+            request.issuerFingerprint === this.deviceKeys.fingerprint) continue;
+        if (prepared >= MAX_PUSH_BATCH) return;
         const key = await this.keyStore.getEpoch(
           this.identity.householdId,
           keyEpoch,
         );
-        if (!key)
-          throw new Error(
-            `Historical key epoch ${keyEpoch} is missing on this device.`,
-          );
-        const grant = await api("/api/sync/provisioning/grants", {
+        // Another authorized device may hold this entitled epoch. A local
+        // absence must not prevent this device from syncing the keys it has.
+        if (!key) continue;
+        const grant = await this.request("/api/sync/provisioning/grants", {
           method: "POST",
           body: JSON.stringify({
             recipientDeviceId: recipient.deviceId,
@@ -516,7 +547,9 @@ export class SyncCoordinator {
         if (
           !keyPackage ||
           keyPackage.grantId !== grant.grantId ||
-          keyPackage.expiresAt <= Date.now()
+          keyPackage.expiresAt <= Date.now() ||
+          keyPackage.recipientFingerprint !== recipient.fingerprint ||
+          request.issuerFingerprint !== this.deviceKeys.fingerprint
         ) {
           keyPackage = await provisionSealedEpochKey({
             sealed: key.sealed,
@@ -529,15 +562,18 @@ export class SyncCoordinator {
           });
           await this.store.updateProvisioningRequest(request.requestId, {
             package: keyPackage,
+            issuerFingerprint: this.deviceKeys.fingerprint,
+            accepted: false,
           });
         }
-        await api(`/api/sync/provisioning/grants/${grant.grantId}`, {
+        await this.request(`/api/sync/provisioning/grants/${grant.grantId}`, {
           method: "POST",
           body: JSON.stringify({ package: keyPackage }),
         });
         await this.store.updateProvisioningRequest(request.requestId, {
           accepted: true,
         });
+        prepared++;
       }
     }
   }
@@ -546,7 +582,7 @@ export class SyncCoordinator {
     const result = [];
     let cursor = "";
     while (true) {
-      const page = await api(
+      const page = await this.request(
         `/api/sync/bindings?cursor=${encodeURIComponent(cursor)}`,
       );
       for (const envelope of page.bindings) {
@@ -565,13 +601,16 @@ export class SyncCoordinator {
           throw new Error(
             `A historical identity key for epoch ${envelope.keyEpoch} is missing.`,
           );
-        const signer = await importDevicePublicKeys(sender.publicKeys);
-        const binding = await decryptIdentityBinding({
-          envelope,
-          householdKey: epoch.householdKey,
-          signingKey: signer.signing,
-          expectedHouseholdId: this.identity.householdId,
-        });
+        let binding;
+        for (const entry of [...sender.verifiedKeyHistory].reverse()) {
+          const signer = await importDevicePublicKeys(entry.publicKeys);
+          try {
+            binding = await decryptIdentityBinding({ envelope, householdKey: epoch.householdKey,
+              signingKey: signer.signing, expectedHouseholdId: this.identity.householdId });
+            break;
+          } catch (error) { if (error.code !== "event_signature_invalid") throw error; }
+        }
+        if (!binding) throw new Error("A household identity record has no valid historical signer.");
         if (
           binding.actorId !== sender.memberId ||
           binding.deviceId !== sender.deviceId
@@ -592,7 +631,7 @@ export class SyncCoordinator {
   async pushIdentityBindings() {
     const pending = await this.store.getPendingBindings();
     for (const record of pending) {
-      await api("/api/sync/bindings", {
+      await this.request("/api/sync/bindings", {
         method: "POST",
         body: JSON.stringify({ bindings: [record.controlEnvelope] }),
       });
@@ -623,17 +662,13 @@ export class SyncCoordinator {
           throw new Error(
             `The current household key epoch ${keyEpoch} is missing.`,
           );
-        const view = new DataView(
-          row.canonical_event.buffer,
-          row.canonical_event.byteOffset,
-          row.canonical_event.byteLength,
-        );
+        const metadata = this.engine.eventMetadata(row.canonical_event);
         const envelope = await encryptEvent({
           eventId: row.event_id,
           householdId: row.householdId,
           deviceId: row.deviceId,
           deviceSequence: row.deviceSequence,
-          logicalTime: view.getBigUint64(76, true).toString(),
+          logicalTime: metadata.logicalTime.toString(),
           keyEpoch,
           plaintext: row.canonical_event,
           householdKey: epoch.householdKey,
@@ -642,7 +677,7 @@ export class SyncCoordinator {
         await this.store.storeOutboxEnvelope(row.event_id, envelope, keyEpoch);
         envelopes.push(envelope);
       }
-      const acknowledgement = await api("/api/sync/events", {
+      const acknowledgement = await this.request("/api/sync/events", {
         method: "POST",
         body: JSON.stringify({ events: envelopes }),
       });
@@ -654,41 +689,38 @@ export class SyncCoordinator {
     }
   }
 
+  async request(path, options = {}) {
+    if (this.stopped) throw new Error("Device sync was stopped.");
+    this.keyStore?.vault.assertUnlocked();
+    await this.keyStore?.vault.checkSecurityEpoch?.();
+    const result = await api(path, { ...options, signal: this.abortController.signal });
+    if (this.stopped) throw new Error("Device sync was stopped.");
+    this.keyStore?.vault.assertUnlocked();
+    return result;
+  }
+
   stop() {
     this.stopped = true;
+    this.abortController.abort();
     clearInterval(this.timer);
     this.timer = null;
     this.keyStore?.close();
     this.keyStore = null;
+    this.deviceKeys = null;
+    this.engine = null;
+    this.store = null;
   }
 }
 
-function validateCanonicalIdentity({
-  encodedEvent,
-  envelope,
-  signer,
-  householdId,
-  bindings,
-}) {
-  if (!(encodedEvent instanceof Uint8Array) || encodedEvent.length < 88)
-    throw new Error("Kin received an incomplete canonical event.");
-  const view = new DataView(
-    encodedEvent.buffer,
-    encodedEvent.byteOffset,
-    encodedEvent.byteLength,
-  );
-  const eventId = toHex(encodedEvent.subarray(4, 20));
-  const embeddedHousehold = toHex(encodedEvent.subarray(20, 36));
-  const embeddedActor = toHex(encodedEvent.subarray(36, 52));
-  const embeddedDevice = toHex(encodedEvent.subarray(52, 68));
-  if (
-    eventId !== envelope.eventId ||
-    envelope.householdId !== householdId ||
-    view.getBigUint64(76, true).toString() !== envelope.logicalTime
-  )
-    throw new Error(
-      "The encrypted envelope does not match its canonical event bytes.",
-    );
+function validateCanonicalIdentity({ encodedEvent, envelope, signer, householdId, bindings, engine }) {
+  const metadata = engine.eventMetadata(encodedEvent);
+  const eventId = idToHex(metadata.eventId);
+  const embeddedHousehold = idToHex(metadata.householdId);
+  const embeddedActor = idToHex(metadata.actorId);
+  const embeddedDevice = idToHex(metadata.deviceId);
+  if (eventId !== envelope.eventId || envelope.householdId !== householdId ||
+      metadata.logicalTime.toString() !== envelope.logicalTime)
+    throw new Error("The encrypted envelope does not match its canonical event bytes.");
   const directIdentity =
     embeddedHousehold === householdId &&
     embeddedActor === signer.memberId &&
@@ -717,10 +749,6 @@ function sameLegacyTuple(binding, identity) {
     binding.legacyActorId === identity.actorId &&
     binding.legacyDeviceId === identity.deviceId
   );
-}
-
-function toHex(bytes) {
-  return [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
 async function api(path, options = {}) {

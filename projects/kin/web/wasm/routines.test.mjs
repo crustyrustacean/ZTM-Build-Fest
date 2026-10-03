@@ -11,7 +11,8 @@ const identity = sequence => ({ eventId: id(sequence), householdId: id(0xaa), ac
 const create = (cadence = "daily", text = "Starter", createdOn = 20261002) => encodeRoutineCreatedRecord({ ...identity(1), routineId: id(0x11), text, cadence, createdOn });
 const action = (sequence, action, occurrenceKey = 20261002) => encodeRoutineActionRecord({ ...identity(sequence), routineId: id(0x11), action, occurrenceKey });
 
-test("v7 Routine writers have exact field offsets and reject invalid input", () => {
+test("v7 Routine writers have exact field offsets and reject invalid input", async () => {
+  await loadKinEngine(url);
   const row = create("weekly", "x");
   const view = new DataView(row.buffer);
   assert.equal(view.getUint16(0, true), 1);

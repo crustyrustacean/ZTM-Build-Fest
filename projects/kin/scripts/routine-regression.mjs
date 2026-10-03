@@ -59,7 +59,7 @@ export async function routineRegressions() {
       contextBefore = await app.store.ensureContext();
     const summary = JSON.stringify(app.state.summary);
     now = new Date(2026, 9, 3, 0, 0, 1).getTime();
-    app.onTimeWake();
+    await app.onTimeWake();
     await idle();
     routine = app.state.routines.find((r) => r.routineId === dailyId);
     check(
@@ -145,6 +145,8 @@ export async function routineRegressions() {
     );
     now = new Date(2026, 9, 19, 12).getTime();
     document.dispatchEvent(new Event("visibilitychange"));
+    for (let i = 0; app.state.routines.find(r => r.routineId === weeklyId).occurrenceKey !== 20261019 && i < 300; i++)
+      await new Promise(resolve => setTimeout(resolve, 10));
     await idle();
     check(
       app.state.routines.find((r) => r.routineId === weeklyId).occurrenceKey ===
@@ -305,11 +307,12 @@ export async function routineRegressions() {
 
 export async function routinePeerRegressions(first, second, until) {
   const idle = (client) =>
-    until(() => client.evaluate("!document.querySelector('kin-app').busy"));
+    until(() => client.evaluate("(()=>{const a=document.querySelector('kin-app');return !a.busy&&!a.refreshing&&!a.pendingRefresh;})()"));
   const append = (client, command) =>
     client.evaluate(
       `(async()=>{try{await document.querySelector('kin-app').store.append(${JSON.stringify(command)},document.querySelector('kin-app').engine);return {ok:true}}catch(error){return {ok:false,code:error.code}}})()`,
     );
+  await Promise.all([idle(first), idle(second)]);
   await first.evaluate(
     `document.querySelector('kin-app').saveRoutine({type:'create-routine',text:'Peer routine',cadence:'daily'})`,
   );
@@ -317,6 +320,8 @@ export async function routinePeerRegressions(first, second, until) {
   await second.evaluate(
     "document.querySelector('kin-app').refreshFromEvents()",
   );
+  await until(() => second.evaluate("document.querySelector('kin-app').state.routines.some(r=>r.text==='Peer routine')"));
+  await Promise.all([idle(first), idle(second)]);
   const command = await first.evaluate(
     `(()=>{const r=document.querySelector('kin-app').state.routines.at(-1);return {type:'complete-routine-occurrence',routineId:r.routineId,occurrenceKey:r.occurrenceKey};})()`,
   );
@@ -337,6 +342,7 @@ export async function routinePeerRegressions(first, second, until) {
       client.evaluate("document.querySelector('kin-app').refreshFromEvents()"),
     ),
   );
+  await Promise.all([idle(first), idle(second)]);
   assert.equal(
     await first.evaluate(
       "document.querySelector('kin-app').store.loadEvents().then(rows=>rows.length)",
@@ -361,6 +367,7 @@ export async function routinePeerRegressions(first, second, until) {
       client.evaluate("document.querySelector('kin-app').refreshFromEvents()"),
     ),
   );
+  await Promise.all([idle(first), idle(second)]);
   assert.equal(
     await first.evaluate(
       "document.querySelector('kin-app').store.loadEvents().then(rows=>rows.length)",
@@ -405,7 +412,7 @@ export async function routineKeyboardRegressions(client, until) {
       });
   };
   const idle = () =>
-    until(() => client.evaluate("!document.querySelector('kin-app').busy"));
+    until(() => client.evaluate("(()=>{const a=document.querySelector('kin-app');return !a.busy&&!a.refreshing&&!a.pendingRefresh;})()"));
   await client.evaluate(
     `(()=>{const ui=document.querySelector('kin-app').routines;ui.input.value='Keyboard routine';ui.input.focus();})()`,
   );
