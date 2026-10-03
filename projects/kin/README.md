@@ -2,9 +2,9 @@
 
 > A private, lightweight household coordination app for the little things families need to know, remember, hand off, or discuss.
 
-**Last published release: `v0.10.3` — Bounded Storage/Archive Hardening & Architecture Closure.** The `v0.11.3` durable-service implementation candidate is tagged `kin-v0.11.3` for human review; it is not a published release. Household events, metadata and private sync keys remain encrypted in browser storage. Startup remains locked until a verified recovery secret or supported passkey PRF unwraps the local root. Recovery protection can be replaced with a new random root and a newly confirmed recovery key. Protected reads use bounded batches, and KARC v1 archives avoid redundant ciphertext copies. Rust owns commands, canonical event codecs, replay and archive framing; browser APIs own cryptography, storage and authentication. Opt-in encrypted relay sync preserves canonical identity and exact retry envelopes.
+**Last published release: `v0.10.3` — Bounded Storage/Archive Hardening & Architecture Closure.** The `v0.11.4` durable-service implementation candidate is tagged `kin-v0.11.4` for human review; it is not a published release. Household events, metadata and private sync keys remain encrypted in browser storage. Startup remains locked until a verified recovery secret or supported passkey PRF unwraps the local root. Recovery protection can be replaced with a new random root and a newly confirmed recovery key. Protected reads use bounded batches, and KARC v1 archives avoid redundant ciphertext copies. Rust owns commands, canonical event codecs, replay and archive framing; browser APIs own cryptography, storage and authentication. Opt-in encrypted relay sync preserves canonical identity and exact retry envelopes.
 
-The [v0.10 release record](docs/V0.10.0.md) describes recovery, migration, compatibility, measurements and validation. Root replacement preserves canonical history and sync keys, resumes after interruption using the new recovery key, and requires adding passkey unlock again afterward. Archives are intentionally local-only history recovery and do not restore sync authority. Maximum-history memory and latency remain desktop measurements; mobile readiness is not claimed. This line stops for human review. The planned v0.11–v0.14 platform and UX lines and v1.0 have not begun; see the [roadmap](docs/ROADMAP.md). Upgrading v0.9.3 requires security setup and verified migration before the old plaintext dataset gains this protection.
+The [v0.10 release record](docs/V0.10.0.md) describes recovery, migration, compatibility, measurements and validation. Root replacement preserves canonical history and sync keys, resumes after interruption using the new recovery key, and requires adding passkey unlock again afterward. Archives are intentionally local-only history recovery and do not restore sync authority. Maximum-history memory and latency remain desktop measurements; mobile readiness is not claimed. This line stops for human review. The v0.11 durable-service candidate awaits review; v0.12–v0.14 and v1.0 remain planned. See the [roadmap](docs/ROADMAP.md). Upgrading v0.9.3 requires security setup and verified migration before the old plaintext dataset gains this protection.
 
 ## The problem
 
@@ -83,7 +83,7 @@ The intended technical direction is Rust compiled to WebAssembly, native Web Com
 - `v0.10.1` — Security Lifecycle & Sync Recovery Correctness (`kin-v0.10.1`)
 - `v0.10.2` — Local Root Rotation & Recovery Lifecycle (`kin-v0.10.2`)
 - `v0.10.3` — Bounded Storage/Archive Hardening & Architecture Closure (`kin-v0.10.3`)
-- Candidate: `v0.11.3` — Durable Service & Deployment (awaiting human review)
+- Candidate: `v0.11.4` — Durable Service & Deployment (awaiting human review)
 - Planned: `v0.12.x` — Data Lifecycle, Retention & Deletion
 - Planned: `v0.13.x` — Recovery & Household Continuity
 - Planned: `v0.14.x` — UX/UI Consolidation

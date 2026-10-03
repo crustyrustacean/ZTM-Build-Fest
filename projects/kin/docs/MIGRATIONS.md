@@ -1,6 +1,6 @@
 # Data Migrations
 
-**Status:** v0.11.3 implementation candidate adds a transactional SQLite service-schema migration alongside the existing recoverable local-encryption migration, root replacement and bounded verification. v0.9.3's additive local schema 1→2 migration remains supported as input; canonical bytes are not rewritten. Earlier version sections are historical.
+**Status:** v0.11.4 implementation candidate adds a transactional SQLite service-schema migration alongside the existing recoverable local-encryption migration, root replacement and bounded verification. v0.9.3's additive local schema 1→2 migration remains supported as input; canonical bytes are not rewritten. Earlier version sections are historical.
 
 ## v0.11 server database migration
 

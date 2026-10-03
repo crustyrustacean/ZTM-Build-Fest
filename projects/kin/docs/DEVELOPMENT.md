@@ -1,6 +1,6 @@
 # Development Workflow
 
-**Status:** v0.11.3 durable-service implementation candidate; awaiting human review. Earlier version sections remain historical contracts.
+**Status:** v0.11.4 durable-service implementation candidate; awaiting human review. Earlier version sections remain historical contracts.
 
 ## Build and run
 
@@ -58,8 +58,30 @@ Use synthetic household text only. Never copy private family messages, health de
 The service database defaults to `projects/kin/.kin-data/kin.sqlite`, outside
 the static web root. `KIN_DATA_DIR` or `KIN_DATABASE_PATH` can select another
 location. The production server holds an exclusive adjacent
-`.service.lock`; graceful shutdown releases it, while a crash leaves a stale
-lock that must only be removed after confirming no service process remains.
+`<database-path>.service.lock`. Backup and restore share an adjacent
+`<database-path>.maintenance.lock`; restore also takes the service lock and
+requires the service to be stopped. Backup may run while the service is active,
+using SQLite's backup API. Graceful completion releases owned locks, while a
+crash or hard kill can leave a stale lock. Kin does not reclaim locks automatically.
+
+If startup or an admin operation reports an existing lock, use the exact absolute
+lock path in the error. Each lock contains JSON with `pid`, `operation`,
+`startedAt` (Unix time in milliseconds), and a random ownership `token`. Inspect
+it locally with `Get-Content -LiteralPath '<lock-path>'` in PowerShell or
+`cat '<lock-path>'` in a POSIX shell. Check the recorded PID with
+`Get-CimInstance Win32_Process -Filter 'ProcessId = <pid>'` (PowerShell) or
+`ps -p <pid> -o pid,lstart,args` (POSIX), and check the service manager and any
+backup/restore jobs for this database. Compare the command, database configuration
+and process start time; a PID alone is not proof because it may have been reused.
+
+Stop Kin and disable automatic restart/admin jobs while diagnosing. Only after
+confirming that no Kin service, backup or restore operation is using the database
+may the stale lock file be removed manually: use
+`Remove-Item -LiteralPath '<lock-path>'` (PowerShell) or `rm -- '<lock-path>'`
+(POSIX), then retry the intended operation. Replace placeholders with the exact
+verified path/PID. Never remove a lock while its owner or another operation is
+active. Remove only the stale lock file, never the database or its WAL/SHM files.
+
 Backups are sensitive and must be stored outside the static web root:
 
 ```powershell
@@ -68,7 +90,9 @@ npm run restore -- C:\private\kin-backups\kin.sqlite
 ```
 
 Restore requires the service to be stopped, verifies the source, and preserves
-the replaced database/WAL sidecars as a `.pre-restore-...` copy. A database
+the replaced database/WAL sidecars as a `.pre-restore-...` copy. Missing, empty,
+directory or unsupported-schema restore sources are rejected before replacement;
+restore does not initialize a new database from an invalid backup. A database
 backup can roll identity and authorization state backward (including revocation
 and key epochs); it is not a rollback-proof recovery mechanism. Keep service
 backups separate from local encrypted browser archives.

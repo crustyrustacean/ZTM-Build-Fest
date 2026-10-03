@@ -1,6 +1,6 @@
 # Pairing and Device Enrollment
 
-**Status:** v0.11.3 implementation candidate; awaiting human review. Manual adult and same-member device pairing use one-time codes, passkey claim/approval/activation, locally generated device keys and compared fingerprints. A queued signed device-key successor completes before pairing/provisioning proceeds. Private transport material is available only while the local household is unlocked. Pairing codes, claims and ceremony flows remain process-local and are cancelled by restart; identity and trusted-device authority are durable in the candidate. Local encrypted archive restore does not restore device trust.
+**Status:** v0.11.4 implementation candidate; awaiting human review. Manual adult and same-member device pairing use one-time codes, passkey claim/approval/activation, locally generated device keys and compared fingerprints. A queued signed device-key successor completes before pairing/provisioning proceeds. Private transport material is available only while the local household is unlocked. Pairing codes, claims and ceremony flows remain process-local and are cancelled by restart; identity and trusted-device authority are durable in the candidate. Local encrypted archive restore does not restore device trust.
 
 ## Distinct operations
 

@@ -10,6 +10,7 @@ import { join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
 import { createKinServer } from "../server/server.mjs";
+import { DurableStore } from "../server/durable-store.mjs";
 
 export async function passkeyRegressions(client) {
   await client.send("WebAuthn.enable", { enableUI: false });
@@ -236,10 +237,11 @@ if (
   const applicationPort = reservation.address().port;
   await new Promise((resolve) => reservation.close(resolve));
   const origin = `http://localhost:${applicationPort}`;
-  const { server } = createKinServer({
+  const { server, store } = createKinServer({
     port: applicationPort,
     host: "127.0.0.1",
     origin,
+    store: new DurableStore(":memory:"),
   });
   await new Promise((resolve) =>
     server.listen(applicationPort, "127.0.0.1", resolve),
@@ -340,7 +342,11 @@ if (
     if (browser.exitCode === null) await Promise.race([once(browser, "exit"), delay(2_000)]);
     browser.unref();
     server.closeAllConnections();
-    await new Promise((resolve) => server.close(resolve));
+    try {
+      await new Promise((resolve) => server.close(resolve));
+    } finally {
+      store.close();
+    }
     await delay(300);
     assert.ok(resolve(profile).startsWith(resolve(tmpdir()) + sep), "Refuse cleanup outside the test-profile directory");
     await rm(profile, {

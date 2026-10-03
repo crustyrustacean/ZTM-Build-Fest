@@ -1,26 +1,19 @@
-import { createReadStream, existsSync, statSync } from "node:fs";
-import { realpathSync } from "node:fs";
-import {
-  extname,
-  basename,
-  dirname,
-  isAbsolute,
-  join,
-  normalize,
-  relative,
-  resolve,
-  sep,
-} from "node:path";
+import { createReadStream, realpathSync, statSync } from "node:fs";
+import { extname, join, resolve } from "node:path";
 import { isIP } from "node:net";
 import { pathToFileURL } from "node:url";
 import { createServer } from "node:http";
 import { randomBytes } from "node:crypto";
 import { PairingError, PairingService } from "./pairing-service.mjs";
 import { EncryptedSyncService } from "./sync-service.mjs";
-import { DurableStore, DurableStoreError } from "./durable-store.mjs";
+import {
+  DurableConflictError,
+  DurableStore,
+  DurableStoreError,
+} from "./durable-store.mjs";
 import { WebAuthn } from "./webauthn.mjs";
+import { isInsideRoot, resolveDurablePath, webRoot } from "./path-safety.mjs";
 
-const webRoot = normalize(join(import.meta.dirname, "..", "web"));
 const FLOW_TTL_MS = 2 * 60_000;
 const MAX_ACTIVE_FLOWS = 512;
 
@@ -34,12 +27,11 @@ export function createKinServer(options = {}) {
     options.dataDirectory ??
     process.env.KIN_DATA_DIR ??
     join(import.meta.dirname, "..", ".kin-data");
-  const databasePath = resolve(
+  const databasePath = resolveDurablePath(
     options.databasePath ??
       process.env.KIN_DATABASE_PATH ??
       join(configuredDataDirectory, "kin.sqlite"),
   );
-  assertOutsideWebRoot(databasePath);
   const store =
     options.store === false
       ? null
@@ -123,17 +115,19 @@ export function createKinServer(options = {}) {
       const safe =
         error instanceof PairingError
           ? error
-          : error instanceof DurableStoreError || store?.failed
-            ? new PairingError(
-                "durable_store_unavailable",
-                "Kin's durable service is unavailable. Restart the service before retrying.",
-                503,
-              )
-            : new PairingError(
-                "server_error",
-                "Kin could not complete that request.",
-                500,
-              );
+          : error instanceof DurableConflictError && !store?.failed
+            ? new PairingError(error.code, error.message, 409)
+            : error instanceof DurableStoreError || store?.failed
+              ? new PairingError(
+                  "durable_store_unavailable",
+                  "Kin's durable service is unavailable. Restart the service before retrying.",
+                  503,
+                )
+              : new PairingError(
+                  "server_error",
+                  "Kin could not complete that request.",
+                  500,
+                );
       console.error(
         JSON.stringify({
           event: "request_failed",
@@ -179,9 +173,16 @@ if (
       console.log(JSON.stringify({ event: "service_ready", origin }));
     });
     installShutdown(application);
-  } catch {
+  } catch (error) {
     console.error(
-      JSON.stringify({ event: "startup_failed", outcome: "configuration_or_storage" }),
+      JSON.stringify({
+        event: "startup_failed",
+        outcome:
+          error.code === "durable_lock_exists"
+            ? "durable_lock_exists"
+            : "configuration_or_storage",
+        ...(error.code === "durable_lock_exists" ? { message: error.message } : {}),
+      }),
     );
     process.exitCode = 1;
   }
@@ -218,36 +219,6 @@ function assertSecureOrigin(host, origin) {
       "Kin requires an HTTPS origin outside loopback development.",
     );
   }
-}
-
-function assertOutsideWebRoot(databasePath) {
-  const dataDirectory = dirname(databasePath);
-  try {
-    const resolvedDirectory = realpathSync(dataDirectory);
-    const resolvedPath = existsSync(databasePath)
-      ? realpathSync(databasePath)
-      : resolve(resolvedDirectory, basename(databasePath));
-    const relativePath = relative(webRoot, resolvedPath);
-    if (isInsideWebRoot(relativePath))
-      throw new Error("Kin durable data must be outside the static web root.");
-  } catch (error) {
-    if (error.code === "ENOENT") {
-      const relativePath = relative(webRoot, databasePath);
-      if (isInsideWebRoot(relativePath))
-        throw new Error("Kin durable data must be outside the static web root.");
-      return;
-    }
-    throw error;
-  }
-}
-
-function isInsideWebRoot(relativePath) {
-  return (
-    relativePath === "" ||
-    (!isAbsolute(relativePath) &&
-      relativePath !== ".." &&
-      !relativePath.startsWith(`..${sep}`))
-  );
 }
 
 async function api(request, response, url, context) {
@@ -869,12 +840,21 @@ function serve(response, pathname) {
     pathname === "/" || pathname === "/pair"
       ? "index.html"
       : decodeURIComponent(pathname.slice(1));
-  const path = normalize(join(webRoot, requested));
-  if (
-    !path.startsWith(webRoot) ||
-    !existsSync(path) ||
-    !statSync(path).isFile()
-  ) {
+  let path;
+  try {
+    const candidate = resolve(webRoot, requested);
+    if (isInsideRoot(candidate, webRoot)) {
+      const canonical = realpathSync(candidate);
+      if (
+        isInsideRoot(canonical, realpathSync(webRoot)) &&
+        statSync(canonical).isFile()
+      )
+        path = canonical;
+    }
+  } catch {
+    // Missing files and inaccessible paths are not static assets.
+  }
+  if (!path) {
     response.writeHead(404);
     response.end("Not found");
     return;

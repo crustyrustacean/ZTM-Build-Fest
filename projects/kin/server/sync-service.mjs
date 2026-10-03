@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import { DurableConflictError } from "./durable-store.mjs";
 import { PairingError } from "./pairing-service.mjs";
 
 const ENVELOPE_FIELDS = [
@@ -156,13 +157,19 @@ export class EncryptedSyncService {
     }
 
     if (this.store && staged.length) {
-      this.store.commitEvents(
-        auth.household.id,
-        state.nextSequence,
-        auth.device.id,
-        state.deviceSequence.get(auth.device.id) ?? 0,
-        staged,
-      );
+      try {
+        this.store.commitEvents(
+          auth.household.id,
+          state.nextSequence,
+          auth.device.id,
+          state.deviceSequence.get(auth.device.id) ?? 0,
+          staged,
+        );
+      } catch (error) {
+        if (error instanceof DurableConflictError)
+          this.households.delete(auth.household.id);
+        throw error;
+      }
     }
     if (!this.store)
       for (const record of staged) {

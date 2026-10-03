@@ -6,6 +6,7 @@ import { join } from "node:path";
 import test from "node:test";
 import {
   acquireDatabaseProcessLock,
+  DurableConflictError,
   DurableStore,
   DurableStoreError,
   hasDatabaseProcessLock,
@@ -119,7 +120,7 @@ test("corrupt canonical relay data fails closed during bounded reads", () => {
   }
 });
 
-test("independent relay writers cannot commit against a stale household cursor", () => {
+test("independent relay writers reject a stale cursor and can retry without restarting", () => {
   const directory = temporaryDirectory();
   const databasePath = join(directory, "kin.sqlite");
   let firstStore;
@@ -177,15 +178,37 @@ test("independent relay writers cannot commit against a stale household cursor",
       ciphertext: Buffer.alloc(32, 2).toString("base64url"),
       signature: Buffer.alloc(64, 3).toString("base64url"),
     });
-    firstSync.push(adult.sessionToken, [makeEnvelope(adult, "a".repeat(32))]);
+    const firstAccepted = firstSync.push(adult.sessionToken, [
+      makeEnvelope(adult, "a".repeat(32)),
+    ]);
     assert.throws(
       () =>
         secondSync.push(secondIdentity.sessionToken, [
           makeEnvelope(joined, "b".repeat(32)),
         ]),
-      DurableStoreError,
+      (error) =>
+        error instanceof DurableConflictError &&
+        error.code === "sync_cursor_conflict",
     );
-    assert.equal(secondStore.failed, true);
+    assert.equal(secondStore.failed, false);
+    assert.equal(secondStore.health(), true);
+    assert.equal(secondStore.eventCount(adult.householdId), 1);
+    assert.equal(
+      secondSync.status(secondIdentity.sessionToken).latestCursor,
+      firstAccepted.latestCursor,
+    );
+    assert.deepEqual(
+      secondSync.push(secondIdentity.sessionToken, [
+        makeEnvelope(joined, "b".repeat(32)),
+      ]),
+      { accepted: 1, latestCursor: "AAAAAAAAAAI", durable: true },
+    );
+    assert.deepEqual(
+      secondSync
+        .pull(secondIdentity.sessionToken)
+        .events.map((event) => event.envelope.eventId),
+      ["a".repeat(32), "b".repeat(32)],
+    );
 
     secondStore.close();
     secondStore = undefined;
@@ -194,7 +217,7 @@ test("independent relay writers cannot commit against a stale household cursor",
     inspection = new DurableStore(databasePath, {
       acquireProcessLock: false,
     });
-    assert.equal(inspection.eventCount(adult.householdId), 1);
+    assert.equal(inspection.eventCount(adult.householdId), 2);
   } finally {
     inspection?.close();
     secondStore?.close();

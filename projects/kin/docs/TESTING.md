@@ -1,6 +1,6 @@
 # Testing Contracts
 
-**Status:** v0.11.3 durable-service implementation candidate; awaiting human review. Earlier version sections are historical release gates. See [V0.10.0](V0.10.0.md) for prior milestone and patch evidence and [V0.11.0](V0.11.0.md) for the current service contract.
+**Status:** v0.11.4 durable-service implementation candidate; awaiting human review. Earlier version sections are historical release gates. See [V0.10.0](V0.10.0.md) for prior milestone and patch evidence and [V0.11.0](V0.11.0.md) for the current service contract.
 
 ## v0.11 durable-service gate
 
@@ -19,6 +19,13 @@ a spawned HTTP service restart. The restart test verifies fresh passkey login
 using a persisted trusted-device verifier, durable acknowledgement, exact
 ciphertext recovery, idempotent retry/conflict behavior, and device-sequence
 continuity. Use synthetic credentials and events only.
+
+PR #17 hardening regressions also cover canonical admin/startup web-root guards
+(including symlinked missing ancestors), static traversal/symlink isolation,
+rollback and retry after stale-writer conflicts, fatal store failures, bounded
+durable cursor pagination, actionable stale-lock errors, admin exclusion and
+cleanup, invalid restore sources, and preservation of old WAL/SHM state. See
+[V0.11.0](V0.11.0.md#pr-17-pre-merge-hardening-evidence-2026-10-03) for gate results.
 
 The production smoke process also takes an exclusive service lock. A test or
 operator restoring a database must stop that process first. The lock is

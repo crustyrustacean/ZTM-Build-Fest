@@ -2,10 +2,11 @@
 
 This file records completed Kin releases. The `v0.0.x` releases are planning and documentation milestones; they do not represent implemented application features. The first implementation milestone remains `v0.1.0`.
 
-## Unreleased — v0.11.0–v0.11.3 Durable Service & Deployment candidate
+## Unreleased — v0.11.0–v0.11.4 Durable Service & Deployment candidate
 
-The four-version implementation candidate is complete, committed and tagged
-`kin-v0.11.3` for human review. It is not a published release.
+The implementation candidate and pre-merge hardening patch are tagged
+`kin-v0.11.4` for human review. The original `kin-v0.11.3` tag is preserved.
+These are review candidates, not published product releases.
 
 ### v0.11.0 — Durable Identity & Relay Foundation
 
@@ -43,6 +44,26 @@ gates also passed. npm reported zero vulnerabilities but warned that the
 native binding loaded successfully. Linux/macOS and launch-workflow validation,
 an independent security audit and production certification are not claimed.
 Restoring an old backup can roll back revocation or key epochs.
+
+### v0.11.4 — Pre-Merge Durability & Operations Corrections
+
+Share canonical web-root guards between service startup and admin commands,
+including symlinked missing ancestors, and prevent static routes from escaping
+the web root. Expected stale-writer conflicts now roll back, return HTTP 409
+and permit retry without poisoning the store; fatal storage errors still fail
+closed. Lock errors include the exact path and safe manual recovery guidance.
+
+Correct durable cursor encoding so bounded pulls can resume, reject missing,
+empty and unsupported restore sources before replacement, and isolate the
+passkey regression store from the default service database. Regression coverage
+proves admin exclusion, cleanup, verified backups and preserved database/WAL/SHM
+state. Schema v1, backup format and client/domain versions are unchanged.
+
+Passed 181 Node tests (107 server), 118 Rust tests, formatting, Clippy, release
+WASM, product/security-storage/security-UI/WebAuthn-PRF browser gates, npm audit,
+version checks and PowerShell/POSIX launcher smoke tests. The POSIX launcher
+used Windows Node through WSL; native Linux Node and macOS remain unverified.
+See [the hardening evidence](docs/V0.11.0.md#pr-17-pre-merge-hardening-evidence-2026-10-03).
 
 ## [0.10.3] — Bounded Storage/Archive Hardening & Architecture Closure
 

@@ -1,6 +1,6 @@
 # Identity and Trusted Devices
 
-**Status:** v0.11.3 implementation candidate; awaiting human review. Server member/passkey/device authorization remains distinct from the local encryption unlock. v0.10 protects successor transport private keys and epoch secrets under the local root while retaining public verification history. The candidate persists server identity and device-token verifiers; raw tokens and sessions remain ephemeral. An encrypted local archive restores local history, not an authenticated server household.
+**Status:** v0.11.4 implementation candidate; awaiting human review. Server member/passkey/device authorization remains distinct from the local encryption unlock. v0.10 protects successor transport private keys and epoch secrets under the local root while retaining public verification history. The candidate persists server identity and device-token verifiers; raw tokens and sessions remain ephemeral. An encrypted local archive restores local history, not an authenticated server household.
 
 ## Separate identities
 

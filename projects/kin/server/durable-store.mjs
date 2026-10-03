@@ -40,6 +40,14 @@ export class DurableStoreError extends Error {
   }
 }
 
+export class DurableConflictError extends DurableStoreError {
+  constructor(code, message) {
+    super(message);
+    this.name = "DurableConflictError";
+    this.code = code;
+  }
+}
+
 export function acquireDatabaseProcessLock(
   databasePath,
   { operation = "service" } = {},
@@ -80,11 +88,14 @@ function acquireExclusiveLock(lockPath, operation) {
         );
       }
     }
-    if (error.code === "EEXIST")
-      throw new DurableStoreError(
-        "A Kin service or maintenance lock already exists; verify that no conflicting Kin operation is running.",
+    if (error.code === "EEXIST") {
+      const lockError = new DurableStoreError(
+        `A Kin service or maintenance lock already exists at ${JSON.stringify(lockPath)}. Inspect its PID, operation and start time, and confirm no Kin service, backup or restore operation is using this database. Only after confirming all such processes have stopped, remove this lock file manually and retry. Never remove an active lock.`,
         { cause: error },
       );
+      lockError.code = "durable_lock_exists";
+      throw lockError;
+    }
     throw new DurableStoreError("Kin could not acquire its exclusive lock.", {
       cause: error,
     });
@@ -195,6 +206,29 @@ export class DurableStore {
       releaseServiceLock = acquireDatabaseProcessLock(target, {
         operation: "restore",
       });
+      if (!exists(source) || !statSync(source).isFile())
+        throw new DurableStoreError(
+          "The Kin restore source must be an existing database file.",
+        );
+      // Restore must never create or migrate an absent/empty backup into a new
+      // household database, or modify an unsupported source before rejecting it.
+      const sourceInspection = new Database(source, {
+        readonly: true,
+        fileMustExist: true,
+      });
+      try {
+        if (
+          sourceInspection.pragma("user_version", { simple: true }) !==
+          SERVER_SCHEMA_VERSION
+        )
+          throw new DurableStoreError(
+            "The Kin restore source uses an unsupported server schema version.",
+          );
+        if (sourceInspection.pragma("integrity_check", { simple: true }) !== "ok")
+          throw new DurableStoreError("The Kin restore source did not validate.");
+      } finally {
+        sourceInspection.close();
+      }
       sourceStore = new DurableStore(source, { acquireProcessLock: false });
       sourceStore.validate();
       await sourceStore.backup(temporary, { maintenanceLockHeld: true });
@@ -538,7 +572,13 @@ export class DurableStore {
     try {
       return this.db.transaction(operation).immediate();
     } catch (error) {
-      if (isSqliteError(error) || error instanceof DurableStoreError)
+      // The SQLite wrapper completes rollback before rethrowing a conflict.
+      // Rollback failures surface as SQLite errors and still fail closed.
+      if (
+        isSqliteError(error) ||
+        (error instanceof DurableStoreError &&
+          !(error instanceof DurableConflictError))
+      )
         this.failed = true;
       throw error;
     }
@@ -876,7 +916,8 @@ export class DurableStore {
         .run(householdId);
       const current = this.statements.getSyncHousehold.get(householdId);
       if (current.next_sequence !== expectedNextSequence)
-        throw new DurableStoreError(
+        throw new DurableConflictError(
+          "sync_cursor_conflict",
           "Kin synchronization state changed; retry from the current cursor.",
         );
       const deviceState = this.db
@@ -885,7 +926,8 @@ export class DurableStore {
         )
         .get(householdId, deviceId);
       if ((deviceState?.last_sequence ?? 0) !== expectedDeviceSequence)
-        throw new DurableStoreError(
+        throw new DurableConflictError(
+          "sync_device_sequence_conflict",
           "Kin device sequence changed; retry after reauthentication.",
         );
 
@@ -1128,7 +1170,9 @@ function isId(value) {
 }
 
 function encodeCursor(sequence) {
-  return sequence.toString(36);
+  const bytes = Buffer.alloc(8);
+  bytes.writeBigUInt64BE(BigInt(sequence));
+  return bytes.toString("base64url");
 }
 
 function isSqliteError(error) {
