@@ -100,7 +100,7 @@ If an unrelated parent-repository file was modified accidentally, revert that ch
 
 # Current Development Stage
 
-Kin uses semantic versions. Current release: `v0.8.2` — Trusted Devices, Authorization, and Security UX. Identity, credentials, sessions, trusted devices, membership, and pairing are separate concepts with explicit authorization. The v0.8.x line continues through its polish milestone before user evaluation. No automatic kin-main merge or push.
+Kin uses semantic versions. Current release: `v0.8.3` — Household Pairing Pre-Feedback Stabilization. The four-release v0.8.x incubation line is complete and awaiting product-experience feedback. Do not begin v0.9.x without explicit approval. No automatic kin-main merge or push.
 
 The pre-implementation releases are:
 

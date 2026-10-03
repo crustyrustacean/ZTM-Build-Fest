@@ -2,6 +2,10 @@
 
 This file records completed Kin releases. The `v0.0.x` releases are planning and documentation milestones; they do not represent implemented application features. The first implementation milestone remains `v0.1.0`.
 
+## [0.8.3] — Household Pairing Pre-Feedback Stabilization
+
+Polish the two-adult journey with URL prefill, clipboard/native sharing fallbacks, readable selectable codes, quiet countdowns, semantic status/error regions, keyboard-native controls, forced-color styling, destructive-action explanations, and actionable passkey errors. Hide local household content on `/pair` before authorization, recover safely from stale claim cookies, reconcile security/recovery documentation, and retain the complete v0.7.x regression suite.
+
 ## [0.8.2] — Trusted Devices, Authorization, and Security UX
 
 Make device trust inspectable and revocable, add logout with session-only semantics, define leaving and other-adult removal, revoke all target sessions/devices on membership removal, and prohibit the last active adult from leaving without a supported deletion/recovery path. Add an authorization matrix and actionable passkey, expiry, revocation, trust, and recovery messages without exposing household details before approval.

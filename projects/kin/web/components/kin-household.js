@@ -19,6 +19,8 @@ class KinHousehold extends HTMLElement {
 
   connectedCallback() { this.className = "household-panel"; this.load(); }
   disconnectedCallback() { clearInterval(this.timer); clearTimeout(this.poll); }
+  set disabled(value) { this.toggleAttribute("data-disabled", Boolean(value)); for (const control of this.querySelectorAll("button, input")) control.disabled = Boolean(value); }
+  get disabled() { return this.hasAttribute("data-disabled"); }
 
   async load() {
     try {
@@ -36,6 +38,7 @@ class KinHousehold extends HTMLElement {
     if (location.pathname === "/pair" && !this.identity) return this.renderJoin();
     if (!this.identity) return this.renderSetup();
     this.renderMember();
+    this.disabled = this.disabled;
   }
 
   renderSetup() {
@@ -113,7 +116,7 @@ class KinHousehold extends HTMLElement {
   renderError(error) { this.message(error?.message || "Kin could not complete that request.", true); }
   text(value) { const paragraph = document.createElement("p"); paragraph.textContent = value; this.append(paragraph); return paragraph; }
   message(value, alert = false) { let region = this.querySelector(".household-message"); if (!region) { region = document.createElement("p"); region.className = "household-message"; this.append(region); } region.setAttribute("role", alert ? "alert" : "status"); region.textContent = value; return region; }
-  makeButton(label, action, className = "") { const button = document.createElement("button"); button.type = "button"; button.textContent = label; button.className = className; button.addEventListener("click", action); return button; }
+  makeButton(label, action, className = "") { const button = document.createElement("button"); button.type = "button"; button.textContent = label; button.className = className; button.disabled = this.disabled; button.addEventListener("click", action); return button; }
   button(label, action, className) { const button = this.makeButton(label, action, className); this.append(button); return button; }
 }
 

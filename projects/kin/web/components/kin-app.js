@@ -132,6 +132,8 @@ class KinApp extends HTMLElement {
     main.id = "main";
     main.tabIndex = -1;
     main.setAttribute("aria-busy", "true");
+    // The invitation route exposes only the enrollment surface until authorization.
+    main.hidden = window.location.pathname === "/pair";
     this.main = main;
     this.catchUp = document.createElement("kin-catch-up");
     this.today = document.createElement("kin-today");
@@ -720,6 +722,7 @@ class KinApp extends HTMLElement {
     this.pulse.disabled = isBusy || !this.store;
     this.catchUp.disabled = isBusy || !this.store;
     this.routines.disabled = isBusy || !this.store;
+    this.household.disabled = isBusy || !this.store;
     this.retryButton.disabled = isBusy;
   }
 

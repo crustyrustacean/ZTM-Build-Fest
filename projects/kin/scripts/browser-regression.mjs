@@ -33,6 +33,11 @@ assert.ok(
 const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../web");
 const profile = await mkdtemp(join(tmpdir(), "kin-regression-"));
 const server = createServer(async (request, response) => {
+  if (new URL(request.url, "http://localhost").pathname === "/api/status") {
+    response.setHeader("Content-Type", "application/json");
+    response.end('{"identity":null,"claim":null}');
+    return;
+  }
   const path = resolve(
     webRoot,
     `.${new URL(request.url, "http://localhost").pathname.replace(/\/$/, "/index.html")}`,

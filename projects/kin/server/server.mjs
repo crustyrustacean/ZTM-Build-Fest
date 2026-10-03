@@ -38,8 +38,10 @@ async function api(request, response, url) {
 
   if (request.method === "GET" && url.pathname === "/api/status") {
     let identity = null;
+    let claim = null;
     try { const auth = service.authorize(session); identity = { householdId: auth.household.id, memberId: auth.member.id, deviceId: auth.device.id }; } catch {}
-    json(response, 200, { identity, claim: claimToken ? service.pairingForClaim(claimToken) : null }); return;
+    try { claim = claimToken ? service.pairingForClaim(claimToken) : null; } catch { clearCookie(response, "kin_claim"); }
+    json(response, 200, { identity, claim }); return;
   }
   if (request.method === "POST" && url.pathname === "/api/passkeys/register/options") {
     if (!['bootstrap', 'claim'].includes(body.purpose)) throw badRequest();

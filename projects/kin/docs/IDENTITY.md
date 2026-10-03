@@ -1,6 +1,6 @@
 # Identity and Trusted Devices
 
-**Status:** Current through v0.8.2. Household/member identity, passkey credentials, sessions, and trusted-device inspection/revocation are implemented by the same-origin in-memory service. Encrypted sync and content-key management remain future work.
+**Status:** Current through v0.8.3. Household/member identity, passkey credentials, sessions, and trusted-device inspection/revocation are implemented by the same-origin in-memory service. Encrypted sync and content-key management remain future work.
 
 ## Separate identities
 

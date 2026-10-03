@@ -1,6 +1,6 @@
 # Pairing and Device Enrollment
 
-**Status:** Current through v0.8.2. Manual short-lived pairing codes, invitation URLs, passkey identity, explicit approval, and trusted-device revocation are implemented. QR, key exchange, encrypted sync, and durable service storage are not implemented.
+**Status:** Current through v0.8.3. Manual short-lived pairing codes, invitation URLs, passkey identity, explicit approval, and trusted-device revocation are implemented. QR, key exchange, encrypted sync, and durable service storage are not implemented.
 
 ## Distinct operations
 
