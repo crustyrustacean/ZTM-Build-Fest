@@ -1122,6 +1122,8 @@ export class DurableStore {
       currentEpochs.set(householdId, state.currentEpoch);
       let cursor = 0;
       let scanned = 0;
+      // Schema v1 has no relay pruning: retained history must be gap-free,
+      // including events from devices that have since been revoked.
       let nextRelaySequence = 1;
       const deviceSequences = new Map();
       while (true) {
@@ -1216,6 +1218,7 @@ export class DurableStore {
         });
         verification.close();
         if (process.platform !== "win32") chmodSync(temporary, 0o600);
+        // Publish without overwriting a destination created during the backup.
         linkSync(temporary, target);
         createdTarget = true;
         unlinkSync(temporary);

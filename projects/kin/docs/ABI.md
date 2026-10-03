@@ -1,6 +1,6 @@
 # JavaScript–WASM ABI
 
-**Status:** v0.10 development adds portable commands, metadata and archive operations. Canonical event schemas and replay protocols v1�v8 remain byte-compatible. Earlier version sections are historical contracts.
+**Status:** v0.11.6 implementation candidate; awaiting human review. v0.10 added portable commands, metadata and archive operations. Canonical event schemas and replay protocols v1-v8 remain byte-compatible. Earlier version sections are historical contracts.
 
 ## Target and exports
 
@@ -132,7 +132,7 @@ Items remain serialized in original add-event order, including archived tombston
 
 ## Call behavior
 
-`kin_apply_events` accepts one complete, ordered event batch using protocol version 1, 2, 3, 4, 5, 6, or 7. It validates the entire request and reconstructs from scratch. On success it publishes a complete result in the requested protocol version and returns zero. On failure it publishes an error and no partial result; stored IndexedDB bytes remain untouched. Unknown protocol/event versions fail with a stable unsupported-version code; malformed payload, bounds overflow, and invalid state transitions fail deterministically.
+`kin_apply_events` accepts one complete event batch using protocol version 1, 2, 3, 4, 5, 6, 7, or 8. Protocols v1-v7 replay the supplied order; v8 sorts a copy for distributed state replay while preserving input order for catch-up boundaries. It validates the entire request and reconstructs from scratch. On success it publishes a complete result in the requested protocol version and returns zero. On failure it publishes an error and no partial result; stored IndexedDB bytes remain untouched. Unknown protocol/event versions fail with a stable unsupported-version code; malformed payload, bounds overflow, and invalid state transitions fail deterministically.
 
 The function may grow memory while parsing or building output. JavaScript must reacquire `memory.buffer` after the call before copying result/error bytes. Length arithmetic is checked for overflow in both languages. Cap a request and result at 64 MiB, a request at 10,000 events, and individual item text at 4096 UTF-8 bytes for v0.1.0; reject larger input before unbounded allocation. The matching 10,000-event storage limit is specified in [STORAGE](STORAGE.md).
 

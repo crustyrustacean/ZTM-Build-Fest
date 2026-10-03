@@ -168,6 +168,7 @@ pub fn rebuild_distributed_on(
     as_of: i64,
     civil_date: CivilDate,
 ) -> Result<HouseholdState, KinError> {
+    // Sort an owned copy for deterministic reduction; callers keep arrival order for cursors.
     let mut ordered_events = events.to_vec();
     ordered_events.sort_by_key(|event| (event.logical_time, event.device_id, event.event_id));
     rebuild_with_context(&ordered_events, as_of, Some(civil_date), true)
@@ -198,6 +199,7 @@ fn rebuild_with_context(
     let mut item_positions = BTreeMap::new();
     let mut item_archives = BTreeMap::new();
     let mut event_bytes = BTreeMap::<EventId, Vec<u8>>::new();
+    // Completions are retained by occurrence key, then projected onto the requested date below.
     let mut last_logical_time = 0;
 
     for event in events {
@@ -505,6 +507,7 @@ fn is_concurrent_terminal_conflict(
     archived_by: Option<(u64, DeviceId)>,
     event: &EventEnvelope,
 ) -> bool {
+    // Cross-device mutations at the archive's logical time cannot undo its terminal tombstone.
     allow_equal_logical_time
         && archived_by.is_some_and(|(logical_time, device_id)| {
             logical_time == event.logical_time && device_id != event.device_id

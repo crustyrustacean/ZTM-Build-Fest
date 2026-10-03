@@ -1,6 +1,6 @@
 # Development Workflow
 
-**Status:** v0.11.5 durable-service implementation candidate; awaiting human review. Earlier version sections remain historical contracts.
+**Status:** v0.11.6 durable-service implementation candidate; awaiting human review. Earlier version sections remain historical contracts.
 
 ## Build and run
 
