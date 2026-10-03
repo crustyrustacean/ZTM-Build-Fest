@@ -1,18 +1,26 @@
 # Roadmap
 
-Current implementation: `v0.10.3 — Bounded Storage/Archive Hardening & Architecture Closure`. This completes the requested implementation line and stops for human review of PR #15. v0.11 and v1.0 have not begun.
+Current implementation: `v0.10.3 — Bounded Storage/Archive Hardening & Architecture Closure`. This completes the requested implementation line and stops for human review of PR #15. The releases after v0.10 are planning only; v0.11–v0.14 and v1.0 have not been implemented.
 
 ```text
 v0.9.3 — Encrypted Event Sync Stabilization
 	↓
-v0.10.x — Portable Core + Local Data Security
+v0.10.x — Portable Core + Local Security
 	↓
-v0.11.x — UX/UI Consolidation
+v0.11.x — Durable Service & Deployment
+	↓
+v0.12.x — Data Lifecycle, Retention & Deletion
+	↓
+v0.13.x — Recovery & Household Continuity
+	↓
+v0.14.x — UX/UI Consolidation
 	↓
 v1.0.0 — Stable Kin Platform
 ```
 
 Kin supports encrypted local storage, recovery/optional PRF unlock, verified migration, Rust commands/codecs, encrypted archives and a static offline shell alongside opt-in encrypted sync. The identity service and relay remain in-memory. Archives recover local history, not server identity. Independent security review and broader browser/authenticator coverage remain outstanding.
+
+The next implementation line, after the v0.10 human review gate, is v0.11.x. v0.11–v0.14 below are planned contracts, not implementation claims. The sequence deliberately settles service durability, data lifecycle/deletion and recovery authority before holistic UX/UI work. The [v0.11](V0.11.0.md), [v0.12](V0.12.0.md), [v0.13](V0.13.0.md) and [v0.14](V0.14.0.md) documents define their planning gates.
 
 ## Planning releases
 
@@ -216,28 +224,67 @@ Completed: persistent exact-envelope outbox, crash-safe remote commit/cursor adv
 
 Completed: recovery and metadata threat assessment, encrypted logging/privacy boundary, bounds and malformed-envelope handling, same-member device enrollment, relay restart semantics, browser storage migration verification, and product-facing sync states. The identity service/relay remain memory-only and no independent security audit is claimed. This is the final v0.9.x encrypted-sync stabilization gate.
 
-### `v0.10.x` — Portable Core + Local Data Security
+### `v0.10.x` — Portable Core + Local Security
 
-The final architecture/security development line. v0.10.0 implements cryptographically locked local household data, independent credential/recovery wrappers, recoverable plaintext migration, Rust-owned command semantics and canonical codecs, encrypted export/import, native domain tests, a static offline shell and signed transport-key migration. v0.10.1 corrects overlapping unlock feedback, asynchronous trusted-device pinning and interrupted key-rotation recovery. The evidence inventory, compatibility, measured limits and readiness work are in [V0.10.0](V0.10.0.md). Remaining architectural/security review belongs here before the v0.11 handoff.
+The final local architecture/security development line. v0.10.0 implements cryptographically locked local household data, independent credential/recovery wrappers, recoverable plaintext migration, Rust-owned command semantics and canonical codecs, encrypted export/import, native domain tests, a static offline shell and signed transport-key migration. v0.10.1 corrects overlapping unlock feedback, asynchronous trusted-device pinning and interrupted key-rotation recovery; v0.10.2 adds local root rotation; v0.10.3 hardens bounded storage/archive processing and closes this implementation line. The evidence inventory, compatibility, measured limits and readiness work are in [V0.10.0](V0.10.0.md). Human review of the v0.10 gate precedes the next implementation line.
 
 Increase the Rust footprint by increasing the amount of Kin that is deterministic, portable, invariant-driven, and independently testable — not by moving browser-native capabilities into Wasm. Web Crypto and networking remain browser/server adapter responsibilities.
 
-### `v0.11.x` — UX/UI Consolidation
+### `v0.11.x` — Durable Service & Deployment
 
-Refine information architecture, navigation, responsive behavior, accessibility,
-keyboard interaction, focus management and screen-reader semantics. Consolidate
-authentication/unlock, pairing, backup/recovery, sync status and onboarding;
-loading/empty/error states; component consistency, visual hierarchy, typography,
-spacing, motion, modern CSS, PWA/install experience and cross-browser UX. v0.10
-must deliver working accessible security states, while this line owns holistic
-product polish. It must not need to redesign encryption, storage or commands.
+Make authorization state, trusted-device/membership records and opaque encrypted
+relay state durable across ordinary service restarts, with explicit schema
+migrations, deployment configuration, backup/restore and operational recovery.
+An acknowledgement means accepted encrypted state was durably committed under a
+documented contract. The service remains an authorization and opaque-relay
+boundary; it must not become a plaintext reducer or household source of truth.
+See [V0.11.0](V0.11.0.md).
+
+### `v0.12.x` — Data Lifecycle, Retention & Deletion
+
+Define what Kin keeps, archives, deletes, compacts and cannot erase. Specify
+household deletion, offline-device tombstones, service-controlled ciphertext,
+backup/log retention and event-history growth without conflating deletion with
+archival, revocation or member removal. See [V0.12.0](V0.12.0.md).
+
+### `v0.13.x` — Recovery & Household Continuity
+
+Define explicit recovery outcomes for lost credentials, devices, server state and
+archives; preserve the boundary between household history and identity/device
+authority; and ensure replacement enrollment is not an authorization bypass.
+Unrecoverable cases must be stated honestly. See [V0.13.0](V0.13.0.md).
+
+### `v0.14.x` — UX/UI Consolidation
+
+After the preceding platform semantics are settled, consolidate information
+architecture, navigation, onboarding, security/recovery/deletion presentation,
+responsive behavior, accessibility, interaction and visual consistency across
+Kin's existing product areas. This line presents stable platform behavior; it
+does not redesign encryption, storage, service durability, deletion, recovery,
+canonical events or sync semantics. See [V0.14.0](V0.14.0.md).
 
 ### `v1.0.0` — Stable Kin Platform
 
-Begin implementation only after BOTH v0.10 architecture/security and v0.11 UX/UI
-readiness criteria are satisfied. Stabilize what those lines secured and refined;
-do not introduce another major architecture at v1.0.
+Begin implementation only after v0.10 local architecture/security, v0.11 durable
+service/deployment, v0.12 data lifecycle/deletion, v0.13 recovery/continuity and
+v0.14 coherent UX/UI readiness properties are satisfied. These are property gates,
+not arbitrary version-number gates. Stabilize what the preceding lines secured
+and refined; do not introduce another major architecture at v1.0.
+
+Likely v0.14 work is information architecture/unified app shell, interaction/state
+correctness, accessibility/responsive resilience, then visual/interaction
+hardening. v1.0 is for release-candidate validation, compatibility/support
+commitments, upgrade guarantees, documentation, final defect resolution and
+stable packaging—not unresolved architecture.
+
+## Product scope boundary
+
+These platform-completion lines do not expand Kin sideways. Unless separately
+approved, third adults, child accounts, arbitrary roles/RBAC, chat/messages,
+attachments, notifications, calendar integration, AI, analytics, sentiment,
+household scoring, admin dashboards, themes and generic workflow/task-manager
+features remain deferred.
 
 ## Scope discipline
 
-Each roadmap item is future work unless explicitly marked as implemented. v0.9.3 supplies authentication, pairing and encrypted sync; v0.10.0 adds local security, portable commands/codecs and encrypted recovery archives. v0.11 remains future work. Do not begin v1.0 before both readiness gates pass. Releases through `v0.0.12` were documentation-only; v0.1.0 was the first coded release. Earlier version sections preserve release history, including draft persistence later removed by v0.10.
+Each roadmap item is future work unless explicitly marked as implemented. v0.9.3 supplies authentication, pairing and encrypted sync; v0.10.x adds local security, portable commands/codecs and encrypted recovery archives. v0.11–v0.14 and v1.0 remain planned. Do not present them as implemented or begin v1.0 before all five required readiness properties pass. Releases through `v0.0.12` were documentation-only; v0.1.0 was the first coded release. Earlier version sections preserve release history, including draft persistence later removed by v0.10.

@@ -4,7 +4,7 @@
 
 **Current status: `v0.10.3` — Bounded Storage/Archive Hardening & Architecture Closure.** Household events, metadata and private sync keys are encrypted in browser storage. Startup remains locked until a verified recovery secret or supported passkey PRF unwraps the local root. Recovery protection can be replaced with a new random root and a newly confirmed recovery key. Protected reads use bounded batches, and KARC v1 archives avoid redundant ciphertext copies. Rust owns commands, canonical event codecs, replay and archive framing; browser APIs own cryptography, storage and authentication. Opt-in encrypted relay sync preserves canonical identity and exact retry envelopes.
 
-The [v0.10 release record](docs/V0.10.0.md) describes recovery, migration, compatibility, measurements and validation. Root replacement preserves canonical history and sync keys, resumes after interruption using the new recovery key, and requires adding passkey unlock again afterward. Archives are intentionally local-only history recovery and do not restore sync authority. Maximum-history memory and latency remain desktop measurements; mobile readiness is not claimed. This line stops for human review. `v0.11.x` and v1.0 have not begun. Upgrading v0.9.3 requires security setup and verified migration before the old plaintext dataset gains this protection.
+The [v0.10 release record](docs/V0.10.0.md) describes recovery, migration, compatibility, measurements and validation. Root replacement preserves canonical history and sync keys, resumes after interruption using the new recovery key, and requires adding passkey unlock again afterward. Archives are intentionally local-only history recovery and do not restore sync authority. Maximum-history memory and latency remain desktop measurements; mobile readiness is not claimed. This line stops for human review. The planned v0.11–v0.14 platform and UX lines and v1.0 have not begun; see the [roadmap](docs/ROADMAP.md). Upgrading v0.9.3 requires security setup and verified migration before the old plaintext dataset gains this protection.
 
 ## The problem
 
@@ -83,7 +83,11 @@ The intended technical direction is Rust compiled to WebAssembly, native Web Com
 - `v0.10.1` — Security Lifecycle & Sync Recovery Correctness (`kin-v0.10.1`)
 - `v0.10.2` — Local Root Rotation & Recovery Lifecycle (`kin-v0.10.2`)
 - `v0.10.3` — Bounded Storage/Archive Hardening & Architecture Closure (`kin-v0.10.3`)
-- Then `v0.11.x` — UX/UI Consolidation, before `v1.0.0` — Stable Kin Platform
+- Planned: `v0.11.x` — Durable Service & Deployment
+- Planned: `v0.12.x` — Data Lifecycle, Retention & Deletion
+- Planned: `v0.13.x` — Recovery & Household Continuity
+- Planned: `v0.14.x` — UX/UI Consolidation
+- Planned: `v1.0.0` — Stable Kin Platform
 - See the [changelog](CHANGELOG.md) for the completed release history.
 
 ## Install, build, and run
@@ -163,6 +167,10 @@ Kin is nested in the ZTM Build Fest repository. Its community files and template
 - [Accepted architecture decision: event-sourced household state](docs/decisions/0001-event-sourced-household-state.md)
 - [UX flows](docs/UX.md)
 - [Roadmap](docs/ROADMAP.md)
+- [Planned v0.11 Durable Service & Deployment contract](docs/V0.11.0.md)
+- [Planned v0.12 Data Lifecycle, Retention & Deletion contract](docs/V0.12.0.md)
+- [Planned v0.13 Recovery & Household Continuity contract](docs/V0.13.0.md)
+- [Planned v0.14 UX/UI Consolidation contract](docs/V0.14.0.md)
 - [v0.1.0 implementation specification](docs/V0.1.0.md)
 - [Handoff release contract and final validation](docs/V0.3.0.md)
 

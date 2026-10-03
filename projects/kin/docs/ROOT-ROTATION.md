@@ -56,4 +56,6 @@ can still access its authorized plaintext and keys.
 Archive recovery is intentionally local-only (Option A). It recovers household
 history, creates fresh anonymous local identities, and grants no membership,
 trusted-device authority or sync reattachment. A future rejoin would require a
-separately authorized workflow. v0.11 must design around this stable boundary.
+separately authorized workflow. The planned v0.13 recovery line must settle the
+long-term archive authority policy; until then the implemented boundary remains
+local-only. The v0.14 UX line must reflect the resulting policy.

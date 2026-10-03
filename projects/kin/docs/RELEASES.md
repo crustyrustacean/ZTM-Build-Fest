@@ -4,15 +4,18 @@
 
 ## Release sequence
 
-The intended progression is `kin-v0.9.3` → `kin-v0.10.0` (Portable Core + Local
+The completed progression is `kin-v0.9.3` → `kin-v0.10.0` (Portable Core + Local
 Data Security) → `kin-v0.10.1` (Security Lifecycle & Sync Recovery Correctness) →
 `kin-v0.10.2` (Local Root Rotation & Recovery Lifecycle) →
 `kin-v0.10.3` (Bounded Storage/Archive Hardening & Architecture Closure) →
-human review → `kin-v0.11.0` (UX/UI Consolidation) → `kin-v1.0.0` (Stable Kin
-Platform). v1.0 requires BOTH architecture/security and UX/UI readiness. Use the
-concrete development slices and gates in [V0.10.0](V0.10.0.md); do not manufacture
-patch releases or knowingly defer a necessary correctness fix. Create tags only
-after completed validation and requested approval, never at development start.
+human review. The planned, unimplemented sequence is v0.11.x (Durable Service &
+Deployment) → v0.12.x (Data Lifecycle, Retention & Deletion) → v0.13.x (Recovery
+& Household Continuity) → v0.14.x (UX/UI Consolidation) → v1.0.0 (Stable Kin
+Platform). v1.0 requires the readiness properties of every preceding line, not
+only architecture/security and UX/UI. Use the release-specific planning contracts
+and [V0.10.0](V0.10.0.md); do not manufacture patch releases or knowingly defer a
+necessary correctness fix. Create tags only after completed validation and
+requested approval, never at development start.
 
 ```text
 scope complete
@@ -94,4 +97,4 @@ Follow [V0.7.0](V0.7.0.md) for capability, correctness, resilience/accessibility
 
 ## v0.8.0 Household Pairing
 
-The v0.7.x line completed at `kin-v0.7.4`, validated commit `a8ded079be6fdbedba8738a64a5f0fb753e7fdd6`, pushed to the fork. The v0.8 record is [V0.8.0](V0.8.0.md); `kin-v0.8.8` corrected active-member slots. The v0.9 record is [V0.9.0](V0.9.0.md). The merged v0.9.3 base and active v0.10 milestone are recorded in [V0.10.0](V0.10.0.md). v1.0 remains gated by both v0.10 and v0.11 readiness.
+The v0.7.x line completed at `kin-v0.7.4`, validated commit `a8ded079be6fdbedba8738a64a5f0fb753e7fdd6`, pushed to the fork. The v0.8 record is [V0.8.0](V0.8.0.md); `kin-v0.8.8` corrected active-member slots. The v0.9 record is [V0.9.0](V0.9.0.md). The merged v0.9.3 base and completed v0.10 implementation line are recorded in [V0.10.0](V0.10.0.md). v1.0 remains gated by local security, durable service, lifecycle/deletion, recovery/continuity and UX/UI readiness; v0.11–v0.14 are planned, not implemented.

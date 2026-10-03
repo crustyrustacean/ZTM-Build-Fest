@@ -8,7 +8,10 @@
 local-only restore.** Archives are recovery copies of household history. They
 grant no membership or trusted-device authority. Rejoining a synchronized
 household requires a separately authorized future workflow; no partial sync
-reattachment is supported. v0.11 must design recovery UX around this boundary.
+reattachment is supported. v0.13 must decide and specify whether restore remains
+local-only or gains authenticated reattachment. Until that decision is
+implemented and reviewed, archive restore continues to grant no sync authority;
+v0.14 must communicate the boundary plainly.
 Root rotation does not change old archives: each retains its original recovery key.
 
 The public metadata carries archive version, recovery-wrapped root metadata and
