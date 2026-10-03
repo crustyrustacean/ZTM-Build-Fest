@@ -1,6 +1,6 @@
 [package]
 name = "musicfeed"
-version = "0.14.1"
+version = "0.2.0"
 edition = "2024"
 
 [[bin]]
@@ -11,6 +11,7 @@ path = "src/bin/main.rs"
 anyhow = "1"
 axum = "0.8"
 axum-macros = "0.5"
+chrono = { version = "0.4", features = ["serde"] }
 config = { version = "0.15", default-features = false, features = ["toml"] }
 datastar = { version = "0.4", features = ["axum" ] }
 serde = { version = "1", features = ["derive"] }

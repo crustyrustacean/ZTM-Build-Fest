@@ -1,19 +1,13 @@
 // src/state.rs
 
-use serde::Serialize;
+use crate::domain::RotationEntry;
 use std::sync::{Arc, Mutex};
 use tera::Tera;
-
-#[derive(Clone, Debug, Default, Serialize)]
-pub struct Item {
-    pub id: u64,
-    pub text: String,
-}
 
 #[derive(Clone, Debug)]
 pub struct AppState {
     pub templates: Tera,
-    pub items: Arc<Mutex<Vec<Item>>>,
+    pub rotation_entries: Arc<Mutex<Vec<RotationEntry>>>,
     pub next_id: Arc<Mutex<u64>>,
 }
 
@@ -25,7 +19,7 @@ impl AppState {
 
         Self {
             templates: tera,
-            items: Arc::new(Mutex::new(Vec::new())),
+            rotation_entries: Arc::new(Mutex::new(Vec::new())),
             next_id: Arc::new(Mutex::new(0)),
         }
     }

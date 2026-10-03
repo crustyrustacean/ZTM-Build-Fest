@@ -2,6 +2,7 @@
 
 pub mod app;
 pub mod configuration;
+pub mod domain;
 pub mod routes;
 pub mod state;
 pub mod telemetry;
@@ -9,6 +10,7 @@ pub mod utils;
 
 pub use app::*;
 pub use configuration::*;
+pub use domain::*;
 pub use routes::*;
 pub use state::*;
 pub use telemetry::*;

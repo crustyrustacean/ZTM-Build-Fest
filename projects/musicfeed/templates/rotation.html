@@ -1,0 +1,21 @@
+<li id="rotation-{{ rotation_entry.id }}" class="rotation-entry">
+  {% if rotation_entry.cover %}
+    <img
+      class="rotation-entry-cover"
+      src="{{ rotation_entry.cover }}"
+      alt="Cover art for {{ rotation_entry.album }}"
+    />
+  {% endif %}
+  <div class="rotation-entry-body">
+    <p class="rotation-entry-artist">{{ rotation_entry.artist }}</p>
+    <p class="rotation-entry-album">
+      {{ rotation_entry.album }} ({{ rotation_entry.year }})
+    </p>
+    {% if rotation_entry.note %}
+      <p class="rotation-entry-note">{{ rotation_entry.note }}</p>
+    {% endif %}
+    <p class="rotation-entry-listened">
+      Listened {{ rotation_entry.listened_date }}
+    </p>
+  </div>
+</li>
