@@ -172,21 +172,63 @@ export class EventStore {
           let encodedEvent;
           if (command.type === "create-routine") {
             kind = "ROUTINE_CREATED";
-            encodedEvent = encodeRoutineCreatedRecord({ ...identity, routineId: randomId(), text: command.text, cadence: command.cadence, createdOn: civilDate });
-          } else if (["complete-routine-occurrence", "reopen-routine-occurrence", "archive-routine"].includes(command.type)) {
+            encodedEvent = encodeRoutineCreatedRecord({
+              ...identity,
+              routineId: randomId(),
+              text: command.text,
+              cadence: command.cadence,
+              createdOn: civilDate,
+            });
+          } else if (
+            [
+              "complete-routine-occurrence",
+              "reopen-routine-occurrence",
+              "archive-routine",
+            ].includes(command.type)
+          ) {
             const action = command.type.split("-")[0];
             if (action !== "archive") {
-              const current = engine.applyEvents(loadedEvents.map(event => event.encoded_event), asOf,
-                context.last_looked_event_id === null ? null : idToHex(context.last_looked_event_id), civilDate);
-              const routine = current.routines.find(record => record.routineId === command.routineId);
-              if (!routine || routine.status === "archived" || routine.occurrenceKey === null || routine.occurrenceKey !== command.occurrenceKey) {
-                const error = new EventStoreError("That period changed. Review the current routine.");
+              const current = engine.applyEvents(
+                loadedEvents.map((event) => event.encoded_event),
+                asOf,
+                context.last_looked_event_id === null
+                  ? null
+                  : idToHex(context.last_looked_event_id),
+                civilDate,
+              );
+              const routine = current.routines.find(
+                (record) => record.routineId === command.routineId,
+              );
+              const occurrenceIsCurrent =
+                action === "complete"
+                  ? routine?.occurrenceStatus === "open"
+                  : routine?.occurrenceStatus === "completed";
+              if (
+                !routine ||
+                routine.status === "archived" ||
+                routine.occurrenceKey === null ||
+                routine.occurrenceKey !== command.occurrenceKey ||
+                !occurrenceIsCurrent
+              ) {
+                const error = new EventStoreError(
+                  "That period changed or the occurrence was already updated. Review the current routine.",
+                );
                 error.code = 4;
                 throw error;
               }
             }
-            kind = action === "archive" ? "ROUTINE_ARCHIVED" : action === "complete" ? "ROUTINE_OCCURRENCE_COMPLETED" : "ROUTINE_OCCURRENCE_REOPENED";
-            encodedEvent = encodeRoutineActionRecord({ ...identity, routineId: idFromHex(command.routineId), occurrenceKey: command.occurrenceKey, action });
+            kind =
+              action === "archive"
+                ? "ROUTINE_ARCHIVED"
+                : action === "complete"
+                  ? "ROUTINE_OCCURRENCE_COMPLETED"
+                  : "ROUTINE_OCCURRENCE_REOPENED";
+            encodedEvent = encodeRoutineActionRecord({
+              ...identity,
+              routineId: idFromHex(command.routineId),
+              occurrenceKey: command.occurrenceKey,
+              action,
+            });
           } else if (command.type === "set-pulse") {
             kind = "PULSE_SET";
             encodedEvent = encodePulseSetRecord({

@@ -1,6 +1,6 @@
 # Roadmap
 
-Current release: `v0.7.3 — Routine Hardening & Polish`. Daily/Weekly capability is implemented; this release audits ABI, replay limits, privacy and documentation without adding feature scope.
+Current release: `v0.7.4 — Routine Stale-Action Correctness`. Daily/Weekly capability is implemented; this patch rejects stale same-period occurrence actions and updates release documentation without adding feature scope.
 
 ## Planning releases
 
@@ -179,6 +179,10 @@ Audit suspended/stale tabs, midnight/focus/visibility, failed writes/retries, ke
 ### `v0.7.3` — Routine Hardening & Polish
 
 Audit ABI/allocation/maximum replay, privacy and documentation consistency; restrained UX polish only. Stop for evaluation.
+
+### `v0.7.4` — Routine Stale-Action Correctness
+
+Reject stale same-period completion/reopen commands before persistence, add multi-client regression coverage, and refresh pairing-document status for the v0.8.0 planning checkpoint. No product capability or persistent-contract change.
 
 ### `v0.8.0` — Household Pairing
 

@@ -1,6 +1,6 @@
 # Debugging and Diagnostics
 
-**Status:** Current through v0.6.3 Summary Hardening & Polish; privacy-safe diagnostic policy. Current ABI errors and UI feedback use bounded messages; no household-content logging exists. Symbolic diagnostics below remain future vocabulary.
+**Status:** Current through v0.7.4 Routine Stale-Action Correctness; privacy-safe diagnostic policy. Current ABI errors and UI feedback use bounded messages; no household-content logging exists. Symbolic diagnostics below remain future vocabulary.
 
 ## Useful diagnostic categories
 

@@ -1,6 +1,6 @@
 # UX
 
-**Status:** Current through v0.6.3 Summary Hardening & Polish; Today, Needs, Handoff, Talk, Pulse and Since You Last Looked are implemented locally. The catch-up summary is bounded and never attributes changes to people.
+**Status:** Current through v0.7.4 Routine Stale-Action Correctness; Today, Needs, Handoff, Talk, Pulse and Since You Last Looked are implemented locally. The catch-up summary is bounded and never attributes changes to people.
 
 ## Primary question
 

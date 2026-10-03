@@ -1,6 +1,6 @@
 # Code Style Contract
 
-**Status:** Current through v0.6.3 Summary Hardening & Polish; conventions for the current implementation. Follow repository/tool defaults where they preserve clarity; this document is guidance, not a formatter configuration.
+**Status:** Current through v0.7.4 Routine Stale-Action Correctness; conventions for the current implementation. Follow repository/tool defaults where they preserve clarity; this document is guidance, not a formatter configuration.
 
 ## Rust
 
@@ -37,4 +37,4 @@ Prefer mobile-first layouts, semantic class names, useful custom properties, res
 
 Update the relevant specification when event semantics, version compatibility, storage, ABI/protocol, privacy/security, accessibility, or release scope changes. Separate implemented behavior from planned and specified behavior. Architectural decisions should have an accepted ADR once the preflight set is created.
 
-Status lines use the latest release reviewed, currently v0.6.3, rather than the release that last changed the contract. Historical release sections retain their original versions and evidence; future-design labels and ADR acceptance remain explicit. A current status does not imply new implementation or new validation.
+Status lines use the latest release reviewed, currently v0.7.4, rather than the release that last changed the contract. Historical release sections retain their original versions and evidence; future-design labels and ADR acceptance remain explicit. A current status does not imply new implementation or new validation.

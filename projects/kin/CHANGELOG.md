@@ -2,6 +2,10 @@
 
 This file records completed Kin releases. The `v0.0.x` releases are planning and documentation milestones; they do not represent implemented application features. The first implementation milestone remains `v0.1.0`.
 
+## [0.7.4] — Routine Stale-Action Correctness
+
+Reject routine completion unless the latest occurrence is open, and reject reopen unless it is completed, even when the submitted period key remains current. Preserve existence, archive and period-key preflight checks and the existing stale-state error code. Add two-tab persistence regressions for stale completion and reopen, refresh the pairing-document status through the v0.8.0 planning checkpoint, and update current release metadata. No product capability or persistent contract changed.
+
 ## [0.7.3] — Routine Hardening & Polish
 
 No capability added. Completed the v0.7.x ABI and parser boundary audit, maximum replay and Wasm memory-growth checks, protocol and allocation ownership review, local-only privacy review, and documentation reconciliation. The full hardening gate passed without changing protocol v7, IndexedDB schema 1, or earlier event bytes. See [V0.7.0](docs/V0.7.0.md).

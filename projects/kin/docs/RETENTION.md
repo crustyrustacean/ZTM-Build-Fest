@@ -1,6 +1,6 @@
 # Retention, Archival, and Deletion
 
-**Status:** Current through v0.6.3 Summary Hardening & Polish; local Item, Handoff, and Talk archival is implemented; export, household erasure, backup, and deletion remain future work. Event/projection rules are in [EVENTS](EVENTS.md) and [STATE](STATE.md); portability is in [PORTABILITY](PORTABILITY.md).
+**Status:** Current through v0.7.4 Routine Stale-Action Correctness; local Item, Handoff, and Talk archival is implemented; export, household erasure, backup, and deletion remain future work. Event/projection rules are in [EVENTS](EVENTS.md) and [STATE](STATE.md); portability is in [PORTABILITY](PORTABILITY.md).
 
 ## Distinct operations
 

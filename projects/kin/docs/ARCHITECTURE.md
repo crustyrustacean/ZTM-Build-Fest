@@ -90,7 +90,7 @@ The v0.1.x core is intended to be extended, not treated as proof that later feat
 | Talk                  | Identified events and deterministic replay           | Implemented in v0.4.0                  | Stabilization audited through v0.4.3; see V0.4.0                      |
 | Pulse                 | Actor IDs and timestamps                             | Implemented in v0.5.0                  | Explicit as_of, fixed enum, set/replace/clear; audited through v0.5.3 |
 | Since You Last Looked | Ordered immutable event history                      | Implemented in v0.6.0                  | Stabilization through v0.6.3                                          |
-| Routines | Event infrastructure and explicit civil context | Implemented in v0.7.0 | Correctness/resilience/hardening audits in v0.7.1–v0.7.3 |
+| Routines              | Event infrastructure and explicit civil context      | Implemented in v0.7.0                  | Correctness/resilience/hardening audits in v0.7.1–v0.7.4              |
 | Pairing               | Household/member/device identity fields              | Yes                                    | Authentication, authorization, pairing, recovery, and device trust    |
 | Offline sync          | Random event IDs and immutable canonical event bytes | Yes                                    | Multi-device transport and conflict/reconciliation policy             |
 | Encrypted sync        | Deterministic, versioned event representation        | Yes                                    | Reviewed cryptographic protocol and key lifecycle                     |

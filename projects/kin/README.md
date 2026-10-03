@@ -2,7 +2,7 @@
 
 > A private, lightweight household coordination app for the little things families need to know, remember, hand off, or discuss.
 
-**Current status: `v0.7.3` — Routine Hardening & Polish.** Kin supports Daily and Monday-start Weekly household routines: create, complete the current occurrence, reopen and archive. Rust derives occurrences from saved events and explicit browser-local civil context through protocol v7. v0.7.3 hardens malformed ABI input, replay/memory limits, protocol boundaries, privacy expectations and documentation consistency. Midnight/focus refresh never creates an event. IndexedDB stays schema 1; protocols v1–v6 and source event bytes remain supported. No framework, analytics, AI or remote service is present.
+**Current status: `v0.7.4` — Routine Stale-Action Correctness.** Kin supports Daily and Monday-start Weekly household routines: create, complete the current occurrence, reopen and archive. Rust derives occurrences from saved events and explicit browser-local civil context through protocol v7. The IndexedDB preflight rejects stale same-period completion/reopen actions against the latest Rust projection; the release adds two-tab regression coverage and refreshes pairing-planning status only. Midnight/focus refresh never creates an event. IndexedDB stays schema 1; protocols v1–v6 and source event bytes remain supported. No framework, analytics, AI or remote service is present.
 
 ## The problem
 
@@ -17,11 +17,6 @@ Kin is intended as a private, lightweight shared household operating layer. Toda
 The intended technical direction is Rust compiled to WebAssembly, native Web Components, vanilla JavaScript, and browser APIs, with a local-first start and no external framework unless a demonstrated requirement justifies one.
 
 ## Release history
-
-- `v0.7.0` — Routines (`kin-v0.7.0`)
-- `v0.7.1` — Routine Correctness (`kin-v0.7.1`)
-- `v0.7.2` — Routine Resilience & Accessibility (`kin-v0.7.2`)
-- `v0.7.3` — Routine Hardening & Polish (`kin-v0.7.3`)
 
 - `v0.0.1` — Product definition and principles (`kin-v0.0.1`)
 - `v0.0.2` — Architecture, event model, and privacy design (`kin-v0.0.2`)
@@ -64,6 +59,11 @@ The intended technical direction is Rust compiled to WebAssembly, native Web Com
 - `v0.6.1` — Summary Correctness (`kin-v0.6.1`)
 - `v0.6.2` — Summary Resilience & Accessibility (`kin-v0.6.2`)
 - `v0.6.3` — Summary Hardening & Polish (`kin-v0.6.3`)
+- `v0.7.0` — Routines (`kin-v0.7.0`)
+- `v0.7.1` — Routine Correctness (`kin-v0.7.1`)
+- `v0.7.2` — Routine Resilience & Accessibility (`kin-v0.7.2`)
+- `v0.7.3` — Routine Hardening & Polish (`kin-v0.7.3`)
+- `v0.7.4` — Routine Stale-Action Correctness (prepared; tag pending validated release commit)
 - See the [changelog](CHANGELOG.md) for the completed release history.
 
 ## Install, build, and run

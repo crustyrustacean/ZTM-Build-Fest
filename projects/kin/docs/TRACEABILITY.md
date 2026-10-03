@@ -1,6 +1,6 @@
 # v0.1.0 Requirement Traceability
 
-**Status:** Current through v0.6.3 Summary Hardening & Polish; earlier version sections are historical contracts. See v0.6.0 below.
+**Status:** Current through v0.7.4 Routine Stale-Action Correctness; earlier version sections are historical contracts. See v0.6.0 below.
 
 | Requirement                                        | Specification authority                                                                 | v0.1.0 validation                                                                  |
 | -------------------------------------------------- | --------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
