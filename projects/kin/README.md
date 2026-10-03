@@ -2,7 +2,7 @@
 
 > A private, lightweight household coordination app for the little things families need to know, remember, hand off, or discuss.
 
-**Current status: `v0.8.8` — Active-Member Slot Correctness.** Kin supports a manual-code and invitation-link flow for exactly two active adults, backed by passkeys, member-bound approval, replay-safe activation, trusted-device session invalidation, and fresh-auth protection for removing another adult. Household capacity is derived from active memberships, so a remaining adult can pair a replacement after an adult leaves or is removed while the inactive historical record remains retained. Existing members can reauthenticate on a trusted browser after logout. Household content remains local to each browser; cross-device sync is not implemented.
+**Current status: `v0.9.3` — Encrypted Event Sync stabilization.** Kin supports opt-in encrypted synchronization of canonical household events between the two passkey-paired adults' trusted devices. Browser Web Crypto encrypts events before the authenticated service relay; the relay coordinates opaque delivery and still sees routing metadata, timing, counts, ciphertext sizes, and device membership. Device revocation invalidates sessions and advances the content-key epoch. Existing local event bytes are preserved during migration, and offline retries reuse the same encrypted envelope.
 
 ## The problem
 
@@ -73,6 +73,10 @@ The intended technical direction is Rust compiled to WebAssembly, native Web Com
 - `v0.8.6` — Pairing Feedback-Gate Corrections (`kin-v0.8.6`)
 - `v0.8.7` — Pairing Security and State Hygiene (`kin-v0.8.7`)
 - `v0.8.8` — Active-Member Slot Correctness (`kin-v0.8.8`)
+- `v0.9.0` — Encrypted Event Sync (`kin-v0.9.0`)
+- `v0.9.1` — Device Provisioning, Epochs, and Revocation (`kin-v0.9.1`)
+- `v0.9.2` — Offline Reconciliation and Conflict Semantics (`kin-v0.9.2`)
+- `v0.9.3` — Recovery, Privacy, and Feedback Readiness (`kin-v0.9.3`)
 - See the [changelog](CHANGELOG.md) for the completed release history.
 
 ## Install, build, and run
@@ -88,11 +92,11 @@ rustup target add wasm32-unknown-unknown
 
 The script builds the WASM module and serves the web app at `http://localhost:8000`. On macOS/Linux, run `sh projects/kin/run.sh` from the repository root.
 
-Kin stores household events in the current browser profile's IndexedDB and may keep independent drafts in tab-scoped `sessionStorage`. The local Node service holds identity and pairing state in memory for this incubation line; restarting it ends sessions and loses the identity registry. Household content is not uploaded and cross-device event sync, backup, content encryption, and last-device recovery are not provided. Browser storage is not a security boundary against device compromise or extensions. Use synthetic household text while evaluating this prototype.
+Kin stores canonical household events and encrypted outbox envelopes in the current browser profile's IndexedDB. Sync is off until an authenticated adult enables it. The local Node service holds identity, relay ciphertext, cursors, and provisioning state in memory; restarting it ends sessions and loses relay records. Local canonical history and exact cached envelopes remain on devices, but this prototype does not provide durable relay storage, backup, all-device recovery, or last-device recovery. A newly joined/replacement adult receives current and later epochs only; pre-join history is unavailable in v0.9.x. Existing adults can pair another device to the same member identity after comparing its device fingerprint. Browser storage and encryption do not protect against a compromised unlocked browser/runtime or extensions. Use synthetic household text while evaluating this prototype.
 
 ## AI usage
 
-AI-assisted development tools are used for brainstorming, product planning, architecture exploration, documentation, implementation support, debugging, and testing. Kin has no AI runtime, analytics, or third-party runtime dependency; household events are processed locally and are not transmitted by the pairing service.
+AI-assisted development tools are used for brainstorming, product planning, architecture exploration, documentation, implementation support, debugging, and testing. Kin has no AI runtime, analytics, or third-party runtime dependency. When sync is explicitly enabled, the service receives encrypted event envelopes and limited routing metadata, never plaintext household semantics or content keys.
 
 ## License
 
@@ -128,6 +132,7 @@ Kin is nested in the ZTM Build Fest repository. Its community files and template
 - [Cryptographic posture](docs/CRYPTOGRAPHY.md)
 - [Threat model](docs/THREAT-MODEL.md)
 - [v0.8.0 Household Pairing contract](docs/V0.8.0.md)
+- [v0.9.0 Encrypted Event Sync contract](docs/V0.9.0.md)
 - [Implementation layout and responsibilities](docs/IMPLEMENTATION.md)
 - [JavaScript/WASM ABI](docs/ABI.md)
 - [IndexedDB storage contract](docs/STORAGE.md)

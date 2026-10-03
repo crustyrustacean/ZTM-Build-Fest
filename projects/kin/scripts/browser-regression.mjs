@@ -21,6 +21,7 @@ import {
   catchUpRegressions,
   catchUpPeerRegressions,
 } from "./catch-up-regression.mjs";
+import { syncStorageRegressions } from "./sync-storage-regression.mjs";
 import { spawn } from "node:child_process";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
@@ -73,6 +74,7 @@ const browser = spawn(
   [
     "--headless=new",
     "--disable-gpu",
+    "--disable-extensions",
     "--no-first-run",
     "--no-default-browser-check",
     "--remote-debugging-port=0",
@@ -1667,11 +1669,12 @@ try {
   assert.ok(
     requests.length > 0 &&
       requests.every((url) => url.startsWith(origin + "/")),
-    "All page requests stay same-origin",
+    `All page requests stay same-origin: ${requests.filter((url) => !url.startsWith(origin + "/")).join(", ")}`,
   );
   console.log(
     "PASS CSP/console and same-origin requests (favicon 404 excluded)",
   );
+  await syncStorageRegressions(first);
 } finally {
   if (browserClient) await browserClient.send("Browser.close").catch(() => {});
   for (const client of clients) client.close();

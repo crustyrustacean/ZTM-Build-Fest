@@ -2,6 +2,22 @@
 
 This file records completed Kin releases. The `v0.0.x` releases are planning and documentation milestones; they do not represent implemented application features. The first implementation milestone remains `v0.1.0`.
 
+## [0.9.3] — Recovery, Privacy, and Feedback Readiness
+
+Completed the v0.9 recovery, metadata, logging, corruption, storage-bound, and UX audit. Added same-member trusted-device pairing, fingerprint-confirmed approval, exact-envelope retry after relay cursor reset, and explicit process-local acknowledgement semantics. Canonical IndexedDB event bytes remain authoritative. The identity service and relay remain memory-only; there is no all-device recovery, durable remote history, independent security audit, or cross-browser certification. Ready for product feedback only after the complete release gates pass.
+
+## [0.9.2] — Offline Reconciliation and Conflict Semantics
+
+Added the separate transport cursor/high-water, atomic remote canonical-event/replay/cursor commit, local device sequence and Lamport advancement, additive Rust v8 identity-binding interpretation, deterministic equal-time reducer order, and persistent exact-envelope outbox. Archive wins over an equal-time concurrent mutation from another device; accepted bytes remain stored and a later causally invalid mutation pauses replay. Catch-up remains arrival-ordered and independent of transport progress.
+
+## [0.9.1] — Device Provisioning, Epochs, and Revocation
+
+Added recipient-bound ECDH/HKDF/AES-GCM key provisioning, device-key fingerprint comparison, separate member/device/household keys, one-use grant handling, compare-and-advance epoch rotation, member/device revocation hooks, and historical-key entitlement rules. Same-member additional-device enrollment uses the existing pairing code/passkey approval flow. Revocation prevents future access but cannot erase prior keys or plaintext.
+
+## [0.9.0] — Encrypted Event Sync
+
+Added the v0.9 threat/key-lifecycle contract, versioned AES-GCM and ECDSA event envelopes, authenticated opaque push/pull relay, bounded process-local cursors, additive IndexedDB schema 2, and offline multi-device fixtures. Sync encrypts exact canonical Kin event bytes; the service receives no plaintext event semantics or content key. Relay state is in-memory and acknowledgements are not durable.
+
 ## [0.8.8] — Active-Member Slot Correctness
 
 Count active memberships rather than retained historical member records when enforcing household capacity. After an adult leaves or is removed, the remaining adult can pair a replacement while the inactive historical membership remains stored. Invitation creation and final approval both enforce the two-active-adult limit, and a full-household approval fails before creating any member, device, credential, session, or confirmed pairing state.

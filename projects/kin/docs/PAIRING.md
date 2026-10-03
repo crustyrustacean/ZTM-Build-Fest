@@ -1,6 +1,6 @@
 # Pairing and Device Enrollment
 
-**Status:** Current through v0.8.8. Manual pairing codes/invitation URLs, passkey identity and reauthentication, member-bound approval/activation, active-member capacity, trusted-device session invalidation, terminal-claim cleanup, and fresh-auth member removal are implemented. QR, key exchange, encrypted sync, and durable service storage are not implemented.
+**Status:** Implemented through v0.9.3. Manual adult and same-member device pairing use one-time codes, passkey claim/approval/activation, locally generated device keys and human-compared key fingerprints. Encrypted key provisioning and epoch rotation are implemented. QR, durable service storage and account recovery are not implemented.
 
 ## Distinct operations
 
@@ -48,7 +48,7 @@ The pairing invitation must not itself be a durable login credential or contain 
 - Bind confirmation to the exact key-exchange transcript. Both devices should show matching human-readable verification information (such as a short fingerprint/word sequence derived using a standard protocol) before approval. The representation and usability must be security-reviewed; it is not an ad hoc cryptographic primitive.
 - Show the inviter and invitee which household and member/device are being added, and require clear confirmation from both.
 
-The v0.8.6 implementation uses a ten-minute Pending invitation and starts a separate fifteen-minute approval window after a successful claim. It validates a code before returning WebAuthn registration options. Cryptographic key exchange, household content encryption, and sync remain future work; see [V0.8.0](V0.8.0.md).
+The v0.8.6 implementation uses a ten-minute Pending invitation and starts a separate fifteen-minute approval window after a successful claim. It validates a code before returning WebAuthn registration options. v0.9 adds recipient-bound provisioning and encrypted sync; see [V0.9.0](V0.9.0.md).
 
 Household capacity is derived from active membership records at both invitation creation and final approval. An inactive historical member does not consume one of the two active-adult slots, but remains stored; a full household cannot create an invitation or approve an in-flight claim.
 
@@ -76,7 +76,7 @@ New device authenticates with a member credential
 Authorize device and provision its household-key access
 ```
 
-This flow must not create another member. It requires proof of the existing member's authority, binds the new device key to that member, and separately approves access to household content. If no authorized device remains, recovery must use a deliberately designed recovery path; possession of an old pairing code is not recovery.
+This flow does not create another member. It requires proof of the existing member's authority, binds the locally generated device key to that member/device, compares the fingerprint on both devices, and separately provisions household key epochs. Same-member devices receive retained history. If no authorized device remains, there is no recovery path; possession of an old pairing code is not recovery.
 
 ## Revocation
 
@@ -89,10 +89,14 @@ Settings
 → Revoke device
 ```
 
-Revocation should immediately mark the device unauthorized at the service, reject future sessions/uploads/downloads, invalidate its sync tokens, and notify remaining household members. Offline events produced by a revoked device must not silently re-enter the household.
+Revocation immediately marks the device unauthorized at the service, invalidates its sessions, and prevents future uploads/downloads. It reserves a new household key epoch; remaining active devices must complete recipient-bound provisioning before sync resumes. Offline events produced by a revoked device are rejected and cannot silently re-enter the household.
 
-Revocation cannot erase plaintext, screenshots, exports, or encryption keys already copied to a lost/compromised device. To provide forward confidentiality, the household content key must be rotated after revocation and new events encrypted under the new key. Existing history may need controlled re-encryption for remaining devices; the exact policy, recovery, and effects on backups are open decisions. Do not promise retroactive erasure.
+Revocation cannot erase plaintext, screenshots, exports, or encryption keys already copied to a lost/compromised device. New events use the accepted new epoch; historical events are not re-encrypted. Remaining trusted devices retain historical keys. A missing key or unavailable active device pauses sync; no server escrow or retroactive erasure is provided.
 
 Member removal and device revocation are different actions. Removing a member must revoke that member's devices and initiate key rotation, but still cannot reclaim data already downloaded.
 
 In v0.8.6, removing another adult requires a fresh passkey assertion bound to the actor, current trusted device, and target member. A session or confirmation dialog alone is insufficient.
+
+## v0.9.x Device-Key Record
+
+The joining device generates separate non-extractable P-256 ECDH/ECDSA keys locally and persists them in the browser key store. It sends only public JWKs during claim. The joining device computes its fingerprint locally; both devices compare the inviter and claimant fingerprints before approval/activation. After fresh passkey approval, the inviter signs a certificate binding the target household/member/device IDs and public keys. Clients verify issuer signatures against locally pinned roots or a manually compared legacy-device key before trusting a directory entry. A changed key or invalid chain blocks sync/provisioning. Key packages are encrypted to the verified recipient ECDH key and signed by the sender; the service stores wrapped bytes only. Same-member devices receive all retained epochs; new/replacement adults receive only current/future epochs. The service and relay remain in-memory, so restart loses server-side state and has no same-household recovery path.

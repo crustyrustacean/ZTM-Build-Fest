@@ -1,6 +1,6 @@
 # Household Events
 
-**Status:** Current through v0.7.0 Routines; earlier version sections are historical contracts. See v0.7.0 below.
+**Status:** Current through v0.9.3. Event schemas/kinds and canonical bytes are unchanged by sync; protocol v8 supplies verified identity context and deterministic distributed replay. Earlier version sections remain historical contracts.
 
 ## Canonical record
 
@@ -28,7 +28,7 @@ Fields are specified now to avoid casually changing identity semantics later. Th
 - **actor_id:** Stable member identity for the person who initiated the event. v0.1.0 uses a temporary local actor placeholder.
 - **device_id:** Stable identity for the originating installation. v0.1.0 uses a local installation placeholder; it is not a trusted-device credential.
 - **timestamp:** UTC wall-clock creation time for display and audit context. It is not sufficient to order distributed events and must not by itself control deterministic replay.
-- **logical_time:** Non-negative logical ordering counter. In v0.1.0, local append order is authoritative and the counter can correspond to local order. For future sync, a device advances beyond the greatest logical time it has observed before creating a causally later event.
+- **logical_time:** Non-negative logical ordering counter. In v0.1.0, local append order is authoritative and the counter can correspond to local order. In v0.9 synchronized v8 replay, a device advances beyond the greatest logical time it has observed before creating a causally later event; equal values represent concurrent events.
 - **kind:** One canonical uppercase past-tense fact name from the event catalogue below. Do not mix imperative (`ADD_ITEM`) and fact (`ITEM_ADDED`) styles.
 - **event_version:** Version of this event payload schema, distinct from the Kin application version, overall JS/WASM protocol version, IndexedDB schema, and portable export version. See [VERSIONING](VERSIONING.md).
 - **payload:** Minimal, kind-specific validated data. For an item event this includes the stable item ID; `ITEM_ADDED` also carries its user-entered text.
@@ -37,34 +37,34 @@ Fields are specified now to avoid casually changing identity semantics later. Th
 
 Use uppercase entity/action-past-tense names consistently. The milestone column records assigned scope; Item, Handoff and Talk events are implemented; later events remain planned.
 
-| Event kind             | Planned milestone | Purpose                                                      |
-| ---------------------- | ----------------- | ------------------------------------------------------------ |
-| `ITEM_ADDED`           | v0.1.0            | Add an item with stable item ID and text.                    |
-| `ITEM_COMPLETED`       | v0.1.0            | Mark an existing item completed.                             |
-| `ITEM_REOPENED`        | v0.2.0            | Reopen a completed item; active is a valid no-op.            |
-| `ITEM_ARCHIVED`        | v0.2.0            | Tombstone an active/completed item without deleting history. |
-| `HANDOFF_ADDED`        | v0.3.0            | Add a short household handoff.                               |
-| `HANDOFF_ACKNOWLEDGED` | v0.3.0            | Record receipt of a handoff.                                 |
-| `HANDOFF_ARCHIVED`     | v0.3.0            | Archive a handoff.                                           |
-| `TALK_ADDED`           | v0.4.0            | Capture a topic for later discussion.                        |
-| `TALK_RESOLVED`        | v0.4.0            | Mark a Talk item resolved.                                   |
-| `TALK_REOPENED`        | v0.4.0            | Reopen a resolved Talk item.                                 |
-| `TALK_ARCHIVED`        | v0.4.0            | Archive a Talk item.                                         |
-| `PULSE_SET`            | v0.5.0            | Set time-bounded capacity context, including expiry.         |
-| `PULSE_CLEARED`        | v0.5.0            | Clear current Pulse context.                                 |
-| `ROUTINE_CREATED`      | v0.7.0            | Define a recurring household need.                           |
-| `ROUTINE_OCCURRENCE_COMPLETED` | v0.7.0 | Complete a routine occurrence. |
-| `ROUTINE_OCCURRENCE_REOPENED` | v0.7.0 | Reopen a routine occurrence. |
-| `ROUTINE_ARCHIVED` | v0.7.0 | Archive a routine definition. |
-| `HOUSEHOLD_CREATED`    | v0.8.0            | Establish a household identity when pairing is introduced.   |
-| `MEMBER_INVITED`       | v0.8.0            | Record a member invitation.                                  |
-| `MEMBER_JOINED`        | v0.8.0            | Record accepted household membership.                        |
-| `MEMBER_REMOVED`       | v0.8.0            | Record explicit member removal.                              |
-| `DEVICE_AUTHORIZED`    | v0.8.0            | Authorize a device for a member.                             |
-| `DEVICE_REVOKED`       | v0.8.0            | Revoke a device's future authorization.                      |
-| `AGREEMENT_CREATED`    | Unscheduled       | Record a deliberately created agreement.                     |
-| `AGREEMENT_REVISED`    | Unscheduled       | Record a deliberate revision.                                |
-| `AGREEMENT_ARCHIVED`   | Unscheduled       | Archive an agreement.                                        |
+| Event kind                     | Planned milestone | Purpose                                                      |
+| ------------------------------ | ----------------- | ------------------------------------------------------------ |
+| `ITEM_ADDED`                   | v0.1.0            | Add an item with stable item ID and text.                    |
+| `ITEM_COMPLETED`               | v0.1.0            | Mark an existing item completed.                             |
+| `ITEM_REOPENED`                | v0.2.0            | Reopen a completed item; active is a valid no-op.            |
+| `ITEM_ARCHIVED`                | v0.2.0            | Tombstone an active/completed item without deleting history. |
+| `HANDOFF_ADDED`                | v0.3.0            | Add a short household handoff.                               |
+| `HANDOFF_ACKNOWLEDGED`         | v0.3.0            | Record receipt of a handoff.                                 |
+| `HANDOFF_ARCHIVED`             | v0.3.0            | Archive a handoff.                                           |
+| `TALK_ADDED`                   | v0.4.0            | Capture a topic for later discussion.                        |
+| `TALK_RESOLVED`                | v0.4.0            | Mark a Talk item resolved.                                   |
+| `TALK_REOPENED`                | v0.4.0            | Reopen a resolved Talk item.                                 |
+| `TALK_ARCHIVED`                | v0.4.0            | Archive a Talk item.                                         |
+| `PULSE_SET`                    | v0.5.0            | Set time-bounded capacity context, including expiry.         |
+| `PULSE_CLEARED`                | v0.5.0            | Clear current Pulse context.                                 |
+| `ROUTINE_CREATED`              | v0.7.0            | Define a recurring household need.                           |
+| `ROUTINE_OCCURRENCE_COMPLETED` | v0.7.0            | Complete a routine occurrence.                               |
+| `ROUTINE_OCCURRENCE_REOPENED`  | v0.7.0            | Reopen a routine occurrence.                                 |
+| `ROUTINE_ARCHIVED`             | v0.7.0            | Archive a routine definition.                                |
+| `HOUSEHOLD_CREATED`            | v0.8.0            | Establish a household identity when pairing is introduced.   |
+| `MEMBER_INVITED`               | v0.8.0            | Record a member invitation.                                  |
+| `MEMBER_JOINED`                | v0.8.0            | Record accepted household membership.                        |
+| `MEMBER_REMOVED`               | v0.8.0            | Record explicit member removal.                              |
+| `DEVICE_AUTHORIZED`            | v0.8.0            | Authorize a device for a member.                             |
+| `DEVICE_REVOKED`               | v0.8.0            | Revoke a device's future authorization.                      |
+| `AGREEMENT_CREATED`            | Unscheduled       | Record a deliberately created agreement.                     |
+| `AGREEMENT_REVISED`            | Unscheduled       | Record a deliberate revision.                                |
+| `AGREEMENT_ARCHIVED`           | Unscheduled       | Archive an agreement.                                        |
 
 “Since You Last Looked” is a derived view of events, not a new event kind. v0.4.x supports Item kinds 1–4, Handoff kinds 5–7 and Talk kinds 8–11. Handoff/Talk kinds use schema 1; later kinds are deferred. Existing event kind codes remain unchanged. Event schema v1 `ITEM_ADDED` contains no classification and normalizes to Today. Schema v2 `ITEM_ADDED` adds a fixed classification byte (`0 = Today`, `1 = Need`) and three zero reserved bytes before the text length. New instances write schema v2 for adds and schema v1 for the other Item events. Protocol and event version compatibility is specified in [ABI](ABI.md) and [VERSIONING](VERSIONING.md). The unscheduled agreement events are not a release commitment.
 
@@ -120,3 +120,11 @@ No domain event kinds are added. Codes 1–13 and their persisted bytes remain u
 ## v0.7.0 Routines
 
 Schema-1 codes 14 ROUTINE_CREATED, 15 ROUTINE_OCCURRENCE_COMPLETED, 16 ROUTINE_OCCURRENCE_REOPENED, 17 ROUTINE_ARCHIVED. Creation persists text/cadence/creation civil date; occurrence actions persist a deterministic date key. No reset or automatically created occurrence event. Archive is terminal. The earlier conceptual ROUTINE_COMPLETED name never had a persisted wire code and is replaced by occurrence-specific naming. See [V0.7.0](V0.7.0.md).
+
+## v0.9.x Distributed Canonical Events
+
+Sync encrypts the exact canonical event bytes; it does not create a semantic JSON event record or rewrite pre-sync identity headers. New synchronized events embed authenticated household/member/device IDs. Historical local placeholder IDs are resolved by a separately signed, encrypted identity-binding control record, supplied to protocol v8 as verified context; source `canonical_bytes` remain exact. Event IDs remain stable 128-bit random identifiers and identify logical events independently of server cursors.
+
+Protocols v1-v7 preserve their legacy strict increasing logical-time behavior. Protocol v8 accepts equal logical times and sorts a copy for state replay by `(logical_time, effective device_id bytewise, event_id bytewise)`. The decoded/input event array retains local arrival order for catch-up summary boundaries; transport cursor and UI acknowledgement cursor are separate. The local logical clock advances beyond the maximum observed event before authoring a causally later event.
+
+Concurrent completion/reopen retains both facts and uses deterministic replay order for projection. Archive wins over an equal-Lamport concurrent mutation from another device; the losing mutation remains stored and is a state no-op. A mutation with greater logical time after the author observed archive is invalid and pauses replay. Duplicate delivery of identical event ID and bytes applies once; same ID with different bytes/envelope is corruption. See [V0.9.0](V0.9.0.md) and [ABI](ABI.md).

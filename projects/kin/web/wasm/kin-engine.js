@@ -96,8 +96,21 @@ export async function loadKinEngine(
   }
 
   return {
-    applyEvents: (records, asOf, cursorEventId = null, civilDate) =>
-      applyEvents(exports, records, asOf, cursorEventId, civilDate),
+    applyEvents: (
+      records,
+      asOf,
+      cursorEventId = null,
+      civilDate,
+      syncIdentity = null,
+    ) =>
+      applyEvents(
+        exports,
+        records,
+        asOf,
+        cursorEventId,
+        civilDate,
+        syncIdentity,
+      ),
   };
 }
 
@@ -114,19 +127,39 @@ function assertCivilDate(value) {
   const day = value % 100;
   const date = new Date(0);
   date.setUTCFullYear(year, month - 1, day);
-  if (!Number.isInteger(value) || year < 1 || year > 9999 ||
-      date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) {
+  if (
+    !Number.isInteger(value) ||
+    year < 1 ||
+    year > 9999 ||
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
     throw new KinEngineError(2, "Kin requires a valid civil date.");
   }
 }
 
-export function encodeRoutineCreatedRecord({ routineId, text, cadence, createdOn, ...identity }) {
+export function encodeRoutineCreatedRecord({
+  routineId,
+  text,
+  cadence,
+  createdOn,
+  ...identity
+}) {
   assertCivilDate(createdOn);
   assertTimestamp(identity.timestamp);
   const code = ["daily", "weekly"].indexOf(cadence);
   const bytes = textEncoder.encode(text);
-  if (code < 0 || bytes.length < 1 || bytes.length > 4096 || strictTextDecoder.decode(bytes) !== text) {
-    throw new KinEngineError(2, "Choose a cadence and valid text up to 4096 UTF-8 bytes.");
+  if (
+    code < 0 ||
+    bytes.length < 1 ||
+    bytes.length > 4096 ||
+    strictTextDecoder.decode(bytes) !== text
+  ) {
+    throw new KinEngineError(
+      2,
+      "Choose a cadence and valid text up to 4096 UTF-8 bytes.",
+    );
   }
   const payload = new Uint8Array(28 + bytes.length);
   payload.set(assertId(routineId));
@@ -138,10 +171,16 @@ export function encodeRoutineCreatedRecord({ routineId, text, cadence, createdOn
   return encodeEventRecord({ ...identity, kind: 14, eventVersion: 1, payload });
 }
 
-export function encodeRoutineActionRecord({ routineId, occurrenceKey, action, ...identity }) {
+export function encodeRoutineActionRecord({
+  routineId,
+  occurrenceKey,
+  action,
+  ...identity
+}) {
   assertTimestamp(identity.timestamp);
   const kind = { complete: 15, reopen: 16, archive: 17 }[action];
-  if (!kind) throw new KinEngineError(2, "Kin received an invalid routine action.");
+  if (!kind)
+    throw new KinEngineError(2, "Kin received an invalid routine action.");
   const payload = new Uint8Array(kind === 17 ? 16 : 20);
   payload.set(assertId(routineId));
   if (kind !== 17) {
@@ -415,11 +454,24 @@ function encodeEventRecord({
   return record;
 }
 
-function applyEvents(exports, records, asOf, cursorEventId, civilDate) {
+function applyEvents(
+  exports,
+  records,
+  asOf,
+  cursorEventId,
+  civilDate,
+  syncIdentity,
+) {
   if (records.length > MAX_EVENT_COUNT) {
     throw new KinEngineError(5, USER_MESSAGES.get(5));
   }
-  const request = encodeRequest(records, asOf, cursorEventId, civilDate);
+  const request = encodeRequest(
+    records,
+    asOf,
+    cursorEventId,
+    civilDate,
+    syncIdentity,
+  );
   const inputPointer = exports.kin_alloc(request.length);
   if (inputPointer === 0) {
     throw new KinEngineError(5, USER_MESSAGES.get(5));
@@ -468,10 +520,20 @@ function applyEvents(exports, records, asOf, cursorEventId, civilDate) {
   return result;
 }
 
-function encodeRequest(records, asOf, cursorEventId, civilDate) {
+function encodeRequest(records, asOf, cursorEventId, civilDate, syncIdentity) {
   assertTimestamp(asOf);
   assertCivilDate(civilDate);
-  let length = REQUEST_HEADER_BYTES;
+  const identityBindings = syncIdentity?.bindings ?? [];
+  if (
+    syncIdentity &&
+    (!Array.isArray(identityBindings) || identityBindings.length > 256)
+  ) {
+    throw new KinEngineError(2, "Kin received invalid sync identity context.");
+  }
+  const headerBytes = syncIdentity
+    ? 64 + identityBindings.length * 96
+    : REQUEST_HEADER_BYTES;
+  let length = headerBytes;
   for (const record of records) {
     length += asBytes(record).length;
     if (!Number.isSafeInteger(length) || length > MAX_PROTOCOL_BYTES) {
@@ -482,7 +544,7 @@ function encodeRequest(records, asOf, cursorEventId, civilDate) {
   const bytes = new Uint8Array(length);
   bytes.set([0x4b, 0x49, 0x4e, 0x45]);
   const view = new DataView(bytes.buffer);
-  view.setUint16(4, PROTOCOL_VERSION, true);
+  view.setUint16(4, syncIdentity ? 8 : PROTOCOL_VERSION, true);
   view.setUint16(6, 0, true);
   view.setUint32(8, records.length, true);
   view.setBigInt64(12, BigInt(asOf), true);
@@ -495,7 +557,25 @@ function encodeRequest(records, asOf, cursorEventId, civilDate) {
     bytes.set(cursor, 24);
   }
   view.setUint32(40, civilDate, true);
-  let offset = REQUEST_HEADER_BYTES;
+  if (syncIdentity) {
+    bytes.set(idFromHex(syncIdentity.householdId), 44);
+    view.setUint16(60, identityBindings.length, true);
+    let bindingOffset = 64;
+    for (const binding of identityBindings) {
+      for (const id of [
+        binding.legacyHouseholdId,
+        binding.legacyActorId,
+        binding.legacyDeviceId,
+        binding.householdId,
+        binding.actorId,
+        binding.deviceId,
+      ]) {
+        bytes.set(idFromHex(id), bindingOffset);
+        bindingOffset += 16;
+      }
+    }
+  }
+  let offset = headerBytes;
   for (const record of records) {
     const eventBytes = asBytes(record);
     bytes.set(eventBytes, offset);
@@ -525,24 +605,14 @@ function copyWasmBytes(memory, pointer, length) {
 
 function decodeError(bytes, status) {
   if (bytes.length < 12 || readAscii(bytes, 0, 4) !== "KERR") {
-    return new KinEngineError(
-      6,
-      USER_MESSAGES.get(6),
-    );
+    return new KinEngineError(6, USER_MESSAGES.get(6));
   }
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const version = view.getUint16(4, true);
   const code = view.getUint16(6, true);
   const messageLength = view.getUint32(8, true);
-  if (
-    version !== 1 ||
-    code !== status ||
-    bytes.length !== 12 + messageLength
-  ) {
-    return new KinEngineError(
-      6,
-      USER_MESSAGES.get(6),
-    );
+  if (version !== 1 || code !== status || bytes.length !== 12 + messageLength) {
+    return new KinEngineError(6, USER_MESSAGES.get(6));
   }
   return new KinEngineError(
     status,
@@ -564,21 +634,23 @@ function decodeState(bytes) {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const protocolVersion = view.getUint16(4, true);
   if (
-    ![1, 2, 3, 4, 5, 6, PROTOCOL_VERSION].includes(protocolVersion) ||
+    ![1, 2, 3, 4, 5, 6, 7, 8].includes(protocolVersion) ||
     view.getUint16(6, true) !== 0
   ) {
     throw new KinEngineError(6, "Kin received an unsupported state format.");
   }
   const resultHeaderBytes =
-    protocolVersion === 7 ? 56 : protocolVersion >= 6
-      ? 52
-      : protocolVersion === 5
-        ? 24
-        : protocolVersion === 4
-          ? 20
-          : protocolVersion === 3
-            ? 16
-            : 12;
+    protocolVersion >= 7
+      ? 56
+      : protocolVersion >= 6
+        ? 52
+        : protocolVersion === 5
+          ? 24
+          : protocolVersion === 4
+            ? 20
+            : protocolVersion === 3
+              ? 16
+              : 12;
   if (bytes.length < resultHeaderBytes) {
     throw new KinEngineError(6, "Kin received a truncated state header.");
   }
@@ -586,10 +658,9 @@ function decodeState(bytes) {
   const talkCount = protocolVersion >= 4 ? view.getUint32(16, true) : 0;
   const pulseCount = protocolVersion >= 5 ? view.getUint32(20, true) : 0;
   const itemCount = view.getUint32(8, true);
-  const routineCount = protocolVersion === 7 ? view.getUint32(52, true) : 0;
+  const routineCount = protocolVersion >= 7 ? view.getUint32(52, true) : 0;
   const summaryCount = protocolVersion >= 6 ? view.getUint32(24, true) : 0;
-  const summaryTotalCount =
-    protocolVersion >= 6 ? view.getUint32(28, true) : 0;
+  const summaryTotalCount = protocolVersion >= 6 ? view.getUint32(28, true) : 0;
   const summaryThroughPresent = protocolVersion >= 6 ? view.getUint8(32) : 0;
   const summaryThroughBytes =
     protocolVersion >= 6 ? bytes.subarray(36, 52) : null;
@@ -611,7 +682,10 @@ function decodeState(bytes) {
   ) {
     throw new KinEngineError(6, "Kin received invalid summary metadata.");
   }
-  if (itemCount + handoffCount + talkCount + pulseCount + routineCount > MAX_EVENT_COUNT) {
+  if (
+    itemCount + handoffCount + talkCount + pulseCount + routineCount >
+    MAX_EVENT_COUNT
+  ) {
     throw new KinEngineError(
       6,
       "Kin received too many items from its household engine.",
@@ -786,16 +860,29 @@ function decodeState(bytes) {
   const routineIds = new Set();
   for (let index = 0; index < routineCount; index += 1) {
     const headerEnd = offset + 56;
-    if (headerEnd > bytes.length) throw new KinEngineError(6, "Kin received a truncated routine.");
+    if (headerEnd > bytes.length)
+      throw new KinEngineError(6, "Kin received a truncated routine.");
     const length = view.getUint32(offset + 52, true);
     const end = headerEnd + length;
     const routineId = idToHex(bytes.subarray(offset, offset + 16));
     const createdAt = Number(view.getBigInt64(offset + 32, true));
     const createdOn = view.getUint32(offset + 40, true);
     const key = view.getUint32(offset + 44, true);
-    const cadence = bytes[offset + 48], status = bytes[offset + 49], occurrence = bytes[offset + 50];
-    if (length < 1 || length > 4096 || end > bytes.length || cadence > 1 || status > 1 || occurrence > 2 ||
-        bytes[offset + 51] !== 0 || (key === 0) !== (occurrence === 0) || (status === 1 && occurrence !== 0) || routineIds.has(routineId)) {
+    const cadence = bytes[offset + 48],
+      status = bytes[offset + 49],
+      occurrence = bytes[offset + 50];
+    if (
+      length < 1 ||
+      length > 4096 ||
+      end > bytes.length ||
+      cadence > 1 ||
+      status > 1 ||
+      occurrence > 2 ||
+      bytes[offset + 51] !== 0 ||
+      (key === 0) !== (occurrence === 0) ||
+      (status === 1 && occurrence !== 0) ||
+      routineIds.has(routineId)
+    ) {
       throw new KinEngineError(6, "Kin received an invalid routine.");
     }
     let text;
@@ -807,18 +894,35 @@ function decodeState(bytes) {
       if (key && cadence === 0 && key < createdOn) throw new Error();
       if (key && cadence === 1) {
         const d = new Date(0);
-        d.setUTCFullYear(Math.floor(key / 10000), Math.floor(key / 100) % 100 - 1, key % 100);
+        d.setUTCFullYear(
+          Math.floor(key / 10000),
+          (Math.floor(key / 100) % 100) - 1,
+          key % 100,
+        );
         if (d.getUTCDay() !== 1) throw new Error();
         d.setUTCDate(d.getUTCDate() + 6);
-        const endKey = d.getUTCFullYear() * 10000 + (d.getUTCMonth() + 1) * 100 + d.getUTCDate();
+        const endKey =
+          d.getUTCFullYear() * 10000 +
+          (d.getUTCMonth() + 1) * 100 +
+          d.getUTCDate();
         if (endKey < createdOn) throw new Error();
       }
       text = strictTextDecoder.decode(bytes.subarray(headerEnd, end));
-    } catch { throw new KinEngineError(6, "Kin received invalid routine fields."); }
+    } catch {
+      throw new KinEngineError(6, "Kin received invalid routine fields.");
+    }
     routineIds.add(routineId);
-    routines.push({ routineId, createdBy: idToHex(bytes.subarray(offset + 16, offset + 32)), createdAt, createdOn,
-      cadence: ["daily", "weekly"][cadence], status: ["active", "archived"][status],
-      occurrenceKey: key || null, occurrenceStatus: ["unavailable", "open", "completed"][occurrence], text });
+    routines.push({
+      routineId,
+      createdBy: idToHex(bytes.subarray(offset + 16, offset + 32)),
+      createdAt,
+      createdOn,
+      cadence: ["daily", "weekly"][cadence],
+      status: ["active", "archived"][status],
+      occurrenceKey: key || null,
+      occurrenceStatus: ["unavailable", "open", "completed"][occurrence],
+      text,
+    });
     offset = end;
   }
   const summaryEntries = [];
@@ -840,7 +944,9 @@ function decodeState(bytes) {
           ? 2
           : kindCode >= 8 && kindCode <= 11
             ? 3
-            : protocolVersion === 7 && kindCode >= 12 && kindCode <= 15 ? 4 : 0;
+            : protocolVersion >= 7 && kindCode >= 12 && kindCode <= 15
+              ? 4
+              : 0;
     const validClassification =
       kindCode === 1 ? classificationCode <= 1 : classificationCode === 255;
     if (
@@ -887,7 +993,7 @@ function decodeState(bytes) {
       handoffs,
       talks,
       pulses,
-      ...(protocolVersion === 7 ? { routines } : {}),
+      ...(protocolVersion >= 7 ? { routines } : {}),
       summary: {
         entries: summaryEntries,
         totalCount: summaryTotalCount,

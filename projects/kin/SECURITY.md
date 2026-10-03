@@ -1,10 +1,10 @@
 # Security Policy
 
-**Current security status:** Kin's v0.3.x prototype runs locally in the browser and stores household events in IndexedDB. There is no backend, authentication, sync service, or implemented encryption. Browser-local storage is not protection against device compromise, shared profiles, or malicious extensions. The security architecture and threat model are specifications, not guarantees.
+**Current security status:** Kin v0.9.3 is an incubation prototype with passkey-authenticated household pairing and opt-in client-encrypted event sync. The same-origin Node service authorizes devices and relays opaque encrypted records, but its identity and relay state are memory-only. This release has not received an independent security audit or production hardening. Encryption does not protect against a compromised unlocked browser/runtime, and device revocation cannot erase data or keys already copied to that device. See [THREAT-MODEL](docs/THREAT-MODEL.md) and [SYNC](docs/SYNC.md) for the implemented boundary and limitations.
 
 ## Supported versions
 
-Kin is a prototype and has no staffed security-support commitment or guaranteed response time. `v0.0.x` releases contain documentation only; the `v0.3.x` line is pre-release software. Follow the private reporting guidance below and include only synthetic data.
+Kin is a prototype and has no staffed security-support commitment or guaranteed response time. Follow the private reporting guidance below and include only synthetic data.
 
 ## Reporting a vulnerability
 
@@ -16,6 +16,6 @@ Reports should include a concise impact description, affected version/commit, sa
 
 ## Scope and response
 
-Implemented security-sensitive areas include safe rendering, WASM protocol parsing and memory ownership, and IndexedDB event handling. Future areas include import/migration, WebAuthn, Web Crypto, device authorization, and synchronization. Only report issues against behavior that actually exists; a documented future design is not a deployed attack surface.
+Implemented security-sensitive areas include safe rendering, WASM protocol parsing and memory ownership, IndexedDB event handling, WebAuthn, device authorization, Web Crypto encryption/key wrapping, and sync authorization/relay. Report issues against behavior that actually exists; a documented future design is not a deployed attack surface. No durable relay, all-device recovery, or production service is provided.
 
 Maintainers will acknowledge and assess reports when available, coordinate a fix and disclosure where applicable, and avoid publishing sensitive details before affected users can reasonably respond. No response-time or remediation guarantee is made.

@@ -1,3 +1,9 @@
+import { SyncKeyStore } from "../sync/key-store.js";
+import {
+  createDeviceAuthorizationCertificate,
+  deviceKeyFingerprint,
+} from "../sync/crypto.js";
+
 const api = async (path, options = {}) => {
   const response = await fetch(path, {
     ...options,
@@ -73,6 +79,12 @@ class KinHousehold extends HTMLElement {
     this.busy = false;
     this.prefilledCode = "";
     this.routeCodeCaptured = false;
+    this.syncKeyStore = null;
+    this.verifiedFingerprint = null;
+    this.verifiedInviterFingerprint = false;
+    this.syncStatus = null;
+    this.localFingerprint = null;
+    this.syncKeyError = null;
   }
 
   connectedCallback() {
@@ -105,6 +117,21 @@ class KinHousehold extends HTMLElement {
       const status = await api("/api/status");
       this.identity = status.identity;
       this.claim = status.claim;
+      if (this.identity) {
+        try {
+          const localKeys = await this.ensureSyncDeviceKey(this.identity);
+          this.localFingerprint = localKeys.fingerprint;
+          this.syncKeyError = null;
+        } catch {
+          this.syncKeyError =
+            "Secure device-key storage is unavailable here. Household information remains local, but device sync and new device pairing are unavailable.";
+        }
+        this.syncStatus = await api("/api/sync/status");
+      } else if (this.claim) {
+        this.syncKeyStore ??= await SyncKeyStore.open();
+        this.localFingerprint =
+          (await this.syncKeyStore.getDevice("pending"))?.fingerprint ?? null;
+      }
       if (this.claim?.state === "Claimed") this.schedulePoll();
       else clearTimeout(this.poll);
       this.render();
@@ -143,15 +170,56 @@ class KinHousehold extends HTMLElement {
   renderJoin() {
     if (this.claim?.state === "Claimed") {
       this.message(
-        "Your identity is ready. The existing adult must approve this device before you can join.",
+        this.claim.purpose === "device"
+          ? "This device is ready. The same adult must approve it before sync access is added."
+          : "Your identity is ready. The existing adult must approve this device before you can join.",
       );
+      this.showFingerprint(
+        "Compare this device key with the approving adult",
+        this.localFingerprint,
+      );
+      this.showFingerprint(
+        "Compare the approving device key",
+        this.claim.inviterKeyFingerprint,
+      );
+      if (
+        !this.localFingerprint ||
+        this.claim.syncKeyFingerprint !== this.localFingerprint ||
+        !this.claim.inviterKeyFingerprint
+      )
+        this.message(
+          "This device key does not match the approval request. Cancel this request and try again.",
+          true,
+        );
       return;
     }
     if (this.claim?.state === "Confirmed") {
       this.message(
         "Approval succeeded. Use your passkey once more to activate this device.",
       );
-      this.button("Activate with passkey", () => this.activateClaim());
+      this.showFingerprint(
+        "Compare the approving device key",
+        this.claim.inviterKeyFingerprint,
+      );
+      const confirmation = document.createElement("input");
+      confirmation.type = "checkbox";
+      confirmation.checked = this.verifiedInviterFingerprint;
+      const label = document.createElement("label");
+      label.append(
+        confirmation,
+        document.createTextNode(
+          " I compared this fingerprint on both devices.",
+        ),
+      );
+      const activate = this.makeButton("Activate with passkey", () =>
+        this.activateClaim(),
+      );
+      activate.disabled = !this.verifiedInviterFingerprint;
+      confirmation.addEventListener("change", () => {
+        this.verifiedInviterFingerprint = confirmation.checked;
+        activate.disabled = !confirmation.checked;
+      });
+      this.append(label, activate);
       return;
     }
     if (this.claim) {
@@ -213,8 +281,27 @@ class KinHousehold extends HTMLElement {
 
   renderMember() {
     this.text("This device belongs to an authenticated household adult.");
+    if (this.syncKeyError) {
+      this.message(this.syncKeyError, true);
+    } else if (this.syncStatus?.enabled) {
+      this.text(
+        this.syncStatus.rotationPending
+          ? "Device sync is paused while trusted-device access updates."
+          : "Device sync is on for this household.",
+      );
+      this.button("Check sync", () => this.requestSync(), "secondary");
+    } else {
+      this.button("Enable device sync", () => this.enableSync());
+    }
     if (!this.pairing) {
-      this.button("Pair another adult", () => this.createPairing());
+      if (!this.syncKeyError) {
+        this.button("Pair another adult", () => this.createPairing());
+        this.button(
+          "Add another device",
+          () => this.createDevicePairing(),
+          "secondary",
+        );
+      }
       this.button("Trusted devices", () => this.showDevices(), "secondary");
       this.button("Household access", () => this.showHousehold(), "secondary");
       this.button("Log out", () => this.logout(), "secondary");
@@ -227,12 +314,19 @@ class KinHousehold extends HTMLElement {
       this.pairing.state === "Pending"
         ? "Waiting for the other adult to claim this code."
         : this.pairing.state === "Claimed"
-          ? `${this.pairing.deviceLabel || "The other device"} is awaiting your approval.`
+          ? this.pairing.purpose === "device"
+            ? `${this.pairing.deviceLabel || "This device"} is awaiting approval for your account.`
+            : `${this.pairing.deviceLabel || "The other device"} is awaiting your approval.`
           : typeof this.pairing.state === "string"
             ? `Pairing ${this.pairing.state.toLowerCase()}.`
             : "Kin could not read the pairing status. Revoke this request or reload before continuing.";
     this.append(state);
     if (["Pending", "Claimed"].includes(this.pairing.state)) {
+      if (this.pairing.state === "Pending")
+        this.showFingerprint(
+          "Compare this household device key",
+          this.localFingerprint,
+        );
       if (this.pairing.code) {
         const code = document.createElement("output");
         code.className = "pairing-code";
@@ -256,18 +350,63 @@ class KinHousehold extends HTMLElement {
           this.makeButton("Share invitation", () => this.share(), "secondary"),
         );
       }
-      if (this.pairing.state === "Claimed")
-        actions.append(
-          this.makeButton("Approve with passkey", () => this.approve()),
+      if (this.pairing.state === "Claimed") {
+        const fingerprint = this.pairing.syncKeyFingerprint;
+        this.showFingerprint(
+          "Confirm this matches the joining device",
+          fingerprint,
         );
+        const approve = this.makeButton("Approve with passkey", () =>
+          this.approve(),
+        );
+        approve.disabled =
+          !fingerprint || this.verifiedFingerprint !== fingerprint;
+        if (fingerprint) {
+          const label = document.createElement("label");
+          const confirmation = document.createElement("input");
+          confirmation.type = "checkbox";
+          confirmation.checked = this.verifiedFingerprint === fingerprint;
+          confirmation.addEventListener("change", () => {
+            this.verifiedFingerprint = confirmation.checked
+              ? fingerprint
+              : null;
+            approve.disabled = !confirmation.checked;
+          });
+          label.append(
+            confirmation,
+            document.createTextNode(
+              " I compared this fingerprint on both devices.",
+            ),
+          );
+          actions.append(label);
+        } else {
+          this.message(
+            "This device has no verifiable sync key. Cancel this request and pair again with an updated Kin device.",
+            true,
+          );
+        }
+        actions.append(approve);
+      }
       actions.append(this.makeButton("Revoke", () => this.revoke(), "danger"));
       this.append(actions);
       this.pollPairing();
+    } else {
+      this.button(
+        "Back to household",
+        () => {
+          this.pairing = null;
+          this.render();
+        },
+        "secondary",
+      );
     }
   }
 
   async register(purpose, values) {
     await this.run(async () => {
+      this.syncKeyStore ??= await SyncKeyStore.open();
+      const pendingKeys = await this.syncKeyStore.getOrCreatePendingDevice();
+      this.localFingerprint = pendingKeys.fingerprint;
       const started = await api("/api/passkeys/register/options", {
         method: "POST",
         body: JSON.stringify({
@@ -279,15 +418,40 @@ class KinHousehold extends HTMLElement {
       const credential = await navigator.credentials.create({
         publicKey: registrationOptions(started.publicKey),
       });
-      await api("/api/passkeys/register/finish", {
+      const registered = await api("/api/passkeys/register/finish", {
         method: "POST",
         body: JSON.stringify({
           flow: started.flow,
           credential: credentialJson(credential),
+          syncPublicKeys: pendingKeys.publicKeys,
         }),
       });
+      if (purpose === "bootstrap")
+        this.localFingerprint = (
+          await this.syncKeyStore.bindPendingDevice({
+            deviceId: registered.deviceId,
+            householdId: registered.householdId,
+            memberId: registered.memberId,
+          })
+        ).fingerprint;
       history.replaceState(null, "", purpose === "claim" ? "/pair" : "/");
       await this.load();
+    });
+  }
+
+  async ensureSyncDeviceKey(identity) {
+    this.syncKeyStore ??= await SyncKeyStore.open();
+    const existing = await this.syncKeyStore.getDevice(identity.deviceId);
+    if (existing) return existing;
+    const pending = await this.syncKeyStore.getOrCreatePendingDevice();
+    await api("/api/sync/device-keys", {
+      method: "POST",
+      body: JSON.stringify({ publicKeys: pending.publicKeys }),
+    });
+    return this.syncKeyStore.bindPendingDevice({
+      deviceId: identity.deviceId,
+      householdId: identity.householdId,
+      memberId: identity.memberId,
     });
   }
 
@@ -314,11 +478,67 @@ class KinHousehold extends HTMLElement {
   async createPairing() {
     await this.run(async () => {
       this.pairing = await api("/api/pairings", { method: "POST", body: "{}" });
+      if (
+        !this.localFingerprint ||
+        this.pairing.inviterKeyFingerprint !== this.localFingerprint
+      )
+        throw new Error(
+          "This device's approved key does not match its local key.",
+        );
       this.render();
     });
   }
+
+  async createDevicePairing() {
+    await this.run(async () => {
+      this.pairing = await api("/api/devices/pairings", {
+        method: "POST",
+        body: "{}",
+      });
+      if (
+        !this.localFingerprint ||
+        this.pairing.inviterKeyFingerprint !== this.localFingerprint
+      )
+        throw new Error(
+          "This device's approved key does not match its local key.",
+        );
+      this.render();
+    });
+  }
+
+  async enableSync() {
+    await this.run(async () => {
+      await api("/api/sync/enable", { method: "POST", body: "{}" });
+      this.syncStatus = await api("/api/sync/status");
+      this.render();
+      this.dispatchEvent(
+        new CustomEvent("kin:sync-enabled", {
+          bubbles: true,
+          composed: true,
+          detail: this.identity,
+        }),
+      );
+    });
+  }
+
+  requestSync() {
+    this.dispatchEvent(
+      new CustomEvent("kin:sync-now", {
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  }
   async approve() {
     await this.run(async () => {
+      if (
+        !this.pairing?.syncKeyFingerprint ||
+        this.verifiedFingerprint !== this.pairing.syncKeyFingerprint
+      ) {
+        throw new Error(
+          "Compare the device fingerprint on both devices before approving.",
+        );
+      }
       const started = await api(
         `/api/pairings/${this.pairing.pairingId}/approve/options`,
         {
@@ -329,6 +549,25 @@ class KinHousehold extends HTMLElement {
       const credential = await navigator.credentials.get({
         publicKey: authenticationOptions(started.publicKey),
       });
+      const ownDevice = await this.syncKeyStore.getDevice(
+        this.identity.deviceId,
+      );
+      const issuerFingerprint = await deviceKeyFingerprint(
+        ownDevice.publicKeys,
+      );
+      if (issuerFingerprint !== this.localFingerprint)
+        throw new Error(
+          "This device's local sync key changed. Pairing was not approved.",
+        );
+      const deviceCertificate = await createDeviceAuthorizationCertificate({
+        householdId: this.identity.householdId,
+        memberId: this.pairing.memberId,
+        deviceId: this.pairing.deviceId,
+        issuerDeviceId: this.identity.deviceId,
+        issuerFingerprint,
+        publicKeys: this.pairing.syncPublicKeys,
+        signingKey: ownDevice.keys.signingPrivateKey,
+      });
       this.pairing = await api(
         `/api/pairings/${this.pairing.pairingId}/approve/finish`,
         {
@@ -336,14 +575,30 @@ class KinHousehold extends HTMLElement {
           body: JSON.stringify({
             flow: started.flow,
             credential: credentialJson(credential),
+            deviceCertificate,
           }),
         },
       );
+      await this.syncKeyStore.pinTrustedDevice({
+        householdId: this.identity.householdId,
+        memberId: this.pairing.confirmedMemberId,
+        deviceId: this.pairing.confirmedDeviceId,
+        publicKeys: this.pairing.syncPublicKeys,
+        fingerprint: this.pairing.syncKeyFingerprint,
+      });
       this.render();
     });
   }
   async activateClaim() {
     await this.run(async () => {
+      if (
+        !this.verifiedInviterFingerprint ||
+        !this.claim?.inviterDeviceId ||
+        !this.claim?.inviterKeyFingerprint
+      )
+        throw new Error(
+          "Compare the approving device fingerprint on both devices before activation.",
+        );
       const started = await api("/api/claim/activate/options", {
         method: "POST",
         body: "{}",
@@ -351,12 +606,39 @@ class KinHousehold extends HTMLElement {
       const credential = await navigator.credentials.get({
         publicKey: authenticationOptions(started.publicKey),
       });
-      await api("/api/claim/activate/finish", {
+      const activated = await api("/api/claim/activate/finish", {
         method: "POST",
         body: JSON.stringify({
           flow: started.flow,
           credential: credentialJson(credential),
         }),
+      });
+      this.syncKeyStore ??= await SyncKeyStore.open();
+      const bound = await this.syncKeyStore.bindPendingDevice({
+        deviceId: activated.deviceId,
+        householdId: activated.householdId,
+        memberId: activated.memberId,
+      });
+      this.localFingerprint = bound.fingerprint;
+      const { devices } = await api("/api/sync/devices");
+      const inviter = devices.find(
+        (device) => device.deviceId === this.claim.inviterDeviceId,
+      );
+      if (
+        !inviter?.publicKeys ||
+        inviter.fingerprint !== this.claim.inviterKeyFingerprint ||
+        (await deviceKeyFingerprint(inviter.publicKeys)) !==
+          this.claim.inviterKeyFingerprint
+      )
+        throw new Error(
+          "The approving device key does not match the compared fingerprint.",
+        );
+      await this.syncKeyStore.pinTrustedDevice({
+        householdId: activated.householdId,
+        memberId: inviter.memberId,
+        deviceId: inviter.deviceId,
+        publicKeys: inviter.publicKeys,
+        fingerprint: inviter.fingerprint,
       });
       location.href = "/";
     });
@@ -406,6 +688,11 @@ class KinHousehold extends HTMLElement {
   async showDevices() {
     await this.run(async () => {
       const { devices } = await api("/api/devices");
+      let directoryDevices = [];
+      if (!this.syncKeyError) {
+        this.syncKeyStore ??= await SyncKeyStore.open();
+        directoryDevices = (await api("/api/sync/devices")).devices;
+      }
       this.replaceChildren();
       const heading = document.createElement("h2");
       heading.textContent = "Trusted devices";
@@ -417,6 +704,72 @@ class KinHousehold extends HTMLElement {
         const text = document.createElement("span");
         text.textContent = `${device.label} — ${device.revokedAt ? "Revoked" : "Trusted"}`;
         item.append(text);
+        const syncDevice = directoryDevices.find(
+          (entry) => entry.deviceId === device.id,
+        );
+        if (syncDevice?.fingerprint) {
+          if (
+            device.id === this.identity.deviceId &&
+            syncDevice.fingerprint !== this.localFingerprint
+          ) {
+            this.message(
+              "This browser's saved device key does not match its trusted record. Device sync is paused.",
+              true,
+            );
+            list.append(item);
+            continue;
+          }
+          const displayedFingerprint =
+            device.id === this.identity.deviceId
+              ? this.localFingerprint
+              : syncDevice.fingerprint;
+          const keyCode = document.createElement("code");
+          keyCode.className = "device-key-fingerprint";
+          keyCode.textContent = displayedFingerprint.match(/.{1,4}/g).join(" ");
+          keyCode.setAttribute(
+            "aria-label",
+            `Device sync code ${keyCode.textContent}`,
+          );
+          item.append(keyCode);
+          const pinned =
+            device.id === this.identity.deviceId ||
+            (await this.syncKeyStore.getPinnedDevice(
+              this.identity.householdId,
+              device.id,
+            ));
+          if (!pinned && syncDevice.publicKeys) {
+            const verify = this.makeButton("Verify device", () => {
+              verify.hidden = true;
+              const prompt = document.createElement("p");
+              prompt.textContent =
+                "Compare this code with the code shown on that device.";
+              const label = document.createElement("label");
+              const confirmation = document.createElement("input");
+              confirmation.type = "checkbox";
+              label.append(
+                confirmation,
+                document.createTextNode(" The codes match."),
+              );
+              const approve = this.makeButton("Trust this device", async () => {
+                await this.syncKeyStore.pinTrustedDevice({
+                  householdId: this.identity.householdId,
+                  memberId: syncDevice.memberId,
+                  deviceId: syncDevice.deviceId,
+                  publicKeys: syncDevice.publicKeys,
+                  fingerprint: syncDevice.fingerprint,
+                });
+                this.requestSync();
+                await this.showDevices();
+              });
+              approve.disabled = true;
+              confirmation.addEventListener("change", () => {
+                approve.disabled = !confirmation.checked;
+              });
+              item.append(prompt, label, approve);
+            });
+            item.append(verify);
+          }
+        }
         if (!device.revokedAt && device.id !== this.identity.deviceId)
           item.append(
             this.makeButton(
@@ -584,6 +937,17 @@ class KinHousehold extends HTMLElement {
   text(value) {
     const paragraph = document.createElement("p");
     paragraph.textContent = value;
+    this.append(paragraph);
+    return paragraph;
+  }
+  showFingerprint(prompt, fingerprint) {
+    if (typeof fingerprint !== "string" || !/^[a-f0-9]{64}$/.test(fingerprint))
+      return null;
+    const paragraph = document.createElement("p");
+    paragraph.className = "pairing-fingerprint";
+    const value = document.createElement("code");
+    value.textContent = fingerprint.match(/.{1,4}/g).join(" ");
+    paragraph.append(document.createTextNode(`${prompt}: `), value);
     this.append(paragraph);
     return paragraph;
   }

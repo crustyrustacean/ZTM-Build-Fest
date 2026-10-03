@@ -1,6 +1,6 @@
 # Identity and Trusted Devices
 
-**Status:** Current through v0.8.8. Household/member identity, passkey credentials, member-bound approvals, trusted-device-bound sessions and reauthentication, membership removal, active-member capacity, and eager revoked-device session invalidation are implemented by the same-origin in-memory service. Encrypted sync and content-key management remain future work.
+**Status:** Implemented through v0.9.3 for the local incubation service. v0.8 member/passkey/device authorization now gates v0.9 device-key registration, encrypted sync, key provisioning, epoch rotation and revocation. Identity and relay state remain in-memory; see [V0.9.0](V0.9.0.md) for threat and recovery limits.
 
 ## Separate identities
 
@@ -48,13 +48,19 @@ Household view
 
 The authenticator's local biometric/PIN operation is handled by the platform; Kin should not collect a biometric or device PIN. Passkeys authenticate a member to the service. They do not automatically encrypt household data, create a household key, identify a particular installation, or provide a general-purpose key-agreement API. Those require separate reviewed key and device protocols.
 
-v0.1.0 had no login. The v0.8.x incubation line supports one passkey per member. Multiple credentials, credential replacement, recovery after losing trusted-device state, and adding a new device for an existing member remain unsupported.
+v0.1.0 had no login. The v0.8.x incubation line supports one passkey per member. v0.9 adds a same-member device-pairing flow with a separate credential per trusted device; account credential replacement remains unsupported. Device-specific keys are generated locally and the existing member approves the device fingerprint before its keys are provisioned.
 
 ## Device authorization
 
 A device is trusted only after explicit enrollment by an active member through the pairing flow. The device has its own ID and device key material, separate from the member's credential and household content key. Each accepted event records its originating `device_id` for later sync and audit context; this must not become a covert activity feed.
 
-Conceptual device states are pending, authorized, and revoked. Only authorized devices may submit or receive encrypted household events. Revocation is a server-side authorization change plus a key-rotation decision; it cannot erase content or keys already copied to a device. See [Pairing](PAIRING.md) and [Sync](SYNC.md).
+Conceptual device states are pending, authorized, and revoked. Each enrolled sync-capable device locally generates separate non-extractable P-256 ECDH and ECDSA private keys. The service stores only public JWKs and a SHA-256 fingerprint. During pairing the joining device compares its locally computed fingerprint with the inviter's displayed value; approval is blocked on mismatch. Passkeys never supply or derive content keys.
+
+Only authorized devices may submit or receive encrypted household events. Device revocation and member removal immediately invalidate target sessions and reserve a new household epoch; the remaining trusted devices must provision that epoch before sync resumes. A revoked device receives no later epoch, but keeps any old plaintext/key it already possessed. See [Pairing](PAIRING.md), [Sync](SYNC.md), and [V0.9.0](V0.9.0.md).
+
+An open browser checks authorization on focus/return and every 30 seconds while visible. Once the service can be reached, a revoked session clears its session cookie and a removed/revoked device also clears its device cookie; the UI stops sync and shows the signed-out state while retaining local household data. A disconnected device cannot learn of revocation until it reconnects or returns to the service.
+
+Historical key entitlement is explicit: a new device for an existing member can receive retained history; a newly joined/replacement adult starts at its membership-time/current epoch and later epochs. v0.9.x does not grant pre-join epoch keys. Kin has no encrypted snapshots, so earlier shared history remains unavailable rather than being reconstructed from plaintext server state.
 
 ## v0.8.6 existing-member reauthentication
 

@@ -2,6 +2,7 @@ import { projectionContext } from "../browser-time.js";
 import "./kin-routines.js";
 import { loadKinEngine } from "../wasm/kin-engine.js";
 import { EventStore } from "../storage/event-store.js";
+import { SyncCoordinator } from "../sync/sync-coordinator.js";
 import "./kin-compose.js";
 import "./kin-item.js";
 import "./kin-today.js";
@@ -21,10 +22,19 @@ class KinApp extends HTMLElement {
     super();
     this.engine = null;
     this.store = null;
-    this.state = { items: [], handoffs: [], talks: [], pulses: [], routines: [] };
+    this.syncCoordinator = null;
+    this.state = {
+      items: [],
+      handoffs: [],
+      talks: [],
+      pulses: [],
+      routines: [],
+    };
     this.busy = false;
     this.starting = null;
     this.initialized = false;
+    this.authorizationTimer = null;
+    this.checkingAuthorization = false;
     this.channel = null;
     this.refreshing = false;
     this.pendingRefresh = false;
@@ -49,11 +59,15 @@ class KinApp extends HTMLElement {
       this.saveTalk({ type: "reopen-talk", talkId: event.detail.talkId });
     this.onArchiveTalk = (event) =>
       this.saveTalk({ type: "archive-talk", talkId: event.detail.talkId });
-    this.onRoutineIntent = event => this.saveRoutine({ ...event.detail, type: event.type.slice(4) });
+    this.onRoutineIntent = (event) =>
+      this.saveRoutine({ ...event.detail, type: event.type.slice(4) });
     this.pulseTimer = null;
     this.catchUpCursor = null;
     this.snapshotBoundary = null;
     this.onCaughtUp = () => this.handleCaughtUp();
+    this.onSyncEnabled = (event) => this.startSyncCoordinator(event.detail);
+    this.onSyncNow = () => void this.syncCoordinator?.syncNow();
+    this.onSyncState = (value) => this.handleSyncState(value);
     this.onSetPulse = (event) => {
       const timestamp = Date.now();
       const hours = event.detail.hours;
@@ -75,6 +89,7 @@ class KinApp extends HTMLElement {
       if (event?.type === "focus" && event.target !== window) return;
       if (document.visibilityState === "hidden") return;
       this.refreshFromEvents();
+      void this.checkHouseholdAuthorization();
     };
     this.onPeerMessage = (event) => this.handlePeerMessage(event);
   }
@@ -98,16 +113,28 @@ class KinApp extends HTMLElement {
     this.addEventListener("kin:set-pulse", this.onSetPulse);
     this.addEventListener("kin:clear-pulse", this.onClearPulse);
     this.addEventListener("kin:caught-up", this.onCaughtUp);
-    for (const action of ["create-routine", "complete-routine-occurrence", "reopen-routine-occurrence", "archive-routine"]) {
+    this.addEventListener("kin:sync-enabled", this.onSyncEnabled);
+    this.addEventListener("kin:sync-now", this.onSyncNow);
+    for (const action of [
+      "create-routine",
+      "complete-routine-occurrence",
+      "reopen-routine-occurrence",
+      "archive-routine",
+    ]) {
       this.addEventListener(`kin:${action}`, this.onRoutineIntent);
     }
     document.addEventListener("visibilitychange", this.onTimeWake);
     window.addEventListener("focus", this.onWindowFocus);
+    this.authorizationTimer = setInterval(
+      () => void this.checkHouseholdAuthorization(),
+      30_000,
+    );
     this.openPeerChannel();
     if (this.store) {
       // Reconnecting must not restart the engine or unlock an in-flight save.
       this.pendingRefresh = true;
       this.flushPeerRefresh();
+      void this.configureSyncCoordinator();
     } else {
       this.initialize();
     }
@@ -191,14 +218,25 @@ class KinApp extends HTMLElement {
     this.removeEventListener("kin:set-pulse", this.onSetPulse);
     this.removeEventListener("kin:clear-pulse", this.onClearPulse);
     this.removeEventListener("kin:caught-up", this.onCaughtUp);
-    for (const action of ["create-routine", "complete-routine-occurrence", "reopen-routine-occurrence", "archive-routine"]) {
+    this.removeEventListener("kin:sync-enabled", this.onSyncEnabled);
+    this.removeEventListener("kin:sync-now", this.onSyncNow);
+    for (const action of [
+      "create-routine",
+      "complete-routine-occurrence",
+      "reopen-routine-occurrence",
+      "archive-routine",
+    ]) {
       this.removeEventListener(`kin:${action}`, this.onRoutineIntent);
     }
     document.removeEventListener("visibilitychange", this.onTimeWake);
     window.removeEventListener("focus", this.onWindowFocus);
+    clearInterval(this.authorizationTimer);
+    this.authorizationTimer = null;
     clearTimeout(this.pulseTimer);
     clearTimeout(this.focusTimer);
     this.closePeerChannel();
+    this.syncCoordinator?.stop();
+    this.syncCoordinator = null;
   }
 
   async initialize() {
@@ -219,6 +257,8 @@ class KinApp extends HTMLElement {
     this.clearAlert();
     this.setStatus("Starting Kin…");
     try {
+      this.syncCoordinator?.stop();
+      this.syncCoordinator = null;
       this.store?.close();
       this.engine = await loadKinEngine();
       this.store = await EventStore.open();
@@ -228,6 +268,7 @@ class KinApp extends HTMLElement {
       this.renderState();
       this.setStatus("Ready.");
       this.retryButton.hidden = true;
+      void this.configureSyncCoordinator();
     } catch (error) {
       this.store?.close();
       this.store = null;
@@ -240,6 +281,87 @@ class KinApp extends HTMLElement {
       }
       this.flushPeerRefresh();
     }
+  }
+
+  async configureSyncCoordinator() {
+    try {
+      const identityResponse = await fetch("/api/status");
+      if (!identityResponse.ok) return;
+      const { identity } = await identityResponse.json();
+      if (!identity) return;
+      const syncResponse = await fetch("/api/sync/status");
+      if (!syncResponse.ok) return;
+      const syncStatus = await syncResponse.json();
+      if (syncStatus.enabled) await this.startSyncCoordinator(identity);
+    } catch {
+      // Local household use remains available while the service is unreachable.
+    }
+  }
+
+  async checkHouseholdAuthorization() {
+    const identity = this.household?.identity;
+    if (
+      !identity ||
+      this.checkingAuthorization ||
+      document.visibilityState === "hidden"
+    )
+      return;
+    this.checkingAuthorization = true;
+    try {
+      const response = await fetch("/api/status", { cache: "no-store" });
+      if (!response.ok) return;
+      const status = await response.json();
+      if (this.household.identity !== identity || status.identity) return;
+      this.syncCoordinator?.stop();
+      this.syncCoordinator = null;
+      this.household.identity = null;
+      this.household.pairing = null;
+      this.household.claim = null;
+      this.household.syncStatus = null;
+      this.household.render();
+      this.setStatus(
+        "You are signed out. Device sync is stopped; local household information remains available on this device.",
+      );
+    } catch {
+      // Keep local household use available while the service is unreachable.
+    } finally {
+      this.checkingAuthorization = false;
+    }
+  }
+
+  async startSyncCoordinator(identity) {
+    if (this.syncCoordinator?.identity.deviceId === identity.deviceId) {
+      return this.syncCoordinator.syncNow();
+    }
+    this.syncCoordinator?.stop();
+    this.syncCoordinator = new SyncCoordinator({
+      store: this.store,
+      engine: this.engine,
+      identity,
+      onState: this.onSyncState,
+    });
+    try {
+      await this.syncCoordinator.start();
+    } catch (error) {
+      this.handleSyncState({
+        state: "paused",
+        message: error.message || "Device sync is paused.",
+      });
+    }
+  }
+
+  handleSyncState(value) {
+    if (value.projection) {
+      if (this.busy) {
+        this.pendingRefresh = true;
+      } else {
+        this.state = value.projection;
+        this.snapshotBoundary = value.snapshotBoundary;
+        this.renderState();
+        if (value.snapshotBoundary) this.broadcastEventChange();
+      }
+    }
+    if (value.message) this.setStatus(value.message);
   }
 
   async handleAddItem(event) {
@@ -392,16 +514,34 @@ class KinApp extends HTMLElement {
       committed = true;
       this.broadcastEventChange();
       this.renderState();
-      if (submitted.type === "create-routine") this.routines.clearIfMatches(submitted);
-      this.setStatus(submitted.type === "create-routine" ? "Routine added." : submitted.type === "archive-routine" ? "Routine archived." : submitted.type === "complete-routine-occurrence" ? "Occurrence completed." : "Occurrence reopened.");
+      if (submitted.type === "create-routine")
+        this.routines.clearIfMatches(submitted);
+      this.setStatus(
+        submitted.type === "create-routine"
+          ? "Routine added."
+          : submitted.type === "archive-routine"
+            ? "Routine archived."
+            : submitted.type === "complete-routine-occurrence"
+              ? "Occurrence completed."
+              : "Occurrence reopened.",
+      );
     } catch (error) {
       if (error.code === 4 && submitted.routineId) this.pendingRefresh = true;
-      this.showAlert(committed ? "Your routine was saved. Try again to refresh the view." : error.userMessage ?? SAVE_ERROR,
-        committed ? this.retryRefresh : () => this.saveRoutine(submitted), committed || !submitted.routineId ? null : submitted);
+      this.showAlert(
+        committed
+          ? "Your routine was saved. Try again to refresh the view."
+          : (error.userMessage ?? SAVE_ERROR),
+        committed ? this.retryRefresh : () => this.saveRoutine(submitted),
+        committed || !submitted.routineId ? null : submitted,
+      );
       this.setStatus("");
     } finally {
       this.setBusy(false);
-      if (submitted.type === "create-routine" || submitted.type === "archive-routine") this.routines.focusInput();
+      if (
+        submitted.type === "create-routine" ||
+        submitted.type === "archive-routine"
+      )
+        this.routines.focusInput();
       else this.routines.restoreFocus(focus);
       this.flushPeerRefresh();
     }
@@ -409,7 +549,12 @@ class KinApp extends HTMLElement {
 
   schedulePulseRefresh() {
     clearTimeout(this.pulseTimer);
-    if (!this.isConnected || (!this.state.pulses.length && !this.state.routines?.some(r => r.status === "active"))) return;
+    if (
+      !this.isConnected ||
+      (!this.state.pulses.length &&
+        !this.state.routines?.some((r) => r.status === "active"))
+    )
+      return;
     // Timers only request canonical replay. Rust alone decides expiry.
     const now = Date.now();
     const active = this.state.pulses.filter(
@@ -419,7 +564,11 @@ class KinApp extends HTMLElement {
     midnight.setHours(24, 0, 0, 0);
     const delay = Math.max(
       1,
-      Math.min(60_000, midnight.getTime() - now, ...active.map((pulse) => pulse.expiresAt - now)),
+      Math.min(
+        60_000,
+        midnight.getTime() - now,
+        ...active.map((pulse) => pulse.expiresAt - now),
+      ),
     );
     this.pulseTimer = setTimeout(this.onTimeWake, delay);
   }
@@ -497,6 +646,7 @@ class KinApp extends HTMLElement {
     const result = await this.store.append(command, this.engine);
     this.state = result.state;
     this.snapshotBoundary = result.snapshotBoundary;
+    void this.syncCoordinator?.syncNow();
   }
 
   applyCatchUpSnapshot(snapshot) {
@@ -506,6 +656,7 @@ class KinApp extends HTMLElement {
       asOf,
       snapshot.cursor.eventId,
       civilDate,
+      snapshot.syncIdentity,
     );
     const throughEventId = state.summary.throughEventId;
     if (throughEventId !== (snapshot.through?.eventId ?? null)) {
@@ -550,8 +701,8 @@ class KinApp extends HTMLElement {
       this.showAlert(
         committed
           ? "Your catch-up position was saved, but Kin could not refresh the summary. Try again to reload it."
-          : error.userMessage ??
-            "Kin could not update this browser's catch-up position. Your saved household information was not deleted.",
+          : (error.userMessage ??
+              "Kin could not update this browser's catch-up position. Your saved household information was not deleted."),
         committed ? this.retryRefresh : () => this.handleCaughtUp(),
       );
       this.setStatus("");
@@ -643,24 +794,38 @@ class KinApp extends HTMLElement {
               (record) => record.talkId === previousRetryIntent.talkId,
             )
           : null;
-        const routine = previousRetryIntent?.routineId ? this.state.routines.find(record => record.routineId === previousRetryIntent.routineId) : null;
-        const item = previousRetryIntent?.routineId ? routine : previousRetryIntent?.talkId
-          ? talk
-          : previousRetryIntent?.handoffId
-            ? handoff
-            : previousRetryIntent
-              ? this.state.items.find(
-                  (stateItem) =>
-                    stateItem.itemId === previousRetryIntent.itemId,
-                )
-              : null;
-        if (previousRetryIntent && (!item || item.status === "archived" || (previousRetryIntent.occurrenceKey !== undefined && item.occurrenceKey !== previousRetryIntent.occurrenceKey))) {
+        const routine = previousRetryIntent?.routineId
+          ? this.state.routines.find(
+              (record) => record.routineId === previousRetryIntent.routineId,
+            )
+          : null;
+        const item = previousRetryIntent?.routineId
+          ? routine
+          : previousRetryIntent?.talkId
+            ? talk
+            : previousRetryIntent?.handoffId
+              ? handoff
+              : previousRetryIntent
+                ? this.state.items.find(
+                    (stateItem) =>
+                      stateItem.itemId === previousRetryIntent.itemId,
+                  )
+                : null;
+        if (
+          previousRetryIntent &&
+          (!item ||
+            item.status === "archived" ||
+            (previousRetryIntent.occurrenceKey !== undefined &&
+              item.occurrenceKey !== previousRetryIntent.occurrenceKey))
+        ) {
           this.setStatus(
-            previousRetryIntent.routineId ? "That period changed. Review the current routine." : previousRetryIntent.talkId
-              ? "That topic changed. Review its current state."
-              : previousRetryIntent.handoffId
-                ? "That handoff changed. Review its current state."
-                : "That item changed. Review its current state below.",
+            previousRetryIntent.routineId
+              ? "That period changed. Review the current routine."
+              : previousRetryIntent.talkId
+                ? "That topic changed. Review its current state."
+                : previousRetryIntent.handoffId
+                  ? "That handoff changed. Review its current state."
+                  : "That item changed. Review its current state below.",
           );
         } else {
           this.showAlert(previousAlert, previousRetry, previousRetryIntent);

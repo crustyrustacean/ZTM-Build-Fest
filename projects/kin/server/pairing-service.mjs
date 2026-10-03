@@ -1,8 +1,10 @@
 import {
+  createPublicKey,
   createHash,
   createHmac,
   randomBytes,
   timingSafeEqual,
+  verify as verifySignature,
 } from "node:crypto";
 
 export const PAIRING_TTL_MS = 10 * 60_000;
@@ -11,6 +13,7 @@ export const MAX_CODE_ATTEMPTS = 8;
 export const RATE_WINDOW_MS = 60_000;
 export const RATE_LIMIT = 12;
 export const MAX_RATE_BUCKETS = 4096;
+export const MAX_TRUSTED_DEVICES = 16;
 export const SESSION_TTL_MS = 12 * 60 * 60_000;
 export const TERMINAL_PAIRING_RETENTION_MS = 24 * 60 * 60_000;
 export const PAIRING_CODE_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
@@ -99,7 +102,10 @@ export class PairingService {
     });
   }
 
-  bootstrap({ credential, deviceLabel = "This device" }) {
+  bootstrap({ credential, deviceLabel = "This device", syncPublicKeys }) {
+    const keyRecord = syncPublicKeys
+      ? validateSyncPublicKeys(syncPublicKeys)
+      : {};
     const householdId = id();
     const memberId = id();
     const deviceId = id();
@@ -123,6 +129,7 @@ export class PairingService {
       trustedAt: this.now(),
       revokedAt: null,
       tokenHash: null,
+      ...keyRecord,
     };
     this.devices.set(deviceId, device);
     const deviceToken = this.issueDeviceToken(device);
@@ -252,8 +259,17 @@ export class PairingService {
     ).length;
   }
 
+  activeTrustedDeviceCount(household) {
+    return [...this.devices.values()].filter(
+      (device) =>
+        device.householdId === household.id &&
+        !device.revokedAt &&
+        this.members.get(device.memberId)?.active,
+    ).length;
+  }
+
   createPairing(sessionToken) {
-    const { member, household } = this.authorize(sessionToken);
+    const { member, household, device } = this.authorize(sessionToken);
     this.prunePairingCapabilities();
     if (this.activeMemberCount(household) >= 2)
       throw new PairingError(
@@ -278,6 +294,8 @@ export class PairingService {
       id: id(),
       householdId: household.id,
       inviterId: member.id,
+      inviterDeviceId: device.id,
+      inviterKeyFingerprint: device.syncKeyFingerprint,
       verifier,
       createdAt: this.now(),
       expiresAt: this.now() + PAIRING_TTL_MS,
@@ -292,10 +310,70 @@ export class PairingService {
     this.audit("pairing_created", {
       householdId: household.id,
       pairingId: pairing.id,
+      inviterDeviceId: device.id,
+      inviterKeyFingerprint: device.syncKeyFingerprint,
     });
     return {
       pairingId: pairing.id,
       code,
+      state: pairing.state,
+      expiresAt: pairing.expiresAt,
+      version: pairing.version,
+    };
+  }
+
+  createDevicePairing(sessionToken) {
+    const { member, household, device } = this.authorize(sessionToken);
+    this.prunePairingCapabilities();
+    if (this.activeTrustedDeviceCount(household) >= MAX_TRUSTED_DEVICES)
+      throw new PairingError(
+        "device_limit",
+        "This household reached its trusted-device limit.",
+        409,
+      );
+    for (const pairing of this.pairings.values()) {
+      if (
+        pairing.householdId === household.id &&
+        ["Pending", "Claimed"].includes(this.state(pairing))
+      )
+        this.revokePairing(sessionToken, pairing.id);
+    }
+    let code;
+    let verifier;
+    do {
+      code = codeValue();
+      verifier = this.verifier(code);
+    } while (this.codeIndex.has(verifier));
+    const pairing = {
+      id: id(),
+      purpose: "device",
+      householdId: household.id,
+      inviterId: member.id,
+      inviterDeviceId: device.id,
+      inviterKeyFingerprint: device.syncKeyFingerprint,
+      memberId: member.id,
+      verifier,
+      createdAt: this.now(),
+      expiresAt: this.now() + PAIRING_TTL_MS,
+      state: "Pending",
+      version: 1,
+      attempts: 0,
+      claimant: null,
+      confirmedMemberId: null,
+    };
+    this.pairings.set(pairing.id, pairing);
+    this.codeIndex.set(verifier, pairing.id);
+    this.audit("device_pairing_created", {
+      householdId: household.id,
+      pairingId: pairing.id,
+      inviterDeviceId: device.id,
+      inviterKeyFingerprint: device.syncKeyFingerprint,
+      memberId: member.id,
+    });
+    return {
+      pairingId: pairing.id,
+      code,
+      purpose: pairing.purpose,
       state: pairing.state,
       expiresAt: pairing.expiresAt,
       version: pairing.version,
@@ -360,10 +438,16 @@ export class PairingService {
     }
     const state = this.state(pairing);
     if (state !== "Pending") throw terminalPairingError(state);
-    return { valid: true };
+    return { valid: true, purpose: pairing.purpose ?? "adult" };
   }
 
-  claimPairing({ code, credential, deviceLabel, rateKey = "unknown" }) {
+  claimPairing({
+    code,
+    credential,
+    deviceLabel,
+    syncPublicKeys,
+    rateKey = "unknown",
+  }) {
     this.rateLimit(rateKey);
     const verifier = this.verifier(code);
     const pairing = this.pairings.get(this.codeIndex.get(verifier));
@@ -390,6 +474,9 @@ export class PairingService {
     pairing.claimant = {
       credential,
       deviceLabel: cleanLabel(deviceLabel),
+      memberId: pairing.memberId ?? id(),
+      deviceId: id(),
+      ...(syncPublicKeys ? validateSyncPublicKeys(syncPublicKeys) : {}),
       tokenHash: hash(claimToken),
       claimedAt,
     };
@@ -403,14 +490,24 @@ export class PairingService {
     return {
       claimToken,
       pairingId: pairing.id,
+      purpose: pairing.purpose ?? "adult",
       state: pairing.state,
       expiresAt: pairing.expiresAt,
       version: pairing.version,
     };
   }
 
-  approvePairing(sessionToken, pairingId, expectedVersion) {
-    const { member, household } = this.authorize(sessionToken);
+  approvePairing(
+    sessionToken,
+    pairingId,
+    expectedVersion,
+    deviceAuthorizationCertificate,
+  ) {
+    const {
+      member,
+      household,
+      device: approverDevice,
+    } = this.authorize(sessionToken);
     const pairing = this.pairings.get(pairingId);
     if (
       !pairing ||
@@ -431,14 +528,91 @@ export class PairingService {
         "The pairing request changed. Review its latest status.",
         409,
       );
+    if (pairing.claimant.syncPublicKeys)
+      validateDeviceAuthorizationCertificate(deviceAuthorizationCertificate, {
+        householdId: household.id,
+        memberId: pairing.claimant.memberId,
+        deviceId: pairing.claimant.deviceId,
+        claimantPublicKeys: pairing.claimant.syncPublicKeys,
+        claimantFingerprint: pairing.claimant.syncKeyFingerprint,
+        approverDevice,
+      });
+    else if (deviceAuthorizationCertificate)
+      throw new PairingError(
+        "device_certificate_invalid",
+        "Kin could not verify this device approval.",
+        400,
+      );
+    if (pairing.purpose === "device") {
+      if (this.activeTrustedDeviceCount(household) >= MAX_TRUSTED_DEVICES)
+        throw new PairingError(
+          "device_limit",
+          "This household reached its trusted-device limit.",
+          409,
+        );
+      const existingMember = this.members.get(pairing.memberId);
+      if (
+        !existingMember?.active ||
+        existingMember.householdId !== household.id
+      )
+        throw new PairingError(
+          "membership_removed",
+          "This household membership is no longer active.",
+          403,
+        );
+      const deviceId = pairing.claimant.deviceId;
+      this.addCredential(existingMember.id, pairing.claimant.credential);
+      existingMember.credentials.add(pairing.claimant.credential.id);
+      this.devices.set(deviceId, {
+        id: deviceId,
+        memberId: existingMember.id,
+        householdId: household.id,
+        label: pairing.claimant.deviceLabel,
+        trustedAt: this.now(),
+        revokedAt: null,
+        ...(pairing.claimant.syncPublicKeys
+          ? {
+              syncPublicKeys: pairing.claimant.syncPublicKeys,
+              syncKeyFingerprint: pairing.claimant.syncKeyFingerprint,
+              deviceAuthorizationCertificate,
+            }
+          : {}),
+      });
+      household.version += 1;
+      pairing.confirmedMemberId = existingMember.id;
+      pairing.confirmedDeviceId = deviceId;
+      pairing.state = "Confirmed";
+      pairing.terminalAt = this.now();
+      pairing.expiresAt = this.now() + CLAIM_TTL_MS;
+      pairing.version += 1;
+      this.codeIndex.delete(pairing.verifier);
+      this.audit("device_pairing_confirmed", {
+        householdId: household.id,
+        pairingId,
+        memberId: existingMember.id,
+        deviceId,
+      });
+      this.audit("device_trusted", {
+        householdId: household.id,
+        memberId: existingMember.id,
+        deviceId,
+      });
+      return this.pairingView(pairing);
+    }
     if (this.activeMemberCount(household) >= 2)
       throw new PairingError(
         "household_full",
         "This household already has two adult members.",
         409,
       );
-    const memberId = id();
-    const deviceId = id();
+    if (this.activeTrustedDeviceCount(household) >= MAX_TRUSTED_DEVICES)
+      throw new PairingError(
+        "device_limit",
+        "This household reached its trusted-device limit.",
+        409,
+      );
+    const memberId = pairing.claimant.memberId;
+    const deviceId = pairing.claimant.deviceId;
     this.addCredential(memberId, pairing.claimant.credential);
     this.members.set(memberId, {
       id: memberId,
@@ -453,6 +627,13 @@ export class PairingService {
       label: pairing.claimant.deviceLabel,
       trustedAt: this.now(),
       revokedAt: null,
+      ...(pairing.claimant.syncPublicKeys
+        ? {
+            syncPublicKeys: pairing.claimant.syncPublicKeys,
+            syncKeyFingerprint: pairing.claimant.syncKeyFingerprint,
+            deviceAuthorizationCertificate,
+          }
+        : {}),
     });
     household.members.add(memberId);
     household.version += 1;
@@ -606,11 +787,26 @@ export class PairingService {
   pairingView(pairing) {
     return {
       pairingId: pairing.id,
+      purpose: pairing.purpose ?? "adult",
+      inviterDeviceId: pairing.inviterDeviceId,
+      inviterKeyFingerprint: pairing.inviterKeyFingerprint,
       state: this.state(pairing),
       expiresAt: pairing.expiresAt,
       version: pairing.version,
       deviceLabel:
         pairing.state === "Claimed" ? pairing.claimant.deviceLabel : undefined,
+      syncKeyFingerprint:
+        pairing.state === "Claimed" || pairing.state === "Confirmed"
+          ? pairing.claimant?.syncKeyFingerprint
+          : undefined,
+      syncPublicKeys:
+        pairing.state === "Claimed" || pairing.state === "Confirmed"
+          ? pairing.claimant?.syncPublicKeys
+          : undefined,
+      memberId: pairing.claimant?.memberId,
+      deviceId: pairing.claimant?.deviceId,
+      confirmedMemberId: pairing.confirmedMemberId,
+      confirmedDeviceId: pairing.confirmedDeviceId,
     };
   }
 
@@ -618,13 +814,39 @@ export class PairingService {
     const { household } = this.authorize(sessionToken);
     return [...this.devices.values()]
       .filter((device) => device.householdId === household.id)
-      .map(({ id, memberId, label, trustedAt, revokedAt }) => ({
-        id,
-        memberId,
-        label,
-        trustedAt,
-        revokedAt,
-      }));
+      .map(
+        ({
+          id,
+          memberId,
+          label,
+          trustedAt,
+          revokedAt,
+          syncKeyFingerprint,
+        }) => ({
+          id,
+          memberId,
+          label,
+          trustedAt,
+          revokedAt,
+          syncKeyFingerprint,
+        }),
+      );
+  }
+
+  registerSyncPublicKeys(sessionToken, syncPublicKeys) {
+    const { device } = this.authorize(sessionToken);
+    const keyRecord = validateSyncPublicKeys(syncPublicKeys);
+    if (device.syncPublicKeys) {
+      if (device.syncKeyFingerprint !== keyRecord.syncKeyFingerprint)
+        throw new PairingError(
+          "sync_device_key_conflict",
+          "This trusted device already has different sync keys.",
+          409,
+        );
+      return { fingerprint: device.syncKeyFingerprint, registered: false };
+    }
+    Object.assign(device, keyRecord);
+    return { fingerprint: device.syncKeyFingerprint, registered: true };
   }
 
   householdView(sessionToken) {
@@ -737,6 +959,105 @@ export class PairingService {
         this.sessions.delete(sessionHash);
     return { id: device.id, revokedAt: device.revokedAt };
   }
+}
+
+function validateSyncPublicKeys(value) {
+  if (
+    !value ||
+    typeof value !== "object" ||
+    Object.keys(value).length !== 2 ||
+    !value.agreement ||
+    !value.signing
+  ) {
+    throw new PairingError(
+      "sync_device_key_invalid",
+      "Kin could not verify this device's public keys.",
+      400,
+    );
+  }
+  try {
+    for (const [name, key] of Object.entries(value)) {
+      if (
+        key.kty !== "EC" ||
+        key.crv !== "P-256" ||
+        typeof key.x !== "string" ||
+        typeof key.y !== "string" ||
+        "d" in key
+      )
+        throw new Error("invalid public key");
+      if (createPublicKey({ key, format: "jwk" }).asymmetricKeyType !== "ec")
+        throw new Error("invalid public key type");
+      if (
+        name === "signing" &&
+        (!Array.isArray(key.key_ops) || !key.key_ops.includes("verify"))
+      )
+        throw new Error("invalid signing usages");
+    }
+    const syncPublicKeys = structuredClone(value);
+    return {
+      syncPublicKeys,
+      syncKeyFingerprint: createHash("sha256")
+        .update(canonicalJson(syncPublicKeys))
+        .digest("hex"),
+    };
+  } catch {
+    throw new PairingError(
+      "sync_device_key_invalid",
+      "Kin could not verify this device's public keys.",
+      400,
+    );
+  }
+}
+
+function validateDeviceAuthorizationCertificate(certificate, expected) {
+  try {
+    if (
+      !certificate ||
+      certificate.version !== 1 ||
+      certificate.householdId !== expected.householdId ||
+      certificate.memberId !== expected.memberId ||
+      certificate.deviceId !== expected.deviceId ||
+      certificate.issuerDeviceId !== expected.approverDevice.id ||
+      certificate.issuerFingerprint !==
+        expected.approverDevice.syncKeyFingerprint ||
+      certificate.fingerprint !== expected.claimantFingerprint ||
+      canonicalJson(certificate.publicKeys) !==
+        canonicalJson(expected.claimantPublicKeys) ||
+      !/^[A-Za-z0-9_-]{86}$/.test(certificate.signature)
+    )
+      throw new Error("certificate fields do not match the pending enrollment");
+    const { signature, ...unsigned } = certificate;
+    const valid = verifySignature(
+      "sha256",
+      Buffer.from(canonicalJson(unsigned)),
+      {
+        key: createPublicKey({
+          key: expected.approverDevice.syncPublicKeys.signing,
+          format: "jwk",
+        }),
+        dsaEncoding: "ieee-p1363",
+      },
+      Buffer.from(signature, "base64url"),
+    );
+    if (!valid) throw new Error("certificate signature is invalid");
+    return structuredClone(certificate);
+  } catch {
+    throw new PairingError(
+      "device_certificate_invalid",
+      "Kin could not verify this device approval.",
+      400,
+    );
+  }
+}
+
+function canonicalJson(value) {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  if (value && typeof value === "object")
+    return `{${Object.keys(value)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`)
+      .join(",")}}`;
+  return JSON.stringify(value);
 }
 
 function cleanLabel(value) {

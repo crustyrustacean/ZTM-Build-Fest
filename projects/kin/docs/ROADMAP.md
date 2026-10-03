@@ -1,6 +1,6 @@
 # Roadmap
 
-Current release: `v0.8.8 — Active-Member Slot Correctness`. Household capacity now counts active memberships rather than retained historical member records. After an adult leaves or is removed, the remaining adult may pair a replacement while the inactive historical membership remains retained. Pairing creation and final approval both enforce the two-active-adult limit. The v0.8.x line remains at its product-feedback gate before encrypted sync work.
+Current release: `v0.9.3 — Encrypted Event Sync Stabilization`. Kin now supports opt-in encrypted canonical-event sync across paired trusted devices, recipient-bound epoch-key provisioning, session/device revocation, separate transport and catch-up cursors, offline outbox retries, and deterministic v8 replay. The local identity service and relay remain in-memory; relay acknowledgements are process-local, all-device recovery is unavailable, and independent security/cross-browser review remain future work. The v0.9.x line is now at its human-feedback gate; do not begin v1.0 planning until feedback is considered.
 
 ## Planning releases
 
@@ -186,11 +186,23 @@ Reject stale same-period completion/reopen commands before persistence, add mult
 
 ### `v0.8.0` — Household Pairing
 
-Completed through v0.8.8: one household with exactly two active adult-member slots, manual pairing codes/invitation URLs, passkeys, member-bound approval and activation, trusted-device controls and session invalidation, reauthentication, protected membership removal, replacement after removal or leave with historical membership retention, terminal-claim cleanup, and bounded authentication flows. QR is deferred. Household content sync remains unimplemented. The implementation record is [V0.8.0](V0.8.0.md).
+Completed through v0.8.8: one household with exactly two active adult-member slots, manual pairing codes/invitation URLs, passkeys, member-bound approval and activation, trusted-device controls and session invalidation, reauthentication, protected membership removal, replacement after removal or leave with historical membership retention, terminal-claim cleanup, and bounded authentication flows. QR is deferred. At the v0.8.8 boundary, household content sync remained unimplemented; v0.9.x adds it. The implementation record is [V0.8.0](V0.8.0.md).
 
 ### `v0.9.0` — Encrypted Sync
 
-Explore encrypted event synchronization across trusted devices, revocation, and offline reconciliation. Minimize what the service can know about household content. This release depends on a reviewed threat model and a clear key lifecycle.
+Completed as the first encrypted-sync iteration: reviewed threat/key lifecycle contract, versioned AES-GCM event envelopes with device signatures, opaque authorized push/pull relay, exact retry outbox, bounded cursoring, additive IndexedDB schema 2, and offline Rust/WASM/browser fixtures. Existing canonical bytes remain unchanged. See [V0.9.0](V0.9.0.md).
+
+### `v0.9.1` — Device Provisioning, Epochs, and Revocation
+
+Completed: locally generated non-extractable device keys, same-member trusted-device pairing with fingerprint comparison, recipient-bound key wrapping, atomic epoch compare-and-advance, revocation/member-removal rotation gates, historical-key entitlements, and retry/stale epoch coverage. Revocation cannot erase prior keys/plaintext.
+
+### `v0.9.2` — Offline Reconciliation and Conflict Semantics
+
+Completed: persistent exact-envelope outbox, crash-safe remote commit/cursor advancement, separate catch-up cursor, additive Rust v8 identity resolution, equal-Lamport deterministic replay, stale local-clock advancement, documented archive conflict behavior, and relay-cursor reset detection/retry.
+
+### `v0.9.3` — Recovery, Privacy, and Feedback Readiness
+
+Completed: recovery and metadata threat assessment, encrypted logging/privacy boundary, bounds and malformed-envelope handling, same-member device enrollment, relay restart semantics, browser storage migration verification, and product-facing sync states. The identity service/relay remain memory-only and no independent security audit is claimed. Stop for human feedback before v1.0 planning.
 
 ### `v1.0.0` — Build Fest release
 
@@ -198,4 +210,4 @@ Focus on polish, reliability, accessibility, mobile UX, privacy documentation, o
 
 ## Scope discipline
 
-Each roadmap item is future work unless explicitly marked as completed. Authentication, passkeys, pairing, and trusted-device authorization are implemented through v0.8.8; encryption and synchronization remain unimplemented. Releases through `v0.0.12` were documentation-only; v0.1.0 is the first coded release. Handoff is implemented in v0.3.0; Talk in v0.4.0; Pulse in v0.5.0; Since You Last Looked in v0.6.0; Routines in v0.7.0.
+Each roadmap item is future work unless explicitly marked as completed. Authentication, passkeys, pairing, trusted-device authorization, and opt-in encrypted event synchronization are implemented through v0.9.3. The v0.9.x line is at its human-feedback gate; do not plan v1.0 until that feedback is considered. Releases through `v0.0.12` were documentation-only; v0.1.0 is the first coded release. Handoff is implemented in v0.3.0; Talk in v0.4.0; Pulse in v0.5.0; Since You Last Looked in v0.6.0; Routines in v0.7.0.

@@ -330,7 +330,10 @@ export async function handoffRegressions() {
       JSON.stringify(app.state),
     "mixed deterministic replay",
   );
-  check(app.store.database.version === 1, "no IndexedDB migration");
+  check(
+    app.store.database.version === 2,
+    "sync stores migrate without changing event rows",
+  );
   return "PASS Handoff add/acknowledge/archive, tombstones, invalid references, inert Unicode, retry draft ownership and mixed replay";
 }
 

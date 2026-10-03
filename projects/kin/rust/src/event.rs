@@ -26,6 +26,16 @@ id_type!(HandoffId);
 id_type!(TalkId);
 id_type!(RoutineId);
 
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub struct IdentityBinding {
+    pub legacy_household_id: HouseholdId,
+    pub legacy_actor_id: ActorId,
+    pub legacy_device_id: DeviceId,
+    pub household_id: HouseholdId,
+    pub actor_id: ActorId,
+    pub device_id: DeviceId,
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ItemClassification {
     Today,

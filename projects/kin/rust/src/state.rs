@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::error::KinError;
 use crate::event::{
-    valid_timestamp, ActorId, EventEnvelope, EventId, EventKind, HandoffId, HouseholdId,
+    valid_timestamp, ActorId, DeviceId, EventEnvelope, EventId, EventKind, HandoffId, HouseholdId,
     ItemClassification, ItemId, PulseValue, RoutineId, TalkId,
 };
 use crate::recurrence::{Cadence, CivilDate};
@@ -152,7 +152,7 @@ pub fn rebuild(events: &[EventEnvelope]) -> Result<HouseholdState, KinError> {
 }
 
 pub fn rebuild_at(events: &[EventEnvelope], as_of: i64) -> Result<HouseholdState, KinError> {
-    rebuild_with_context(events, as_of, None)
+    rebuild_with_context(events, as_of, None, false)
 }
 
 pub fn rebuild_on(
@@ -160,13 +160,24 @@ pub fn rebuild_on(
     as_of: i64,
     civil_date: CivilDate,
 ) -> Result<HouseholdState, KinError> {
-    rebuild_with_context(events, as_of, Some(civil_date))
+    rebuild_with_context(events, as_of, Some(civil_date), false)
+}
+
+pub fn rebuild_distributed_on(
+    events: &[EventEnvelope],
+    as_of: i64,
+    civil_date: CivilDate,
+) -> Result<HouseholdState, KinError> {
+    let mut ordered_events = events.to_vec();
+    ordered_events.sort_by_key(|event| (event.logical_time, event.device_id, event.event_id));
+    rebuild_with_context(&ordered_events, as_of, Some(civil_date), true)
 }
 
 fn rebuild_with_context(
     events: &[EventEnvelope],
     as_of: i64,
     civil_date: Option<CivilDate>,
+    allow_equal_logical_time: bool,
 ) -> Result<HouseholdState, KinError> {
     if !valid_timestamp(as_of) {
         return Err(KinError::MalformedProtocol);
@@ -174,14 +185,18 @@ fn rebuild_with_context(
     let mut pulses = BTreeMap::new();
     let mut routines: Vec<RoutineState> = Vec::new();
     let mut routine_positions = BTreeMap::new();
+    let mut routine_archives = BTreeMap::new();
     let mut completed_periods = BTreeSet::new();
     let mut household_id = None;
     let mut items = Vec::new();
     let mut handoffs = Vec::new();
     let mut talks = Vec::new();
     let mut talk_positions = BTreeMap::new();
+    let mut talk_archives = BTreeMap::new();
     let mut handoff_positions = BTreeMap::new();
+    let mut handoff_archives = BTreeMap::new();
     let mut item_positions = BTreeMap::new();
+    let mut item_archives = BTreeMap::new();
     let mut event_bytes = BTreeMap::<EventId, Vec<u8>>::new();
     let mut last_logical_time = 0;
 
@@ -201,7 +216,9 @@ fn rebuild_with_context(
             household_id = Some(event.household_id);
         }
 
-        if event.logical_time <= last_logical_time {
+        if event.logical_time < last_logical_time
+            || (!allow_equal_logical_time && event.logical_time == last_logical_time)
+        {
             return Err(KinError::InvalidEvent);
         }
 
@@ -243,11 +260,16 @@ fn rebuild_with_context(
                     .copied()
                     .ok_or(KinError::InvalidEvent)?;
                 let routine = &routines[position];
-                if routine.archived {
-                    return Err(KinError::InvalidEvent);
-                }
                 routine.cadence.validate_key(routine.created_on, *key)?;
-                if matches!(event.kind, EventKind::RoutineOccurrenceCompleted { .. }) {
+                if routine.archived {
+                    if !is_concurrent_terminal_conflict(
+                        allow_equal_logical_time,
+                        routine_archives.get(routine_id).copied(),
+                        event,
+                    ) {
+                        return Err(KinError::InvalidEvent);
+                    }
+                } else if matches!(event.kind, EventKind::RoutineOccurrenceCompleted { .. }) {
                     completed_periods.insert((*routine_id, *key));
                 } else {
                     completed_periods.remove(&(*routine_id, *key));
@@ -264,10 +286,18 @@ fn rebuild_with_context(
                     .ok_or(KinError::InvalidEvent)?;
                 let routine = &mut routines[position];
                 if routine.archived {
-                    return Err(KinError::InvalidEvent);
+                    if !is_concurrent_terminal_conflict(
+                        allow_equal_logical_time,
+                        routine_archives.get(routine_id).copied(),
+                        event,
+                    ) {
+                        return Err(KinError::InvalidEvent);
+                    }
+                } else {
+                    routine.archived = true;
+                    routine.occurrence_key = None;
+                    routine_archives.insert(*routine_id, (event.logical_time, event.device_id));
                 }
-                routine.archived = true;
-                routine.occurrence_key = None;
             }
             EventKind::PulseSet { value, expires_at } => {
                 if !valid_timestamp(event.timestamp) || !valid_timestamp(*expires_at) {
@@ -319,13 +349,23 @@ fn rebuild_with_context(
                     .ok_or(KinError::InvalidEvent)?;
                 let talk = &mut talks[position];
                 if talk.status == TalkStatus::Archived {
-                    return Err(KinError::InvalidEvent);
+                    if !is_concurrent_terminal_conflict(
+                        allow_equal_logical_time,
+                        talk_archives.get(talk_id).copied(),
+                        event,
+                    ) {
+                        return Err(KinError::InvalidEvent);
+                    }
+                } else if matches!(event.kind, EventKind::TalkArchived { .. }) {
+                    talk.status = TalkStatus::Archived;
+                    talk_archives.insert(*talk_id, (event.logical_time, event.device_id));
+                } else {
+                    talk.status = match event.kind {
+                        EventKind::TalkResolved { .. } => TalkStatus::Resolved,
+                        EventKind::TalkReopened { .. } => TalkStatus::Open,
+                        _ => return Err(KinError::InvalidEvent),
+                    };
                 }
-                talk.status = match event.kind {
-                    EventKind::TalkResolved { .. } => TalkStatus::Resolved,
-                    EventKind::TalkReopened { .. } => TalkStatus::Open,
-                    _ => TalkStatus::Archived,
-                };
             }
             EventKind::HandoffAdded { handoff_id, text } => {
                 if text.trim().is_empty() || handoff_positions.contains_key(handoff_id) {
@@ -348,12 +388,19 @@ fn rebuild_with_context(
                     .ok_or(KinError::InvalidEvent)?;
                 let handoff = &mut handoffs[position];
                 if handoff.status == HandoffStatus::Archived {
-                    return Err(KinError::InvalidEvent);
+                    if !is_concurrent_terminal_conflict(
+                        allow_equal_logical_time,
+                        handoff_archives.get(handoff_id).copied(),
+                        event,
+                    ) {
+                        return Err(KinError::InvalidEvent);
+                    }
+                } else if matches!(event.kind, EventKind::HandoffArchived { .. }) {
+                    handoff.status = HandoffStatus::Archived;
+                    handoff_archives.insert(*handoff_id, (event.logical_time, event.device_id));
+                } else {
+                    handoff.status = HandoffStatus::Acknowledged;
                 }
-                handoff.status = match event.kind {
-                    EventKind::HandoffAcknowledged { .. } => HandoffStatus::Acknowledged,
-                    _ => HandoffStatus::Archived,
-                };
             }
             EventKind::ItemAdded {
                 item_id,
@@ -381,7 +428,15 @@ fn rebuild_with_context(
                 match items[position].status {
                     ItemStatus::Active => items[position].status = ItemStatus::Completed,
                     ItemStatus::Completed => {}
-                    ItemStatus::Archived => return Err(KinError::InvalidEvent),
+                    ItemStatus::Archived => {
+                        if !is_concurrent_terminal_conflict(
+                            allow_equal_logical_time,
+                            item_archives.get(item_id).copied(),
+                            event,
+                        ) {
+                            return Err(KinError::InvalidEvent);
+                        }
+                    }
                 }
             }
             EventKind::ItemReopened { item_id } => {
@@ -392,7 +447,15 @@ fn rebuild_with_context(
                 match items[position].status {
                     ItemStatus::Active => {}
                     ItemStatus::Completed => items[position].status = ItemStatus::Active,
-                    ItemStatus::Archived => return Err(KinError::InvalidEvent),
+                    ItemStatus::Archived => {
+                        if !is_concurrent_terminal_conflict(
+                            allow_equal_logical_time,
+                            item_archives.get(item_id).copied(),
+                            event,
+                        ) {
+                            return Err(KinError::InvalidEvent);
+                        }
+                    }
                 }
             }
             EventKind::ItemArchived { item_id } => {
@@ -403,8 +466,17 @@ fn rebuild_with_context(
                 match items[position].status {
                     ItemStatus::Active | ItemStatus::Completed => {
                         items[position].status = ItemStatus::Archived;
+                        item_archives.insert(*item_id, (event.logical_time, event.device_id));
                     }
-                    ItemStatus::Archived => return Err(KinError::InvalidEvent),
+                    ItemStatus::Archived => {
+                        if !is_concurrent_terminal_conflict(
+                            allow_equal_logical_time,
+                            item_archives.get(item_id).copied(),
+                            event,
+                        ) {
+                            return Err(KinError::InvalidEvent);
+                        }
+                    }
                 }
             }
         }
@@ -426,6 +498,17 @@ fn rebuild_with_context(
         pulses: pulses.into_values().collect(),
         routines,
     })
+}
+
+fn is_concurrent_terminal_conflict(
+    allow_equal_logical_time: bool,
+    archived_by: Option<(u64, DeviceId)>,
+    event: &EventEnvelope,
+) -> bool {
+    allow_equal_logical_time
+        && archived_by.is_some_and(|(logical_time, device_id)| {
+            logical_time == event.logical_time && device_id != event.device_id
+        })
 }
 
 pub fn summarize(

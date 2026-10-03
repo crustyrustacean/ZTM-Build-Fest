@@ -3,10 +3,10 @@ use std::sync::Mutex;
 
 use crate::error::KinError;
 use crate::protocol::{
-    decode_request_with_summary, encode_state, encode_state_v6, encode_state_v7,
-    ERROR_PROTOCOL_VERSION, MAX_PROTOCOL_BYTES, PROTOCOL_V6, PROTOCOL_V7,
+    decode_request_with_summary, encode_state, encode_state_v6, encode_state_v7, encode_state_v8,
+    ERROR_PROTOCOL_VERSION, MAX_PROTOCOL_BYTES, PROTOCOL_V6, PROTOCOL_V7, PROTOCOL_V8,
 };
-use crate::state::{rebuild, rebuild_at, rebuild_on, summarize_validated};
+use crate::state::{rebuild, rebuild_at, rebuild_distributed_on, rebuild_on, summarize_validated};
 
 struct AbiState {
     allocations: BTreeMap<u32, Box<[u8]>>,
@@ -115,7 +115,13 @@ pub extern "C" fn kin_apply_events(pointer: u32, length: u32) -> i32 {
                     return Err(KinError::InvalidAbi);
                 }
                 decode_request_with_summary(input).and_then(|request| {
-                    let state = if let Some(date) = request.civil_date {
+                    let state = if request.protocol_version == PROTOCOL_V8 {
+                        rebuild_distributed_on(
+                            &request.events,
+                            request.as_of.unwrap(),
+                            request.civil_date.unwrap(),
+                        )
+                    } else if let Some(date) = request.civil_date {
                         rebuild_on(&request.events, request.as_of.unwrap(), date)
                     } else {
                         match request.as_of {
@@ -127,7 +133,9 @@ pub extern "C" fn kin_apply_events(pointer: u32, length: u32) -> i32 {
                         if request.protocol_version >= PROTOCOL_V6 {
                             summarize_validated(&request.events, request.summary_cursor, &household)
                                 .and_then(|summary| {
-                                    if request.protocol_version == PROTOCOL_V7 {
+                                    if request.protocol_version == PROTOCOL_V8 {
+                                        encode_state_v8(&household, &summary)
+                                    } else if request.protocol_version == PROTOCOL_V7 {
                                         encode_state_v7(&household, &summary)
                                     } else {
                                         encode_state_v6(&household, &summary)

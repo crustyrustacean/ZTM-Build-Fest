@@ -1,6 +1,6 @@
 # v0.1.0 Testing Contract
 
-**Status:** Current through v0.7.0 Routines; earlier version sections are historical contracts. See v0.7.0 below.
+**Status:** Current through v0.9.3 Encrypted Sync stabilization. Earlier version sections are historical release gates; see the v0.9.3 gate below.
 
 ## Rust domain tests
 
@@ -150,3 +150,19 @@ Run every truncated v6 result boundary and malformed summary count, kind, entity
 ## v0.7.0 Routines
 
 Run `cargo test`, `node web/wasm/kin-engine.test.mjs`, `node web/wasm/routines.test.mjs`, and the complete browser runner after a release Wasm build. `rust/src/routine_tests.rs` holds independent v7 wire fixtures; `recurrence.rs` covers Gregorian calendar primitives. `scripts/routine-regression.mjs` exercises real IndexedDB/Wasm lifecycle, boundaries, stale keys, quota/abort/retry, cross-tab races and keyboard focus. Existing suites retain explicit legacy protocol fixtures. See [V0.7.0](V0.7.0.md) for the full matrix and actual release evidence.
+
+## v0.9.3 Encrypted Sync Gate
+
+Run from the repository root after the release WASM build:
+
+```powershell
+cargo test --manifest-path projects/kin/Cargo.toml
+node --test projects/kin/web/sync/crypto.test.mjs
+node --test projects/kin/server/pairing-service.test.mjs projects/kin/server/pairing-sync-keys.test.mjs projects/kin/server/sync-service.test.mjs projects/kin/server/sync-http.test.mjs projects/kin/server/sync-e2e.test.mjs
+node --test projects/kin/web/wasm/kin-engine.test.mjs projects/kin/web/wasm/routines.test.mjs
+node projects/kin/scripts/browser-regression.mjs 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'
+```
+
+The release gate includes: exact canonical-byte encrypt/relay/decrypt roundtrip; ciphertext opacity; wrong-key, wrong-AAD/identity, modified nonce/tag/signature, wrong recipient, and expiry failures; same-member and new-member device enrollment; duplicate/mismatched provisioning retries; revocation and stale-session rejection; single-winner epoch CAS and the 128-epoch bound; 16-device/128-grant bounds; equal-Lamport delivery in different arrival orders; archive/concurrent-mutation conflict behavior; local clock advancement; exact-envelope retries after relay cursor reset; crash-safe remote event/replay/cursor commit; catch-up cursor independence; non-destructive v1→v2 IndexedDB migration; CSP, accessibility modes, and legacy v1-v7 compatibility.
+
+The browser-native synthetic storage fixture uses an isolated database and the real release WASM. It verifies byte-preserving migration, idempotent encrypted retry, cursor rollback rejection, cross-order v8 state replay versus arrival-ordered catch-up, and retained-envelope requeue after process-local relay loss. Service restart tests explicitly assert that accepted relay ciphertext is lost and acknowledgement is not durable; local canonical history remains intact. These tests do not certify cross-browser behavior, assistive technology, physical multi-device behavior, production durability, or an independent cryptographic audit.
