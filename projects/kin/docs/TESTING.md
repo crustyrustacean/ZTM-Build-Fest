@@ -1,6 +1,6 @@
 # Testing Contracts
 
-**Status:** Current through v0.10.2. Earlier version sections are historical release gates. See [V0.10.0](V0.10.0.md) for milestone and patch counts, environment and measurements.
+**Status:** Current through v0.10.3. Earlier version sections are historical release gates. See [V0.10.0](V0.10.0.md) for milestone and patch counts, environment and measurements.
 
 ## v0.10 security and portability gate
 
@@ -51,6 +51,30 @@ mismatched acknowledgements. The storage runner also exercises pending-rotation
 compare-and-set and the retained rotation barrier in encrypted IndexedDB.
 
 ## Rust domain tests
+
+### v0.10.3 bounded storage and corruption gate
+
+`bounded-storage-regression.mjs` runs through the existing storage runner. It
+checks 270 sparse ordered records with native pages ≤128 and crypto concurrency
+≤32, duplicate routing rejection, decrypted index mismatch, cancellation between
+batches, durable peer locks during 70-event migration/restore, exact source
+retention and resume, lock after queued native restore writes, and duplicate
+archive rejection before encryption. `encrypted-idb.test.mjs` checks both root
+formats against wrong routing/AAD, unsupported versions, plaintext field leakage,
+truncation and modified tags. Existing wrapper, KARC metadata/ciphertext,
+canonical duplicate and malformed/version tests remain mandatory.
+
+The storage runner now also forcibly terminates and reopens its isolated browser
+profile at pre/post event-publication boundaries (four assertions), separately
+from its four document-reload assertions. Synthetic recovery keys stay only in
+the test host. The UI runner holds a real peer read while locking to verify that
+numbered intent aborts the native transaction before the durable lock can queue
+behind it. Existing same/current-epoch delayed-notification tests remain intact.
+
+The full release gate additionally runs both project build/launcher workflows,
+including PowerShell and POSIX shell HTTP/WASM smoke tests, native formatting and
+warnings-denied Clippy/tests, complete Node/real-WASM/server tests, all product,
+security and PRF browser runners, version/whitespace and Kin-only path checks.
 
 ### v0.10.2 root lifecycle gate
 

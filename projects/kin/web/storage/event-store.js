@@ -2,7 +2,7 @@ import {
   idToHex, idFromHex, randomId, eventMetadata, eventMetadataBatch,
 } from "../wasm/kin-engine.js";
 import {
-  encryptedDatabase, snapshotStores, protectRows, valuesEqual, unprotectRecord,
+  encryptedDatabase, snapshotStores, protectRows, valuesEqual, compareStoreRows,
 } from "./encrypted-idb.js";
 import { projectionContext } from "../browser-time.js";
 import { rotateEventProtection, resumeEventProtection } from "./root-rotation.js";
@@ -182,13 +182,33 @@ export class EventStore {
         let manifest = await readSecurity(database);
         if (!manifest || manifest.vaultId !== vault.vaultId)
           throw new EventStoreError("Kin could not match this household's security setup.");
+        const capabilityEpoch = vault.securityEpoch ?? vault.manifest.lockEpoch ?? 0;
+        if (manifest.rootVersion !== vault.manifest.rootVersion || !valuesEqual(manifest.verifier, vault.manifest.verifier) ||
+            !Number.isSafeInteger(capabilityEpoch) || capabilityEpoch < 0 || capabilityEpoch !== (manifest.lockEpoch ?? 0)) {
+          vault.lock();
+          const error = new EventStoreError("Kin was locked before migration began. Unlock again to resume safely."); error.code = "locked"; throw error;
+        }
         if (manifest.phase === "encrypted") return manifest;
         if (!["preparing", "cleanup-pending"].includes(manifest.phase))
           throw new EventStoreError("Kin found an unsupported migration state.");
+        const checkMigration = async () => {
+          vault.assertUnlocked();
+          const current = await readSecurity(database);
+          if (!current || !["preparing", "cleanup-pending"].includes(current.phase) || current.vaultId !== manifest.vaultId ||
+              current.rootVersion !== manifest.rootVersion || !valuesEqual(current.verifier, manifest.verifier) ||
+              (current.configRevision ?? 0) !== (manifest.configRevision ?? 0) || (current.lockEpoch ?? 0) !== (manifest.lockEpoch ?? 0)) {
+            vault.lock();
+            const error = new EventStoreError("Kin was locked during migration. Unlock to resume safely."); error.code = "locked"; throw error;
+          }
+          vault.assertUnlocked();
+        };
         if (manifest.phase === "preparing") {
           const names = Object.keys(EVENT_STORE_DEFINITIONS);
           const original = await snapshotStores(database, names);
-          const rows = structuredClone(original);
+          // IDB owns the source snapshot. Canonical bytes stay immutable; only
+          // context defaults and pending transport seals may change in migration.
+          const rows = { ...original, local_context: structuredClone(original.local_context),
+            sync_state: structuredClone(original.sync_state) };
           const events = validateEventRows(rows.events);
           validateLegacyOutbox(rows.sync_outbox, events);
           let context = rows.local_context.find((row) => row.key === CONTEXT_KEY);
@@ -205,24 +225,25 @@ export class EventStore {
           validateCursorBoundary(context, events);
           const { asOf, civilDate } = projectionContext();
           engine.applyEvents(events.map((row) => row.encoded_event), asOf, context.last_looked_event_id === null ? null : idToHex(context.last_looked_event_id), civilDate, syncIdentityFromContext(context));
-          const keys = await prepareKeys(vault);
+          const keys = await prepareKeys(vault, { check: checkMigration });
           if (keys?.rewrapEventRows) await keys.rewrapEventRows(rows);
           else if (keys?.rewrapSyncState) {
             for (let i = 0; i < rows.sync_state.length; i += 1) rows.sync_state[i] = await keys.rewrapSyncState(rows.sync_state[i]);
           }
-          const protectedRows = await protectRows(vault, EVENT_STORE_DEFINITIONS, rows);
-          // Verification is over recovered bytes, not just ciphertext existence.
-          const recovered = await Promise.all(protectedRows.events.map((row) => unprotectRecord(vault, EVENT_STORE, EVENT_STORE_DEFINITIONS.events, row)));
-          if (!valuesEqual(events, recovered)) throw new EventStoreError("Kin could not verify the encrypted event history.");
-          engine.applyEvents(recovered.map((row) => row.encoded_event), asOf, context.last_looked_event_id === null ? null : idToHex(context.last_looked_event_id), civilDate, syncIdentityFromContext(context));
+          const protectedRows = await protectRows(vault, EVENT_STORE_DEFINITIONS, rows, { check: checkMigration });
+          // protectRows decrypts and compares every complete candidate record.
+          // Replaying the proven-equal canonical source preserves the complete
+          // post-verification replay without another recovered plaintext graph.
+          engine.applyEvents(events.map((row) => row.encoded_event), asOf,
+            context.last_looked_event_id === null ? null : idToHex(context.last_looked_event_id), civilDate, syncIdentityFromContext(context));
           vault.assertUnlocked();
           manifest = { ...manifest, phase: "cleanup-pending" };
           await replaceVerifiedSnapshot(database, original, protectedRows, manifest, vault);
         }
-        await finalizeKeys(vault);
+        await finalizeKeys(vault, { check: checkMigration });
         vault.assertUnlocked();
         manifest = { ...manifest, phase: "encrypted" };
-        await writeSecurity(database, manifest);
+        await writeSecurity(database, manifest, vault);
         return manifest;
       } finally { database.close(); }
     };
@@ -290,9 +311,11 @@ export class EventStore {
     return archive;
   }
 
-  static async restoreEmpty({ vault, engine, snapshot, manifest }) {
+  static async restoreEmpty({ vault, engine, snapshot, manifest, ownedSnapshot = false }) {
     vault.assertUnlocked();
-    const source = structuredClone(snapshot);
+    // Authenticated archive decoding can transfer its private result to this
+    // operation. Public callers retain defensive cloning against later mutation.
+    const source = ownedSnapshot ? snapshot : structuredClone(snapshot);
     validateArchiveSnapshot(source, engine);
     const context = source.local_context[0];
     // An archive contains history, not device authorization. New local actions
@@ -307,11 +330,12 @@ export class EventStore {
     });
     validateArchiveSnapshot(source, engine);
     const rows = { events: source.events, local_context: source.local_context };
-    const protectedRows = await protectRows(vault, EVENT_STORE_DEFINITIONS, rows);
+    const protectedRows = await protectRows(vault, EVENT_STORE_DEFINITIONS, rows, { check: () => EventStore.checkSecurityEpoch(vault) });
     const database = await openEventDatabase();
     try {
       const names = [...Object.keys(EVENT_STORE_DEFINITIONS), SECURITY_STORE];
       const transaction = database.transaction(names, "readwrite");
+      abortOnVaultLock(transaction, vault);
       return await transactionResult(transaction, (finish) => {
         let current;
         let remaining = names.length;
@@ -323,6 +347,7 @@ export class EventStore {
             vault.assertUnlocked();
             if (occupied) throw new EventStoreError("Restore requires an empty local household. Existing information was not changed.");
             if (current?.phase !== "encrypted" || current.vaultId !== vault.vaultId ||
+                current.rootVersion !== vault.manifest.rootVersion || !valuesEqual(current.verifier, vault.manifest.verifier) ||
                 (current.lockEpoch ?? 0) !== vault.securityEpoch ||
                 (manifest && (manifest.vaultId !== current.vaultId || !valuesEqual(manifest.verifier, current.verifier))))
               throw new EventStoreError("Unlock and finish protecting the empty household before restoring an archive.");
@@ -2196,7 +2221,7 @@ function validateArchiveSnapshot(snapshot, engine) {
   if ((context.sync_identity_bindings ?? []).some((binding) => !onlyFields(binding, bindingFields) || Object.keys(binding).length !== bindingFields.length))
     throw new EventStoreError("Kin found unsupported archive identity bindings.");
   const { asOf, civilDate } = projectionContext();
-  engine.applyEvents(rows.map((row) => row.encoded_event), asOf,
+  engine.planImport(rows.map((row) => row.encoded_event), asOf,
     context.last_looked_event_id === null ? null : idToHex(context.last_looked_event_id), civilDate, syncIdentityFromContext(context));
   return snapshot;
 }
@@ -2207,14 +2232,28 @@ async function readSecurity(database) {
   return transactionResult(transaction, (finish) => { request.onsuccess = () => finish(request.result ?? null); });
 }
 
-async function writeSecurity(database, record) {
+function abortOnVaultLock(transaction, vault) {
+  const unsubscribe = vault.onLock(() => {
+    const error = new EventStoreError("Kin locked before local storage could commit."); error.code = "locked";
+    abortWith(transaction, error);
+  });
+  transaction.addEventListener("complete", unsubscribe, { once: true });
+  transaction.addEventListener("abort", unsubscribe, { once: true });
+}
+
+async function writeSecurity(database, record, vault) {
   const transaction = database.transaction(SECURITY_STORE, "readwrite");
+  abortOnVaultLock(transaction, vault);
   return transactionResult(transaction, (finish) => {
     const store = transaction.objectStore(SECURITY_STORE);
     const request = store.get(SECURITY_KEY);
     request.onsuccess = () => {
+      try { vault.assertUnlocked(); }
+      catch (error) { abortWith(transaction, error); return; }
       const current = request.result;
-      if (!current || current.vaultId !== record.vaultId || (current.lockEpoch ?? 0) !== (record.lockEpoch ?? 0)) {
+      if (!current || current.phase !== "cleanup-pending" || current.vaultId !== record.vaultId ||
+          current.rootVersion !== record.rootVersion || !valuesEqual(current.verifier, record.verifier) ||
+          (current.configRevision ?? 0) !== (record.configRevision ?? 0) || (current.lockEpoch ?? 0) !== (record.lockEpoch ?? 0)) {
         const error = new EventStoreError("Kin was locked during migration. Unlock to resume safely."); error.code = "locked";
         abortWith(transaction, error); return;
       }
@@ -2227,8 +2266,8 @@ async function writeSecurity(database, record) {
 async function replaceVerifiedSnapshot(database, original, protectedRows, manifest, vault) {
   const names = [...Object.keys(EVENT_STORE_DEFINITIONS), SECURITY_STORE];
   const transaction = database.transaction(names, "readwrite");
+  abortOnVaultLock(transaction, vault);
   return transactionResult(transaction, (finish) => {
-    const actual = {};
     let remaining = names.length;
     let current;
     const securityRequest = transaction.objectStore(SECURITY_STORE).get(SECURITY_KEY);
@@ -2242,7 +2281,6 @@ async function replaceVerifiedSnapshot(database, original, protectedRows, manife
           vault.lock();
           const error = new EventStoreError("Kin was locked during migration. Unlock to resume safely."); error.code = "locked"; throw error;
         }
-        if (!valuesEqual(original, actual)) throw new EventStoreError("Household data changed during migration. Close other Kin tabs and retry.");
         for (const [storeName, rows] of Object.entries(protectedRows)) {
           const store = transaction.objectStore(storeName);
           store.clear();
@@ -2253,11 +2291,10 @@ async function replaceVerifiedSnapshot(database, original, protectedRows, manife
       } catch (error) { abortWith(transaction, error); }
     }
     for (const name of names.filter((value) => value !== SECURITY_STORE)) {
-      const request = transaction.objectStore(name).getAll();
-      request.onsuccess = () => {
-        actual[name] = request.result;
-        complete();
-      };
+      compareStoreRows(transaction, name, original[name], {
+        check: () => vault.assertUnlocked(), complete,
+        fail: (error) => abortWith(transaction, error),
+      });
     }
   });
 }

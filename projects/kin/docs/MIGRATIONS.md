@@ -1,6 +1,6 @@
 # Data Migrations
 
-**Status:** v0.10.0 implements recoverable local-encryption migration. v0.9.3's additive schema 1→2 migration remains supported as input; canonical bytes are not rewritten. Earlier version sections are historical.
+**Status:** v0.10.3 implements recoverable local-encryption migration, root replacement and bounded verification. v0.9.3's additive schema 1→2 migration remains supported as input; canonical bytes are not rewritten. Earlier version sections are historical.
 
 ## v0.9.3 → v0.10 local protection
 
@@ -39,6 +39,13 @@ replacement and final publication compare lock epochs again, so an interrupted
 setup cannot overwrite a newer lock with its earlier journal snapshot.
 
 ## Migration categories
+
+v0.10.3 retains canonical source bytes once and clones only metadata requiring
+mutation. Every 32-row protection batch decrypts and compares exact values and
+checks the durable security epoch before/after crypto. Legacy device migration
+checks between individual device/epoch operations as well. Final source CAS uses
+bounded native pages; full Rust replay still runs before atomic replacement.
+Native key/event replacement transactions abort on lock through completion.
 
 ### v0.10.2 root replacement recovery
 

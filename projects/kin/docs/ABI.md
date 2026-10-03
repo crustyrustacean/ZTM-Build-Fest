@@ -289,6 +289,19 @@ input order; EventStore uses it before replay to avoid one crossing per row.
 
 ### KARC v1 encrypted archive framing
 
+v0.10.3 adds two compact framing operations while retaining the original
+`kin_encode_archive` and `kin_decode_archive` exports and their byte layouts.
+`kin_archive_header(ptr,len)` accepts exactly two little-endian u32 lengths
+(metadata and ciphertext) and returns the validated 16-byte KARC v1 header.
+`kin_archive_layout(ptr,len)` accepts that header plus the actual complete archive
+buffer length:u32 (20 bytes total), validates the same bounds/version/reserved
+fields/exact total length, and returns the two lengths (8 bytes). Rust remains
+the framing authority; the browser copies opaque payload sections directly into
+or out of its own buffers without routing their contents through WASM. These
+operations do not authenticate ciphertext. The adapter returns detached copies
+when decoding, so callers cannot mutate an archive input during asynchronous
+authentication. Host ownership and ordinary ABI result lifetimes still apply.
+
 Header: `KARC`, archive-version:u16=1, reserved:u16=0,
 metadata-length:u32, ciphertext-length:u32, followed by exactly those two opaque
 sections. Metadata must contain 1�1,048,576 bytes; ciphertext at least a 16-byte

@@ -1115,6 +1115,11 @@ class KinApp extends HTMLElement {
 
   lockHousehold(broadcast = true, { preserveSecurityOperation = false } = {}) {
     if (broadcast) {
+      // A protected read holds a native transaction while crypto runs. Notify
+      // peers before the epoch write queues behind that read, so they abort it
+      // promptly. The later committed epoch remains authoritative if delivery
+      // is missed. Numbered intent also cannot revoke a newer unlock epoch.
+      this.notifyPeerLock((this.vault?.securityEpoch ?? this.security?.manifest?.lockEpoch ?? -1) + 1);
       this.lockBarrier = Promise.resolve(this.lockBarrier)
         .then(() => EventStore.lockAll())
         .then((lockEpoch) => {
@@ -1177,6 +1182,12 @@ class KinApp extends HTMLElement {
       this.setStatus("Household locked.");
       if (!preserveSecurityOperation) this.security.locked();
     }
+  }
+
+  notifyPeerLock(lockEpoch) {
+    if (!Number.isSafeInteger(lockEpoch) || lockEpoch < 1) return;
+    try { this.channel?.postMessage({ type: "household-locked", lockEpoch }); }
+    catch { /* The durable epoch still fences subsequent operations. */ }
   }
 }
 

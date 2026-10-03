@@ -1,6 +1,6 @@
 # Roadmap
 
-Current implementation: `v0.10.2 — Local Root Rotation & Recovery Lifecycle`. v0.10.3 will complete bounded storage/archive hardening before the requested human review of PR #15. v0.11 has not begun.
+Current implementation: `v0.10.3 — Bounded Storage/Archive Hardening & Architecture Closure`. This completes the requested implementation line and stops for human review of PR #15. v0.11 and v1.0 have not begun.
 
 ```text
 v0.9.3 — Encrypted Event Sync Stabilization

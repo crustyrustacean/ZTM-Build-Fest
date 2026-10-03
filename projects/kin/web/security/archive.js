@@ -1,4 +1,4 @@
-import { LocalVault, serializeProtectedValue, deserializeProtectedValue, toBase64Url, fromBase64Url, VaultError } from "./local-vault.js";
+import { LocalVault, serializeProtectedValue, deserializeProtectedValue, VaultError } from "./local-vault.js";
 import { EventStore } from "../storage/event-store.js";
 
 export async function exportHouseholdArchive({ store, engine, vault }) {
@@ -12,13 +12,13 @@ export async function exportHouseholdArchive({ store, engine, vault }) {
   };
   if (!manifest.wrappers.length) throw new VaultError("Create a verified recovery path before exporting.");
   const metadata = serializeProtectedValue({ archiveVersion: 1, manifest });
-  const envelope = await vault.sealArchive(snapshot, metadata);
+  const envelope = await vault.sealArchive(snapshot, metadata, { rawCiphertext: true });
   await assertCurrentProtection(vault);
   const { ciphertext, ...protection } = envelope;
   // The binary container carries raw ciphertext: base64 would make valid large
   // household histories exceed the archive framing budget unnecessarily.
   const framedMetadata = serializeProtectedValue({ archiveVersion: 1, manifest, protection });
-  return engine.encodeArchive(framedMetadata, fromBase64Url(ciphertext));
+  return engine.encodeArchive(framedMetadata, ciphertext);
 }
 
 export async function importHouseholdArchive({ bytes, recoverySecret, engine, vault }) {
@@ -34,11 +34,11 @@ export async function importHouseholdArchive({ bytes, recoverySecret, engine, va
     sourceVault = await LocalVault.unlock(header.manifest, recoverySecret);
     await assertCurrentProtection(vault);
     const authenticatedMetadata = serializeProtectedValue({ archiveVersion: 1, manifest: header.manifest });
-    const snapshot = await sourceVault.openArchive({ ...header.protection, ciphertext: toBase64Url(ciphertext) }, authenticatedMetadata);
+    const snapshot = await sourceVault.openArchive({ ...header.protection, ciphertext }, authenticatedMetadata, { ownedCiphertext: true });
     await assertCurrentProtection(vault);
     // EventStore validates and replays the whole corpus and rejects a nonempty
     // target inside the same transaction that publishes the imported history.
-    return await EventStore.restoreEmpty({ vault, engine, snapshot });
+    return await EventStore.restoreEmpty({ vault, engine, snapshot, ownedSnapshot: true });
   } finally {
     unsubscribe();
     sourceVault?.lock();

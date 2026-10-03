@@ -466,8 +466,26 @@ async function browserUiChecks() {
     );
     const peerStore = peerApp.store,
       peerEngine = peerApp.engine;
-    app.lockHousehold();
-    await wait(() => peerApp.state === null && peerApp.vault === null);
+    const peerVault = peerApp.vault;
+    const originalPeerOpen = peerVault.open.bind(peerVault);
+    let releasePeerRead, reachedPeerRead;
+    const peerReadGate = new Promise((resolve) => { releasePeerRead = resolve; });
+    const peerReadStarted = new Promise((resolve) => { reachedPeerRead = resolve; });
+    peerVault.open = async (...args) => {
+      const value = await originalPeerOpen(...args);
+      reachedPeerRead();
+      await peerReadGate;
+      return value;
+    };
+    const peerRead = peerStore.loadEvents().then(() => false, () => true);
+    try {
+      await peerReadStarted;
+      app.lockHousehold();
+      await wait(() => peerApp.state === null && peerApp.vault === null);
+      await app.lockBarrier;
+      check(await peerRead, "peer lock intent aborts a crypto-held read before the durable epoch write can deadlock");
+      check(peerVault.locked, "peer lock disposes the key during a native read transaction");
+    } finally { releasePeerRead(); peerVault.open = originalPeerOpen; }
     check(
       peerApp.store === null && peerApp.engine === null && peerApp.main.hidden,
       "lock broadcast revokes peer capabilities",

@@ -158,6 +158,41 @@ test("archive framing preserves opaque encrypted material and fails closed", asy
   engine.dispose();
 });
 
+test("compact archive framing preserves the original full-buffer ABI and detached ownership", async () => {
+  const engine = await loadKinEngine(url);
+  const { instance } = await WebAssembly.instantiate(wasm, {});
+  const exports = instance.exports;
+  const invoke = (operation, bytes) => {
+    const pointer = exports.kin_alloc(bytes.length);
+    try {
+      new Uint8Array(exports.memory.buffer, pointer, bytes.length).set(bytes);
+      assert.equal(exports[operation](pointer, bytes.length), 0);
+      return new Uint8Array(exports.memory.buffer, exports.kin_result_ptr(), exports.kin_result_len()).slice();
+    } finally { assert.equal(exports.kin_free(pointer, bytes.length), 0); }
+  };
+  const metadata = new TextEncoder().encode("published opaque metadata");
+  const ciphertext = new Uint8Array(1024 * 1024).fill(83);
+  const originalRequest = new Uint8Array(4 + metadata.length + ciphertext.length);
+  new DataView(originalRequest.buffer).setUint32(0, metadata.length, true);
+  originalRequest.set(metadata, 4); originalRequest.set(ciphertext, 4 + metadata.length);
+  const archived = engine.encodeArchive(metadata, ciphertext);
+  assert.deepEqual(archived, invoke("kin_encode_archive", originalRequest));
+  assert.deepEqual(invoke("kin_decode_archive", archived), originalRequest);
+  const restored = engine.decodeArchive(archived);
+  archived.fill(0); metadata.fill(0); ciphertext.fill(0);
+  assert.equal(restored.ciphertext[0], 83);
+  assert.equal(new TextDecoder().decode(restored.metadata), "published opaque metadata");
+  const maximumLengths = new Uint8Array(8);
+  new DataView(maximumLengths.buffer).setUint32(0, 1024 * 1024, true);
+  new DataView(maximumLengths.buffer).setUint32(4, 64 * 1024 * 1024 - 1024 * 1024 - 16, true);
+  const header = invoke("kin_archive_header", maximumLengths);
+  assert.equal(header.length, 16);
+  const request = new Uint8Array(20); request.set(header);
+  new DataView(request.buffer).setUint32(16, 64 * 1024 * 1024, true);
+  assert.deepEqual(invoke("kin_archive_layout", request), maximumLengths);
+  engine.dispose(); exports.kin_clear();
+});
+
 test("import planning validates the complete corpus and rejects duplicate identity", async () => {
   const engine = await loadKinEngine(url);
   const bytes = encodeAddedRecord({

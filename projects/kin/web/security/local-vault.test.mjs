@@ -1,6 +1,30 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { LocalVault, randomRecoverySecret, serializeProtectedValue, deserializeProtectedValue } from "./local-vault.js";
+import { LocalVault, randomRecoverySecret, serializeProtectedValue, deserializeProtectedValue, toBase64Url, fromBase64Url } from "./local-vault.js";
+
+test("raw archive ciphertext preserves the published v1 crypto contract under old and rotated roots", async () => {
+  const source = await LocalVault.create();
+  const candidate = await LocalVault.createRotation(source.vault);
+  const value = { formatVersion: 1, events: [{ encoded_event: new Uint8Array([1, 2, 255]), logical_time: 9n }] };
+  const metadata = new TextEncoder().encode("authenticated archive metadata");
+  for (const vault of [source.vault, candidate.vault]) {
+    const raw = await vault.sealArchive(value, metadata, { rawCiphertext: true });
+    assert.ok(raw.ciphertext instanceof Uint8Array);
+    assert.equal(raw.version, 1);
+    assert.equal(raw.rootVersion, undefined);
+    assert.deepEqual(await vault.openArchive(raw, metadata, { ownedCiphertext: true }), value);
+    assert.deepEqual(await vault.openArchive({ ...raw, ciphertext: toBase64Url(raw.ciphertext) }, metadata), value);
+    const legacy = await vault.sealArchive(value, metadata);
+    assert.deepEqual(await vault.openArchive({ ...legacy, ciphertext: fromBase64Url(legacy.ciphertext) }, metadata, { ownedCiphertext: true }), value);
+    for (const index of [0, raw.ciphertext.length - 1]) {
+      const changed = raw.ciphertext.slice(); changed[index] ^= 1;
+      await assert.rejects(vault.openArchive({ ...raw, ciphertext: changed }, metadata, { ownedCiphertext: true }));
+    }
+    await assert.rejects(vault.openArchive(raw, new Uint8Array([1]), { ownedCiphertext: true }));
+    await assert.rejects(vault.openArchive({ ...raw, ciphertext: raw.ciphertext.slice(0, 15) }, metadata, { ownedCiphertext: true }));
+  }
+  source.vault.lock(); candidate.vault.lock();
+});
 
 test("recovery wrapper unlocks encrypted canonical bytes without storing root or recovery secret", async () => {
   const { vault, manifest, recoverySecret } = await LocalVault.create();

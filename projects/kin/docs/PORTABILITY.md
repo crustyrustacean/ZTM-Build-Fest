@@ -1,6 +1,6 @@
 # Portable Household Data
 
-**Status:** v0.10.0 implements encrypted `.kin` backup and restore. Rust owns `KARC` v1 framing, 64 MiB bounds, version validation and complete import planning. Browser crypto/files own authenticated encryption, file selection/download and explicit restore confirmation. Corrupt/unsupported archives never partially import. Earlier conceptual sections below are design history.
+**Status:** v0.10.3 implements encrypted `.kin` backup and restore. Rust owns `KARC` v1 framing, 64 MiB bounds, version validation and complete import planning. Browser crypto/files own authenticated encryption, file selection/download and explicit restore confirmation. Corrupt/unsupported archives never partially import. Earlier conceptual sections below are design history.
 
 ## Implemented archive boundary
 
@@ -34,6 +34,21 @@ explicit compatibility boundary, not a claim of same-household server recovery.
 The memory-only identity service still cannot reconstruct lost server identity.
 
 ## Ownership principle
+
+### v0.10.3 bounded KARC v1 processing
+
+KARC v1 remains one authenticated payload with unchanged bytes/AAD semantics.
+Internal raw-ciphertext APIs avoid base64 conversion of the whole archive.
+Additive compact Rust framing/layout calls validate metadata/ciphertext lengths
+and headers while browser-owned buffers retain opaque ciphertext. Existing
+full-buffer ABI exports and old archives remain supported. Import authenticates
+the complete body, verifies canonical data and full Rust replay, then publishes
+atomically; corruption at the end cannot partially import. Durable lock checks
+guard archive phases and the final native transaction aborts on lock.
+
+This reduces avoidable copies without introducing KARC v2. Web Crypto's complete
+AES-GCM payload and the bounded full canonical replay still require whole buffers;
+desktop measurements in [V0.10.0](V0.10.0.md) quantify the practical limit.
 
 > Household members should be able to obtain a usable copy of their Kin data.
 

@@ -1,6 +1,6 @@
 # Local Event Storage
 
-**Status:** v0.10.0 encrypted local storage. The event database is schema 3, key database schema 4, local envelope v1. Canonical event bytes remain unchanged inside authenticated ciphertext. The v0.9.3 database description and earlier notes below record the migration source.
+**Status:** v0.10.3 encrypted local storage. The event database is schema 3, key database schema 4, local envelopes v1 (original roots) and v2 (rotated roots). Canonical event bytes remain unchanged inside authenticated ciphertext. The v0.9.3 database description and earlier notes below record the migration source.
 
 All four household draft surfaces now retain text only in unlocked inputs. Reload/lock discards drafts, and startup removes historical sessionStorage draft keys before components mount. No household plaintext is written to localStorage, sessionStorage, Cache Storage, cookies, OPFS or debug persistence.
 
@@ -24,6 +24,23 @@ idempotent and journalled, then final publication enables ordinary access. Locke
 or interrupted work cannot publish stale results. See [ROOT-ROTATION](ROOT-ROTATION.md).
 
 ## v0.10 encrypted storage contract
+
+v0.10.3 pages large protected reads in 128-row native requests and bounds crypto
+concurrency to 32. The enclosing transaction preserves the original snapshot and
+serialized-write semantics. Local capability cancellation is checked between
+batches; prompt numbered peer-lock intent aborts long reads before the durable
+epoch write queues behind them. If notification is missed, the current read
+serializes before the epoch commit and every subsequent stale operation fails.
+Do not open an external epoch-read transaction from inside an event read that
+already holds the security store: a queued lock write could deadlock it.
+
+Migration retains one immutable canonical source, clones only metadata requiring
+mutation, decrypts/compares each replacement, and fully replays the verified
+canonical bytes. Final source comparisons use bounded pages. Restore's private
+authenticated snapshot can explicitly transfer ownership; public caller snapshots
+retain defensive copying. Final native migration/restore/rotation transactions
+abort on local lock. Complete plaintext results remain required at the bounded
+10,000-event/64 MiB Rust replay and KARC v1 interfaces.
 
 The [v0.10 contract](V0.10.0.md) defines the complete baseline inventory, minimal
 routing metadata, AES-GCM envelope/AAD, key hierarchy and transaction requirements.

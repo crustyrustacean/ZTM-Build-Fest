@@ -236,3 +236,40 @@ test("a mismatched rotation acknowledgement cannot install the proposed key", as
   assert.equal(f.epochs.has(3), false);
   assert.ok(f.state.pendingRotation);
 });
+
+for (const change of ["peer lock", "root rotation"]) {
+  test(`an in-flight provisioning response cannot resume after a missed ${change} broadcast`, async (t) => {
+    const marker = { lockEpoch: 4, rootVersion: 1 };
+    let checks = 0, locked = false, privateProcessing = false, release, entered;
+    const started = new Promise(resolve => { entered = resolve; });
+    const response = new Promise(resolve => { release = resolve; });
+    t.mock.method(globalThis, "fetch", async () => {
+      entered();
+      return { ok: true, json: () => response };
+    });
+    const coordinator = new SyncCoordinator({ store: {}, engine: {}, identity: {} });
+    coordinator.keyStore = { vault: {
+      assertUnlocked() { if (locked) throw Object.assign(new Error("Local vault locked"), { code: "locked" }); },
+      async checkSecurityEpoch() {
+        checks++;
+        if (marker.lockEpoch !== 4 || marker.rootVersion !== 1) {
+          locked = true;
+          throw Object.assign(new Error("The durable local protection epoch changed"), { code: "locked" });
+        }
+      },
+    } };
+    const sender = { deviceId: "sender", publicKeys: {},
+      get verifiedKeyHistory() { privateProcessing = true; return []; } };
+    const receiving = coordinator.receiveProvisioning([sender]);
+    const rejected = assert.rejects(receiving, error => error.code === "locked");
+    await started;
+    // Deliberately do not invoke stop()/lock(): the broadcast was missed.
+    marker.lockEpoch++;
+    if (change === "root rotation") marker.rootVersion++;
+    release({ grants: [{ senderDeviceId: sender.deviceId }] });
+    await rejected;
+    assert.equal(checks, 2);
+    assert.equal(locked, true);
+    assert.equal(privateProcessing, false, "stale response must stop before entering private key processing");
+  });
+}

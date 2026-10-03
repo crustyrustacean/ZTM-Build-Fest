@@ -704,6 +704,11 @@ export class SyncCoordinator {
     await this.keyStore?.vault.checkSecurityEpoch?.();
     const result = await api(path, { ...options, signal: this.abortController.signal });
     if (this.stopped) throw new Error("Device sync was stopped.");
+    // A peer may advance the durable lock/root epoch while this response is in
+    // flight even when its broadcast is missed. Reject before using private keys
+    // to process provisioning or exposing the response to the sync continuation.
+    await this.keyStore?.vault.checkSecurityEpoch?.();
+    if (this.stopped) throw new Error("Device sync was stopped.");
     this.keyStore?.vault.assertUnlocked();
     return result;
   }

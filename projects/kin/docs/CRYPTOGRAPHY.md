@@ -1,6 +1,6 @@
 # Cryptographic Posture
 
-**Status:** Implemented through v0.10.0 for local incubation. Web Crypto supplies AES-GCM, ECDSA P-256/SHA-256, ECDH P-256 and HKDF-SHA-256 for local encryption, archives and existing encrypted sync. Recovery or verified WebAuthn PRF authorizes local root unwrapping. No independent cryptographic audit or production certification is claimed.
+**Status:** Implemented through v0.10.3 for local incubation. Web Crypto supplies AES-GCM, ECDSA P-256/SHA-256, ECDH P-256 and HKDF-SHA-256 for local encryption, archives and existing encrypted sync. Recovery or verified WebAuthn PRF authorizes local root unwrapping. No independent cryptographic audit or production certification is claimed.
 
 ## Non-negotiable rule
 

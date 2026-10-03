@@ -1,5 +1,6 @@
 // Run in an isolated browser profile before application setup, never user storage.
 export async function keyMigrationRegression() {
+  let checks = 0;
   const { LocalVault } = await import('/security/local-vault.js');
   const { SyncKeyStore, migrateSyncKeys, finalizeSyncKeyMigration } = await import('/sync/key-store.js');
   const { generateDeviceKeys, exportDevicePublicKeys, deviceKeyFingerprint, createHouseholdEpochKey,
@@ -8,8 +9,9 @@ export async function keyMigrationRegression() {
     let failed = false;
     try { await action(); } catch { failed = true; }
     if (!failed) throw new Error('Expected the protected key operation to fail closed.');
+    checks += 1;
   };
-  const check = (value, message) => { if (!value) throw new Error(message); };
+  const check = (value, message) => { if (!value) throw new Error(message); checks += 1; };
   const name = 'kin-crypto-keys';
   await new Promise((resolve, reject) => {
     const request = indexedDB.deleteDatabase(name);
@@ -47,6 +49,21 @@ export async function keyMigrationRegression() {
     'AES/sealed mismatch must preserve every original key capability');
   check(rejectedRows.security_state.length === 0, 'AES/sealed mismatch must not commit a migration journal');
   await writeLegacyEpoch(epoch);
+  const checkingVault = await LocalVault.unlock(manifest, recoverySecret);
+  let preparationChecks = 0;
+  await assertFails(() => migrateSyncKeys(checkingVault, { check: async () => {
+    if (++preparationChecks === 3) { checkingVault.lock(); throw new Error('Injected durable peer epoch change between keys'); }
+  } }));
+  const interruptedCheck = await rawRows();
+  check(preparationChecks === 3 && interruptedCheck.security_state.length === 0 &&
+    interruptedCheck.devices[0].keys.signingPrivateKey instanceof CryptoKey,
+  'durable per-key check must stop before staging and preserve the legacy source');
+  const preparingVault = await LocalVault.unlock(manifest, recoverySecret);
+  await assertFails(() => lockDuringMetadataWrite('preparing', preparingVault,
+    () => migrateSyncKeys(preparingVault, { prepareOnly: true })));
+  const interruptedPreparation = await rawRows();
+  check(interruptedPreparation.security_state.length === 0 && interruptedPreparation.devices[0].keys.signingPrivateKey instanceof CryptoKey,
+    'locking after queued journal write must abort preparation and preserve the legacy source');
   await migrateSyncKeys(vault, { prepareOnly: true });
   await assertFails(() => SyncKeyStore.open({ vault }));
   const staged = await rawRows();
@@ -55,6 +72,23 @@ export async function keyMigrationRegression() {
   const resumed = await migrateSyncKeys(vault, { prepareOnly: true });
   check(firstStage === JSON.stringify((await rawRows()).security_state), 'resume must reuse exact staged successor');
   const eventRows = await resumed.rewrapEventRows({ sync_state: [{ key: 'active', pendingRotation: { sealed: rotation.sealed } }] });
+  const batchVault = await LocalVault.unlock(manifest, recoverySecret);
+  let protectionChecks = 0;
+  await assertFails(() => finalizeSyncKeyMigration(batchVault, { check: async () => {
+    if (++protectionChecks === 3) { batchVault.lock(); throw new Error('Injected durable peer epoch change after a key batch'); }
+  } }));
+  const interruptedBatch = await rawRows();
+  check(protectionChecks === 3 && JSON.stringify(interruptedBatch.security_state) === firstStage &&
+    interruptedBatch.devices[0].keys.signingPrivateKey instanceof CryptoKey,
+  'durable batch check must preserve all legacy keys and exact staged successor');
+  const committingVault = await LocalVault.unlock(manifest, recoverySecret);
+  await assertFails(() => lockDuringMetadataWrite('encrypted', committingVault,
+    () => finalizeSyncKeyMigration(committingVault)));
+  const interruptedCommit = await rawRows();
+  check(JSON.stringify(interruptedCommit.security_state) === firstStage &&
+    interruptedCommit.devices[0].keys.signingPrivateKey instanceof CryptoKey &&
+    interruptedCommit.epochs[0].householdKey instanceof CryptoKey,
+  'locking after queued final metadata must restore all original keys and the exact migration journal');
   await finalizeSyncKeyMigration(vault);
   const store = await SyncKeyStore.open({ vault });
   const device = await store.getDevice(identity.deviceId);
@@ -87,7 +121,18 @@ export async function keyMigrationRegression() {
     const request = indexedDB.deleteDatabase(name);
     request.onsuccess = resolve; request.onerror = () => reject(request.error);
   });
-  return 'PASS legacy AES/seal mismatch preservation, staged nonextractable-key migration, exact interrupted retry, rotation reseal, protected persistence, recovery reload, lock and delayed-digest trusted-device pinning (new, existing, mismatched, conflicting, concurrent, mutable input and lock cancellation)';
+  return `PASS ${checks} legacy key migration, mismatch preservation, durable batch cancellation, native lock rollback, rotation reseal, protected recovery and trusted-pin assertions`;
+
+  async function lockDuringMetadataWrite(phase, targetVault, action) {
+    const original = IDBObjectStore.prototype.put;
+    IDBObjectStore.prototype.put = function (value, ...args) {
+      const request = original.call(this, value, ...args);
+      if (this.name === 'security_state' && value?.key === 'vault' && value.phase === phase) targetVault.lock();
+      return request;
+    };
+    try { return await action(); }
+    finally { IDBObjectStore.prototype.put = original; targetVault.lock(); }
+  }
 
   async function trustedPinRegression() {
     const candidate = { ...identity, deviceId: 'e'.repeat(32), publicKeys, fingerprint };

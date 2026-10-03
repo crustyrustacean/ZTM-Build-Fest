@@ -207,19 +207,21 @@ export class LocalVault {
     return structuredClone(this.manifest);
   }
 
-  async sealArchive(value, metadata = new Uint8Array()) {
+  async sealArchive(value, metadata = new Uint8Array(), { rawCiphertext = false } = {}) {
     this.assertUnlocked();
     const bytes = serializeProtectedValue(value);
     try {
-      const result = await encryptBytes(this.root, bytes, this.vaultId, "kin/archive/v1", ["archive", "1", toBase64Url(metadata)]);
+      const result = await encryptBytes(this.root, bytes, this.vaultId, "kin/archive/v1", ["archive", "1", toBase64Url(metadata)], 1, rawCiphertext);
       this.assertUnlocked();
       return result;
     } finally { bytes.fill(0); }
   }
 
-  async openArchive(envelope, metadata = new Uint8Array()) {
+  async openArchive(envelope, metadata = new Uint8Array(), { ownedCiphertext = false } = {}) {
     this.assertUnlocked();
-    const bytes = await decryptBytes(this.root, envelope, this.vaultId, "kin/archive/v1", ["archive", "1", toBase64Url(metadata)]);
+    // The archive adapter transfers its private copied ciphertext buffer. Other
+    // callers keep the established immutable base64 representation by default.
+    const bytes = await decryptBytes(this.root, envelope, this.vaultId, "kin/archive/v1", ["archive", "1", toBase64Url(metadata)], 1, ownedCiphertext);
     try {
       this.assertUnlocked();
       return deserializeProtectedValue(bytes);
@@ -272,7 +274,7 @@ async function deriveKey(secret, salt, purpose, vaultId, context) {
   );
 }
 
-async function encryptBytes(secret, bytes, vaultId, purpose, context, rootVersion = 1) {
+async function encryptBytes(secret, bytes, vaultId, purpose, context, rootVersion = 1, rawCiphertext = false) {
   if (bytes.byteLength > MAX_VALUE_BYTES) throw new VaultError("The protected record exceeds Kin's supported size.");
   // A fresh 256-bit salt derives a one-use AES key; the root is never an AES key.
   // The independently random 96-bit IV is never intentionally reused under a key.
@@ -284,17 +286,18 @@ async function encryptBytes(secret, bytes, vaultId, purpose, context, rootVersio
   const ciphertext = await crypto.subtle.encrypt(
     { name: "AES-GCM", iv: nonce, additionalData: fields([purpose, String(version), vaultId, ...authenticatedContext]), tagLength: 128 }, key, bytes,
   );
-  return { version, ...(version === 2 ? { rootVersion } : {}), vaultId, salt: toBase64Url(salt), nonce: toBase64Url(nonce), ciphertext: toBase64Url(new Uint8Array(ciphertext)) };
+  return { version, ...(version === 2 ? { rootVersion } : {}), vaultId, salt: toBase64Url(salt), nonce: toBase64Url(nonce),
+    ciphertext: rawCiphertext ? new Uint8Array(ciphertext) : toBase64Url(new Uint8Array(ciphertext)) };
 }
 
-async function decryptBytes(secret, envelope, vaultId, purpose, context, rootVersion = 1) {
+async function decryptBytes(secret, envelope, vaultId, purpose, context, rootVersion = 1, ownedCiphertext = false) {
   const version = rootVersion === 1 ? 1 : 2;
   if (envelope?.version !== version || envelope.vaultId !== vaultId ||
       (version === 2 ? envelope.rootVersion !== rootVersion : envelope.rootVersion !== undefined))
     throw new VaultError("The protected record belongs to a different household or format.");
   const salt = fromBase64Url(envelope.salt);
   const nonce = fromBase64Url(envelope.nonce);
-  const ciphertext = fromBase64Url(envelope.ciphertext);
+  const ciphertext = ownedCiphertext && envelope.ciphertext instanceof Uint8Array ? envelope.ciphertext : fromBase64Url(envelope.ciphertext);
   if (salt.length !== 32 || nonce.length !== 12 || ciphertext.length < 16 || ciphertext.length > MAX_VALUE_BYTES + 16)
     throw new VaultError("The protected record has invalid bounds.");
   const authenticatedContext = version === 1 ? context : ["root-version", String(rootVersion), ...context];

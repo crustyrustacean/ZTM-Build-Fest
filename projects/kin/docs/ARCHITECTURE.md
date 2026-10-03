@@ -1,6 +1,6 @@
 # Architecture
 
-**Status:** Current through v0.10.0. Rust owns portable commands, canonical codecs, replay and archive framing/import validation. JavaScript owns the local encryption/unlock boundary and browser capabilities. Event DB schema 3 and key DB schema 4 persist encrypted protected values. The same-origin identity/relay service remains in-memory.
+**Status:** Current through v0.10.3. Rust owns portable commands, canonical codecs, replay and archive framing/import validation. JavaScript owns root rotation, local encryption/unlock, bounded persistence and browser capabilities. Event DB schema 3 and key DB schema 4 persist encrypted protected values. The same-origin identity/relay service remains in-memory.
 
 ## v0.10 implementation boundary
 
@@ -128,11 +128,18 @@ A manual ABI is implemented for v0.1.0 in [ABI](ABI.md), including exported func
 
 The manual boundary keeps the interface visible and avoids convenience bindings before a demonstrated need. A later requirement may justify revisiting that choice through an explicit architecture decision; the v0.1.0 implementation must follow the current contract.
 
-## Deferred v0.10.x architectural debt
+## Canonical boundary debt resolved in v0.10.0
 
-JavaScript currently participates in constructing canonical domain-event layouts while Rust independently decodes and validates them. This duplicates wire-format knowledge across the boundary. In addition, browser-side storage and sync code reads canonical fields directly from fixed byte offsets, including logical time at offset 76. Outside a narrow Wasm/codec adapter, browser subsystems should not depend on hard-coded canonical event offsets.
+The v0.9.3 baseline duplicated canonical layouts in browser code and read fields
+by fixed offsets. v0.10.0 moved command construction, codec validation and metadata
+to Rust through the narrow WASM adapter. Browser storage/sync pass canonical bytes
+and consume validated metadata. No remaining domain codec migration is assigned
+to v0.11.
 
-The v0.10.x line should establish one Rust-owned codec/metadata boundary. Options include exposing validated metadata through the Wasm API, storing validated structured metadata alongside authoritative canonical bytes, or providing an explicit Rust-owned codec API. Until then, canonical bytes remain authoritative; this debt does not justify changing v0.9.3 event bytes or moving Web Crypto, networking, IndexedDB, or DOM behavior into Rust.
+v0.10.3 adds compact Rust-owned archive header/layout validation so opaque
+ciphertext does not cross WASM merely to be copied. KARC v1 bytes and existing
+full-buffer ABI exports remain unchanged. Web Crypto, networking, IndexedDB and
+DOM remain browser responsibilities.
 
 ## Local-first progression
 

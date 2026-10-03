@@ -205,6 +205,7 @@ class KinSecurity extends HTMLElement {
       ({ vault: candidate } = await LocalVault.createRotation(source, secret));
       this.assertCurrentOperation(operation);
       const app = this.closest("kin-app");
+      app.notifyPeerLock(source.securityEpoch + 1);
       app.lockHousehold(false, { preserveSecurityOperation: true });
       this.phase = "protecting";
       this.render();
@@ -300,7 +301,7 @@ class KinSecurity extends HTMLElement {
         try {
           this.assertCurrentOperation(operation);
           await EventStore.migrate({ vault, engine,
-            prepareKeys: (current) => migrateSyncKeys(current, { prepareOnly: true }),
+            prepareKeys: (current, options) => migrateSyncKeys(current, { ...options, prepareOnly: true }),
             finalizeKeys: (current) => finalizeSyncKeyMigration(current),
           });
         } finally { engine.dispose(); }

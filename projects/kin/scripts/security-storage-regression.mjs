@@ -11,6 +11,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { keyMigrationRegression } from "./security-key-regression.mjs";
 import { rotationStorageRegression } from "./rotation-storage-regression.mjs";
 import { rootRotationRegression, rootRotationRestartFixture } from "./root-rotation-regression.mjs";
+import { boundedStorageRegression } from "./bounded-storage-regression.mjs";
 import { rootKeyRotationRegression } from "./root-key-rotation-regression.mjs";
 
 export async function securityStorageRegressions(client, { adapterOnly = false } = {}) {
@@ -394,9 +395,10 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   });
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   const origin = `http://127.0.0.1:${server.address().port}`;
-  const browser = spawn(executable, ["--headless=new", "--disable-gpu", "--disable-extensions", "--no-first-run", "--no-default-browser-check", "--edge-skip-compat-layer-relaunch", "--remote-debugging-port=0", `--user-data-dir=${profile}`, "about:blank"], { windowsHide: true, stdio: "ignore" });
-  let socket;
-  try {
+  let browser, socket;
+  async function connectBrowser() {
+    await rm(join(profile, "DevToolsActivePort"), { force: true });
+    browser = spawn(executable, ["--headless=new", "--disable-gpu", "--disable-extensions", "--no-first-run", "--no-default-browser-check", "--edge-skip-compat-layer-relaunch", "--remote-debugging-port=0", `--user-data-dir=${profile}`, "about:blank"], { windowsHide: true, stdio: "ignore" });
     let port;
     for (let attempt = 0; attempt < 200 && !port; attempt += 1) { try { port = (await readFile(join(profile, "DevToolsActivePort"), "utf8")).split("\n")[0]; } catch { await delay(50); } }
     assert.ok(port, "Browser did not start");
@@ -406,14 +408,39 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     let id = 0;
     const pending = new Map();
     socket.onmessage = ({ data }) => { const message = JSON.parse(data); if (message.id) { const task = pending.get(message.id); pending.delete(message.id); message.error ? task.reject(Error(JSON.stringify(message.error))) : task.resolve(message.result); } };
+    socket.onclose = () => { for (const task of pending.values()) task.reject(Error("Isolated browser connection closed")); pending.clear(); };
     const send = (method, params) => new Promise((resolve, reject) => { const next = ++id; pending.set(next, { resolve, reject }); socket.send(JSON.stringify({ id: next, method, params })); });
     const client = { evaluate: async (expression) => { const result = await send("Runtime.evaluate", { expression, awaitPromise: true, returnByValue: true }); assert.equal(result.exceptionDetails, undefined, JSON.stringify(result.exceptionDetails)); return result.result.value; } };
     for (let attempt = 0; attempt < 100; attempt += 1) { if (await client.evaluate("location.origin === " + JSON.stringify(origin))) break; await delay(20); }
+    return client;
+  }
+  async function stopBrowser() {
+    if (socket) {
+      const closed = new Promise((resolve) => socket.addEventListener("close", resolve, { once: true }));
+      socket.close();
+      await Promise.race([closed, delay(1_000)]);
+      socket = null;
+    }
+    if (!browser) return;
+    if (process.platform === "win32" && browser.pid) {
+      const killer = spawn("powershell.exe", ["-NoProfile", "-Command",
+        "for ($attempt = 0; $attempt -lt 10; $attempt++) { $targets = Get-CimInstance Win32_Process -Filter \"Name = 'msedge.exe' OR Name = 'chrome.exe'\" | Where-Object { $_.CommandLine -like \"*$env:KIN_TEST_PROFILE*\" }; if (-not $targets) { break }; foreach ($target in $targets) { Stop-Process -Id $target.ProcessId -Force -ErrorAction SilentlyContinue }; Start-Sleep -Milliseconds 100 }"],
+      { windowsHide: true, stdio: "ignore", env: { ...process.env, KIN_TEST_PROFILE: profile } });
+      const [code] = await once(killer, "exit");
+      assert.equal(code, 0, "Could not terminate the isolated browser profile");
+    } else browser.kill("SIGKILL");
+    if (browser.exitCode === null) await Promise.race([once(browser, "exit"), delay(2_000)]);
+    browser.unref();
+    browser = null;
+  }
+  try {
+    let client = await connectBrowser();
     if (!process.argv.includes("--performance-only")) {
       await securityStorageRegressions(client, { adapterOnly: process.argv.includes("--adapter-only") });
       if (!process.argv.includes("--adapter-only")) console.log(await client.evaluate(`(${keyMigrationRegression.toString()})()`));
       if (!process.argv.includes("--adapter-only")) console.log(await client.evaluate(`(${rotationStorageRegression.toString()})()`));
       if (!process.argv.includes("--adapter-only")) console.log(await client.evaluate(`(${rootRotationRegression.toString()})()`));
+      if (!process.argv.includes("--adapter-only")) console.log(await client.evaluate(`(${boundedStorageRegression.toString()})()`));
       if (!process.argv.includes("--adapter-only")) console.log(await client.evaluate(`(${rootKeyRotationRegression.toString()})()`));
       if (!process.argv.includes("--adapter-only")) {
         let restartChecks = 0;
@@ -430,6 +457,17 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
           restartChecks += (await client.evaluate(`(${rootRotationRestartFixture.toString()})(${JSON.stringify({ resume })})`)).checks;
         }
         console.log(`PASS ${restartChecks} actual page-reload root rotation recovery assertions`);
+        let processChecks = 0;
+        for (const phase of ["events-staged", "events-committed"]) {
+          const resume = await client.evaluate(`(${rootRotationRestartFixture.toString()})(${JSON.stringify({ phase })})`);
+          // Terminate the actual isolated browser process and reopen its saved
+          // profile. Only the user's separately retained fixture secret stays in
+          // this host; no JS heap, vault, engine or connection survives.
+          await stopBrowser();
+          client = await connectBrowser();
+          processChecks += (await client.evaluate(`(${rootRotationRestartFixture.toString()})(${JSON.stringify({ resume })})`)).checks;
+        }
+        console.log(`PASS ${processChecks} actual browser-process restart root rotation recovery assertions`);
       }
     }
     if (process.argv.includes("--performance") || process.argv.includes("--performance-only")) {
@@ -439,20 +477,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
       finally { const memory = await monitor.stop(); if (measurement) console.log("PERFORMANCE " + JSON.stringify({ ...measurement, ...memory })); }
     }
   } finally {
-    if (socket) {
-      const closed = new Promise((resolve) => socket.addEventListener("close", resolve, { once: true }));
-      socket.close();
-      await Promise.race([closed, delay(1_000)]);
-    }
-    if (process.platform === "win32" && browser.pid) {
-      const killer = spawn("powershell.exe", ["-NoProfile", "-Command",
-        "for ($attempt = 0; $attempt -lt 10; $attempt++) { $targets = Get-CimInstance Win32_Process -Filter \"Name = 'msedge.exe'\" | Where-Object { $_.CommandLine -like \"*$env:KIN_TEST_PROFILE*\" }; if (-not $targets) { break }; foreach ($target in $targets) { Stop-Process -Id $target.ProcessId -Force -ErrorAction SilentlyContinue }; Start-Sleep -Milliseconds 100 }"],
-      { windowsHide: true, stdio: "ignore", env: { ...process.env, KIN_TEST_PROFILE: profile } });
-      const [code] = await once(killer, "exit");
-      if (code !== 0) console.warn(`Could not terminate Edge processes for the isolated test profile (PowerShell ${code}).`);
-    } else browser.kill();
-    if (browser.exitCode === null) await Promise.race([once(browser, "exit"), delay(2_000)]);
-    browser.unref();
+    await stopBrowser();
     server.closeAllConnections();
     await new Promise((resolve) => server.close(resolve));
     await delay(300);

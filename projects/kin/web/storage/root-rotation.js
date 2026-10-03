@@ -1,9 +1,9 @@
 import { LocalVault, VaultError } from "../security/local-vault.js";
-import { snapshotStores, protectRecord, unprotectRecord, recordIdentity, valuesEqual } from "./encrypted-idb.js";
+import { snapshotStores, protectRecord, unprotectRecord, recordIdentity, valuesEqual, compareStoreRows, PROTECTED_BATCH_SIZE } from "./encrypted-idb.js";
 
 const SECURITY = "security_state";
 const KEY = "vault";
-const BATCH = 32;
+const BATCH = PROTECTED_BATCH_SIZE;
 const prefix = (rotation) => `root-rotation:${rotation.id}:`;
 const stageKey = (rotation, store, row, definition) => `${prefix(rotation)}${store}:${recordIdentity(row[definition.keyPath])}`;
 const failure = (message, code = "rotation_invalid") => new VaultError(message, code);
@@ -113,18 +113,19 @@ async function continueRotation(database, options, contract, marker) {
     await onPhase("keys-staged");
     await check();
     const original = await snapshotStores(database, Object.keys(definitions));
-    const prior = await snapshotStores(database, [SECURITY]);
-    const existing = new Map(prior[SECURITY].filter((row) => row.key.startsWith(prefix(rotation))).map((row) => [row.key, row]));
+    const existing = (await readStageKeys(database)).filter((key) => typeof key === "string" && key.startsWith(prefix(rotation)));
     const protectedRows = {}, recoveredRows = {};
     const expectedStageKeys = new Set();
     for (const [store, rows] of Object.entries(original)) {
       protectedRows[store] = []; recoveredRows[store] = [];
       for (let offset = 0; offset < rows.length; offset += BATCH) {
         await check(); sourceVault.assertUnlocked();
-        const batch = await Promise.all(rows.slice(offset, offset + BATCH).map(async (source) => {
+        const page = rows.slice(offset, offset + BATCH);
+        const savedPage = await readStages(database, page.map((source) => stageKey(rotation, store, source, definitions[store])));
+        const batch = await Promise.all(page.map(async (source, index) => {
           const key = stageKey(rotation, store, source, definitions[store]);
           const value = await unprotectRecord(sourceVault, store, definitions[store], source);
-          const saved = existing.get(key);
+          const saved = savedPage[index];
           if (saved && (saved.version !== 1 || saved.rotationId !== rotation.id || saved.vaultId !== rotation.vaultId ||
               saved.fromRootVersion !== rotation.fromRootVersion || saved.toRootVersion !== rotation.toRootVersion || saved.store !== store))
             throw failure("Kin found an inconsistent root-rotation staging record.");
@@ -144,7 +145,7 @@ async function continueRotation(database, options, contract, marker) {
         await onPhase("event-stage-batch", { store, offset, count: batch.length });
       }
     }
-    if ([...existing.keys()].some((key) => !expectedStageKeys.has(key)))
+    if (existing.some((key) => !expectedStageKeys.has(key)))
       throw failure("Kin found unexpected root-rotation staging records.");
     await checkpoint("events-staged");
     await onPhase("events-staged");
@@ -264,6 +265,16 @@ function readStages(database, keys) {
   });
 }
 
+function readStageKeys(database) {
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction(SECURITY, "readonly");
+    const request = transaction.objectStore(SECURITY).getAllKeys();
+    transaction.oncomplete = () => resolve(request.result);
+    transaction.onabort = () => reject(transaction.error ?? failure("The rotation staging keys could not be read."));
+    transaction.onerror = () => {};
+  });
+}
+
 function guardedWrite(database, expected, vault, schedule, names = [SECURITY]) {
   return new Promise((resolve, reject) => {
     const transaction = database.transaction(names, "readwrite");
@@ -301,23 +312,23 @@ function changeMarker(database, expected, replacement, sourceVault, candidateVau
 function replaceEvents(database, expected, replacement, original, protectedRows, vault) {
   const names = [...Object.keys(original), SECURITY];
   return guardedWrite(database, expected, vault, (transaction) => {
-    const actual = {};
     let remaining = Object.keys(original).length;
-    for (const name of Object.keys(original)) {
-      const request = transaction.objectStore(name).getAll();
-      request.onsuccess = () => {
-        actual[name] = request.result;
+    const complete = () => {
         if (--remaining) return;
         try {
           vault.assertUnlocked();
-          if (!valuesEqual(original, actual)) throw failure("Household data changed during rotation. Saved data was preserved.");
           for (const [store, rows] of Object.entries(protectedRows)) {
             const target = transaction.objectStore(store); target.clear();
             for (const row of rows) target.put(row);
           }
           transaction.objectStore(SECURITY).put(replacement);
         } catch (error) { transaction.__kinFailure = error; transaction.abort(); }
-      };
+    };
+    for (const name of Object.keys(original)) {
+      compareStoreRows(transaction, name, original[name], {
+        check: () => vault.assertUnlocked(), complete,
+        fail: (error) => { transaction.__kinFailure = error; transaction.abort(); },
+      });
     }
   }, names);
 }

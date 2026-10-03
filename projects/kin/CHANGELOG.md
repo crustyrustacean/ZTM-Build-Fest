@@ -2,6 +2,26 @@
 
 This file records completed Kin releases. The `v0.0.x` releases are planning and documentation milestones; they do not represent implemented application features. The first implementation milestone remains `v0.1.0`.
 
+## [0.10.3] — Bounded Storage/Archive Hardening & Architecture Closure
+
+Page protected reads and bound decryption concurrency, remove redundant migration
+and restore copies, and preserve exact comparison, full Rust replay and atomic
+publication. KARC v1 remains the archive format: raw ciphertext stays in browser
+buffers while Rust validates compact framing metadata. Legacy archives and ABI
+entry points remain supported. Additional corruption and mid-operation lock
+checks exercise fail-closed publication.
+
+Archive restoration is intentionally local-only and grants no sync authority.
+The [release record](docs/V0.10.0.md) contains same-harness before/after desktop
+measurements, compatibility and the internal architecture/security review. No
+independent audit, mobile certification, v0.11 redesign or v1.0 work is claimed.
+
+Passed 118 Rust tests, 150 Node/real-WASM tests on both Windows and Linux,
+313 security storage assertions, 97 security UI assertions, 18 virtual-authenticator
+assertions, the complete product browser gate and PowerShell/POSIX launch workflows.
+Maximum-history sampled renderer memory fell from 2.82 to 1.32 GiB; typical 10k
+unlock measured 9% slower. KARC v1 archive sizes and canonical bytes are unchanged.
+
 ## [0.10.2] — Local Root Rotation & Recovery Lifecycle
 
 Replace recovery protection with an independent random root and a new, re-entered

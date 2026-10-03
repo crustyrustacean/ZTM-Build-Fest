@@ -1,14 +1,14 @@
 # Persistent Contract Versioning
 
-**Status:** Current through v0.10.2; earlier version sections preserve historical contracts.
+**Status:** Current through v0.10.3; earlier version sections preserve historical contracts.
 
 ## Independent version axes
 
 Kin version numbers describe product releases; they do not version every persistent or transport contract.
 
-| Version axis | v0.10.2 read/write contract | Governs |
+| Version axis | v0.10.3 read/write contract | Governs |
 | --- | --- | --- |
-| Application | `0.10.2` | Local root rotation and recovery lifecycle |
+| Application | `0.10.3` | Bounded storage/archive hardening and architecture closure |
 | Canonical event schema | Item add 1/2; other kinds 1 | Immutable event interpretation; original bytes retained |
 | Replay protocol | Reads v1–v8; writes local v7 / synchronized v8 | Request context and projection semantics |
 | Manual WASM ABI | Existing exports plus additive command/metadata/archive/import APIs | Host ownership and calls; new command packet v1 |
@@ -32,7 +32,8 @@ after explicit rotation those clients fail closed on manifest/local-envelope v2.
 KARC v1 framing, crypto and body remain supported, including old root-v1 archives.
 Archives made after rotation carry manifest v2 and require a reader supporting it.
 An additive ABI or storage change does not rewrite canonical history or imply a
-sync-protocol bump. v0.9 clients cannot open the upgraded local databases or unlock
+sync-protocol bump. v0.10.3 adds compact archive-framing ABI calls while retaining
+the original exports and all v0.10.2 persistent formats. v0.9 clients cannot open the upgraded local databases or unlock
 the protected records. Mixed old/new sync clients preserve relay-envelope format,
 but an old client cannot validate a new signed device-key successor and must be
 upgraded before trusting changed fingerprints. Do not downgrade persisted stores.

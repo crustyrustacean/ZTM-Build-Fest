@@ -16,11 +16,13 @@ export async function rootRotationRegression() {
   const engine = await loadKinEngine();
   const prepareKeys = prepareRootRotationKeys, commitKeys = commitRootRotationKeys;
 
-  async function fixture() {
+  async function fixture(eventCount = 2) {
     await remove("kin"); await remove("kin-crypto-keys");
     const legacy = await EventStore.openLegacyForMigration();
     await legacy.append({ type: "add", text: "root lifecycle first canonical row", classification: "need" }, engine);
     await legacy.append({ type: "add", text: "root lifecycle second canonical row", classification: "today" }, engine);
+    for (let index = 2; index < eventCount; index++)
+      await legacy.append({ type: "add", text: `root batch fixture ${index}`, classification: "need" }, engine);
     await legacy.getCatchUpState();
     legacy.close();
     const source = await LocalVault.create();
@@ -158,6 +160,23 @@ export async function rootRotationRegression() {
     check(persisted.events.every((row) => (row.protected_value.rootVersion ?? 1) === 1), "Foreign journal never replaces committed old-root events");
     transaction = database.transaction("security_state", "readwrite"); transaction.objectStore("security_state").put(valid); await transactionDone(transaction); database.close();
     await finishResume(test, valid);
+  }
+
+  {
+    const test = await fixture(70);
+    let reached = false;
+    await reject(() => EventStore.rotateProtection({ sourceVault: test.source.vault, candidateVault: test.candidate.vault, engine, prepareKeys, commitKeys,
+      onPhase: async (phase, detail) => {
+        if (phase === "event-stage-batch" && detail.store === "events" && detail.offset >= 32) {
+          reached = true;
+          throw Error("second root staging page interruption");
+        }
+      } }), "A 70-event rotation stops after its second staged page");
+    check(reached, "Second-page root interruption occurs after at least 64 candidate records");
+    const database = await rawDatabase();
+    const markerRows = await snapshotStores(database, ["security_state"]); database.close();
+    check(markerRows.security_state.filter((row) => row.store === "events").length === 64, "Partial journal contains exactly two bounded event pages");
+    await finishResume(test);
   }
 
   for (const phase of ["begun", "events-staged", "events-committed"]) {

@@ -1,6 +1,19 @@
 // Browser capability adapter: domain records are encrypted before native IDB
 // commits. A native request keeps transactions active across Web Crypto awaits.
 const FORMAT = 1;
+export const PROTECTED_BATCH_SIZE = 32;
+export const PROTECTED_PAGE_SIZE = 128;
+
+export async function mapProtectedBatch(values, operation, check = () => {}) {
+  const result = new Array(values.length);
+  for (let offset = 0; offset < values.length; offset += PROTECTED_BATCH_SIZE) {
+    await check();
+    const batch = await Promise.all(values.slice(offset, offset + PROTECTED_BATCH_SIZE).map(operation));
+    await check();
+    for (let index = 0; index < batch.length; index += 1) result[offset + index] = batch[index];
+  }
+  return result;
+}
 
 export function recordIdentity(value) {
   if (typeof value === "string") return `s:${value}`;
@@ -42,21 +55,19 @@ export async function unprotectRecord(vault, store, definition, row) {
   return value;
 }
 
-export async function protectRows(vault, definitions, rowsByStore) {
+export async function protectRows(vault, definitions, rowsByStore, { check = async () => {} } = {}) {
   const result = {};
+  const assertCurrent = async () => { vault.assertUnlocked(); await check(); vault.assertUnlocked(); };
   for (const [store, rows] of Object.entries(rowsByStore)) {
     if (!definitions[store]) throw new Error("Unknown protected store.");
-    result[store] = [];
-    // Bounded parallel work avoids allocating the full corpus twice in Web Crypto.
-    for (let offset = 0; offset < rows.length; offset += 32) {
-      const batch = await Promise.all(rows.slice(offset, offset + 32).map(async (value) => {
+    // Verify one bounded group and release its recovered plaintext before
+    // advancing. The complete recovered graph is never retained alongside source.
+    result[store] = await mapProtectedBatch(rows, async (value) => {
         const row = await protectRecord(vault, store, definitions[store], value);
         const recovered = await unprotectRecord(vault, store, definitions[store], row);
         if (!valuesEqual(value, recovered)) throw new Error("Protected migration verification failed.");
         return row;
-      }));
-      result[store].push(...batch);
-    }
+      }, assertCurrent);
   }
   return result;
 }
@@ -90,15 +101,51 @@ export function snapshotStores(database, names) {
   });
 }
 
-export function replaceStores(database, rowsByStore, { metadata, guard } = {}) {
+// Compare against a frozen source inside the committing native transaction.
+// Paging avoids allocating a second complete source snapshot merely to compare it.
+export function compareStoreRows(transaction, name, expected, { check, complete, fail }) {
+  const store = transaction.objectStore(name);
+  let offset = 0;
+  const read = (range) => {
+    const request = store.getAll(range, PROTECTED_PAGE_SIZE);
+    request.onerror = () => fail(request.error);
+    request.onsuccess = () => {
+      try {
+        check();
+        const rows = request.result;
+        for (const row of rows) {
+          if (offset >= expected.length || !valuesEqual(row, expected[offset++]))
+            throw new Error("Stored data changed before replacement. The saved source was preserved.");
+        }
+        if (rows.length < PROTECTED_PAGE_SIZE) {
+          if (offset !== expected.length) throw new Error("Stored records changed before replacement.");
+          complete();
+        } else read(IDBKeyRange.lowerBound(rows.at(-1)[store.keyPath], true));
+      } catch (error) { fail(error); }
+    };
+  };
+  try { read(); } catch (error) { fail(error); }
+}
+
+export function replaceStores(database, rowsByStore, { metadata, guard, vault } = {}) {
   const names = Object.keys(rowsByStore);
   if (metadata && !names.includes(metadata.store)) names.push(metadata.store);
   return new Promise((resolve, reject) => {
     const transaction = database.transaction(names, "readwrite");
-    transaction.oncomplete = () => resolve();
-    transaction.onabort = () => reject(transaction.__kinFailure ?? transaction.error ?? new Error("Storage replacement failed."));
+    const unsubscribe = vault?.onLock(() => {
+      const error = new Error("Kin locked before the storage replacement completed.");
+      error.code = "locked";
+      transaction.__kinFailure ??= error;
+      try { transaction.abort(); } catch { /* Already ending. */ }
+    });
+    transaction.oncomplete = () => { unsubscribe?.(); resolve(); };
+    transaction.onabort = () => {
+      unsubscribe?.();
+      reject(transaction.__kinFailure ?? transaction.error ?? new Error("Storage replacement failed."));
+    };
     transaction.onerror = () => {};
     try {
+      vault?.assertUnlocked();
       guard?.();
       for (const [name, rows] of Object.entries(rowsByStore)) {
         const store = transaction.objectStore(name);
@@ -107,8 +154,8 @@ export function replaceStores(database, rowsByStore, { metadata, guard } = {}) {
       }
       if (metadata) transaction.objectStore(metadata.store).put(metadata.value);
     } catch (error) {
-      transaction.__kinFailure = error;
-      transaction.abort();
+      transaction.__kinFailure ??= error;
+      try { transaction.abort(); } catch { /* A lock may have already aborted it. */ }
     }
   });
 }
@@ -166,8 +213,26 @@ export function encryptedDatabase(database, vault, definitions, { securityGuard 
           const store = native.objectStore(name);
           const definition = definitions[name];
           const read = (source, method, args, many = false) => requestOperation(async () => {
+            if (many && source === store && args.length === 0) {
+              // One native transaction retains the original serialization and
+              // snapshot contract while holding at most 128 ciphertext rows;
+              // Web Crypto still processes only 32 values at a time.
+              const values = [];
+              let range;
+              while (true) {
+                assertLive();
+                const page = await runNative(() => store.getAll(range, PROTECTED_PAGE_SIZE));
+                if (!page.length) return values;
+                const lastKey = page.at(-1)[definition.keyPath];
+                const decoded = await mapProtectedBatch(page,
+                  (row) => unprotectRecord(vault, name, definition, row), assertLive);
+                values.push(...decoded);
+                if (page.length < PROTECTED_PAGE_SIZE) return values;
+                range = IDBKeyRange.lowerBound(lastKey, true);
+              }
+            }
             const raw = await runNative(() => source[method](...args));
-            if (many) return Promise.all(raw.map((row) => unprotectRecord(vault, name, definition, row)));
+            if (many) return mapProtectedBatch(raw, (row) => unprotectRecord(vault, name, definition, row), assertLive);
             return unprotectRecord(vault, name, definition, raw);
           });
           return {

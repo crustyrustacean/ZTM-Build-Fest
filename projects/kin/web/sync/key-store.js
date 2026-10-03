@@ -421,8 +421,9 @@ async function securityRecord(database) {
 
 // The encrypted staging journal retains one exact successor across interruptions.
 // Legacy key capabilities stay intact until the event migration has committed.
-export async function migrateSyncKeys(vault, { prepareOnly = true } = {}) {
-  vault.assertUnlocked();
+export async function migrateSyncKeys(vault, { prepareOnly = true, check = async () => {} } = {}) {
+  const assertLive = async () => { vault.assertUnlocked(); await check(); vault.assertUnlocked(); };
+  await assertLive();
   const database = await openRawDatabase();
   try {
     const marker = await securityRecord(database);
@@ -436,6 +437,7 @@ export async function migrateSyncKeys(vault, { prepareOnly = true } = {}) {
     } else {
       staged = { devices: [], epochs: [], trusted_devices: legacy.trusted_devices };
       for (const old of legacy.devices) {
+        await assertLive();
         if (!old.keys || old.serializedKeys) throw new SyncKeyStoreError("Unexpected legacy device-key format.");
         const { keys, serializedKeys } = await generateProtectedDeviceKeys();
         const publicKeys = await exportDevicePublicKeys(keys);
@@ -454,6 +456,7 @@ export async function migrateSyncKeys(vault, { prepareOnly = true } = {}) {
         staged.devices.push(next);
       }
       for (const old of legacy.epochs) {
+        await assertLive();
         const sealed = await resealForMigration(old.sealed, legacy.devices, staged.devices, old);
         const { householdKey: discardedKey, ...metadata } = old;
         staged.epochs.push({ ...metadata, sealed });
@@ -462,25 +465,29 @@ export async function migrateSyncKeys(vault, { prepareOnly = true } = {}) {
       const verified = await vault.open(staging, { store: "sync-key-migration", id: "staged" });
       // Verify all serialized device secrets can reconstruct the exact public key.
       for (const record of verified.devices) {
+        await assertLive();
         const keys = await importProtectedDeviceKeys(record.serializedKeys);
         if (await deviceKeyFingerprint(await exportDevicePublicKeys(keys)) !== record.fingerprint)
           throw new SyncKeyStoreError("Device migration verification failed.");
       }
+      await assertLive();
       await replaceStores(database, {}, { metadata: { store: SECURITY_STORE, value: {
         key: "vault", phase: "preparing", vaultId: vault.vaultId, staging,
-      } }, guard: () => vault.assertUnlocked() });
+      } }, vault, guard: () => vault.assertUnlocked() });
     }
     const migration = {
       async rewrapEventRows(rows) {
-        vault.assertUnlocked();
+        await assertLive();
         for (const state of rows.sync_state ?? []) {
+          await assertLive();
           if (state.pendingRotation?.sealed)
             state.pendingRotation.sealed = await resealForMigration(state.pendingRotation.sealed, legacy.devices, staged.devices);
         }
-        vault.assertUnlocked();
+        await assertLive();
         return rows;
       },
     };
+    await assertLive();
     if (!prepareOnly) throw new SyncKeyStoreError("Device keys must be finalized only after verified event migration.");
     return migration;
   } finally { database.close(); }
@@ -501,8 +508,9 @@ async function resealForMigration(sealed, oldDevices, newDevices, legacyEpoch = 
   throw new SyncKeyStoreError("A saved sync key cannot be migrated. Original data was preserved.");
 }
 
-export async function finalizeSyncKeyMigration(vault) {
-  vault.assertUnlocked();
+export async function finalizeSyncKeyMigration(vault, { check = async () => {} } = {}) {
+  const assertLive = async () => { vault.assertUnlocked(); await check(); vault.assertUnlocked(); };
+  await assertLive();
   const database = await openRawDatabase();
   try {
     const marker = await securityRecord(database);
@@ -510,11 +518,14 @@ export async function finalizeSyncKeyMigration(vault) {
     if (marker.phase === "encrypted") return;
     if (marker.phase !== "preparing") throw new SyncKeyStoreError("Prepare device-key migration before committing it.");
     const staged = await vault.open(marker.staging, { store: "sync-key-migration", id: "staged" });
-    const protectedRows = await protectRows(vault, KEY_DEFINITIONS, staged);
+    const protectedRows = await protectRows(vault, KEY_DEFINITIONS, staged, { check: assertLive });
+    await assertLive();
     await replaceStores(database, protectedRows, {
       metadata: { store: SECURITY_STORE, value: { key: "vault", phase: "encrypted", vaultId: vault.vaultId } },
+      vault,
       guard: () => vault.assertUnlocked(),
     });
+    await assertLive();
   } finally { database.close(); }
 }
 

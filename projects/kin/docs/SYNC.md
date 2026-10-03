@@ -1,6 +1,6 @@
 # Synchronization Design
 
-**Status:** Implemented through v0.10.1 for the local incubation service. Existing encrypted envelopes and v8 canonical replay remain compatible. The local outbox, sync state, epoch secrets and private device keys are encrypted at rest and unavailable while locked. Signed device-key successors preserve verification history and repair entitled post-join epoch grants. The relay and identity service remain in-memory; acknowledgements are process-local, not durable.
+**Status:** Implemented through v0.10.3 for the local incubation service. Existing encrypted envelopes and v8 canonical replay remain compatible. The local outbox, sync state, epoch secrets and private device keys are encrypted at rest and unavailable while locked. Signed device-key successors preserve verification history and repair entitled post-join epoch grants. The relay and identity service remain in-memory; acknowledgements are process-local, not durable.
 
 ## Intended direction
 
@@ -140,6 +140,11 @@ The local service exposes authenticated `/api/sync/status`, `/api/sync/devices`,
 
 The browser stores non-extractable device keys and sealed epoch keys in a separate IndexedDB database. Canonical event rows remain the state authority in `kin` schema 2; `sync_state`, `sync_outbox`, and `sync_bindings` are separate stores. Each new local event and its outbox entry commit atomically. The exact encrypted envelope is retained through retry and after acceptance so a cursor reset after relay restart can requeue the same bytes. A downloaded event advances the transport cursor only in the same transaction as canonical-byte persistence and successful Rust replay. The UI acknowledgement cursor remains independent.
 
-The current JS/Wasm protocol boundary has deferred v0.10.x debt: JavaScript constructs canonical event layouts while Rust decodes them, and browser storage/sync code reads fields such as logical time directly from byte offset 76. Canonical event bytes remain authoritative in v0.9.3. Consolidation should move validated metadata access behind a narrow codec boundary without moving browser-native cryptography, storage, or network transport into Rust; see [ARCHITECTURE](ARCHITECTURE.md#deferred-v010x-architectural-debt).
+The v0.9.3 baseline duplicated canonical layouts and fixed-offset metadata reads
+in browser code. v0.10.0 resolved that debt with Rust-owned commands/codecs and
+validated metadata through the narrow WASM adapter; see [ARCHITECTURE](ARCHITECTURE.md).
+v0.10.3 additionally rechecks the durable local epoch after each awaited sync
+response so a missed peer notification cannot resume private-key use under a
+disposed root. Networking and Web Crypto remain browser responsibilities.
 
 The server is intentionally in-memory in this incubation. It returns `durable: false`; full restart loses household identity/session and service-side relay records, and v0.9.x has no way to restore the same authenticated household. A relay-only cursor reset while identity state survives is detected; clients retain local canonical bytes and cached exact envelopes for retry. Sync is not durable across full restart, and ciphertext authored only by a device whose local state is lost may be unavailable. A newly joined/replacement adult receives current and later epochs only; v0.9.x does not grant pre-join epoch keys, so earlier history remains unavailable. All-device loss may make encrypted data unrecoverable.

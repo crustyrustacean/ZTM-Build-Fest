@@ -90,6 +90,8 @@ export async function loadKinEngine(
     "kin_execute_command",
     "kin_encode_archive",
     "kin_decode_archive",
+    "kin_archive_header",
+    "kin_archive_layout",
     "kin_plan_import",
     "kin_clear",
     "kin_result_ptr",
@@ -496,11 +498,18 @@ function encodeArchive(exports, metadata, ciphertext) {
   ciphertext = asBytes(ciphertext);
   if (metadata.length + ciphertext.length + 16 > MAX_PROTOCOL_BYTES)
     throw new KinEngineError(5, USER_MESSAGES.get(5));
-  const bytes = new Uint8Array(4 + metadata.length + ciphertext.length);
-  new DataView(bytes.buffer).setUint32(0, metadata.length, true);
-  bytes.set(metadata, 4);
-  bytes.set(ciphertext, 4 + metadata.length);
-  return callCore(exports, "kin_encode_archive", bytes);
+  const lengths = new Uint8Array(8);
+  const view = new DataView(lengths.buffer);
+  view.setUint32(0, metadata.length, true);
+  view.setUint32(4, ciphertext.length, true);
+  const header = callCore(exports, "kin_archive_header", lengths);
+  if (header.length !== 16)
+    throw new KinEngineError(6, "Kin received an invalid archive header.");
+  const bytes = new Uint8Array(16 + metadata.length + ciphertext.length);
+  bytes.set(header);
+  bytes.set(metadata, 16);
+  bytes.set(ciphertext, 16 + metadata.length);
+  return bytes;
 }
 function planImport(exports, records, asOf, cursor, civilDate, syncIdentity) {
   const bytes = callCore(
@@ -524,20 +533,31 @@ function planImport(exports, records, asOf, cursor, civilDate, syncIdentity) {
   };
 }
 function decodeArchive(exports, bytes) {
-  const output = callCore(exports, "kin_decode_archive", asBytes(bytes));
-  if (output.length < 4)
+  bytes = asBytes(bytes);
+  if (bytes.length > MAX_PROTOCOL_BYTES)
+    throw new KinEngineError(5, USER_MESSAGES.get(5));
+  if (bytes.length < 16)
+    throw new KinEngineError(2, USER_MESSAGES.get(2));
+  const request = new Uint8Array(20);
+  request.set(bytes.subarray(0, 16));
+  new DataView(request.buffer).setUint32(16, bytes.length, true);
+  const output = callCore(exports, "kin_archive_layout", request);
+  if (output.length !== 8)
     throw new KinEngineError(6, "Kin received an invalid archive result.");
   const length = new DataView(
     output.buffer,
     output.byteOffset,
     output.byteLength,
   ).getUint32(0, true);
-  if (4 + length >= output.length)
+  const ciphertextLength = new DataView(output.buffer, output.byteOffset, output.byteLength).getUint32(4, true);
+  if (16 + length + ciphertextLength !== bytes.length)
     throw new KinEngineError(6, "Kin received an invalid archive result.");
   return {
     version: 1,
-    metadata: output.slice(4, 4 + length),
-    ciphertext: output.slice(4 + length),
+    // These copies deliberately detach caller-owned archive input before any
+    // asynchronous authentication; no view escapes into mutable source bytes.
+    metadata: bytes.slice(16, 16 + length),
+    ciphertext: bytes.slice(16 + length),
   };
 }
 

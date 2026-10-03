@@ -1,6 +1,6 @@
 # Release Process
 
-**Status:** Current implementation: v0.10.2 Local Root Rotation & Recovery Lifecycle. The user authorized v0.10.2 and v0.10.3, annotated tags before updating existing PR #15 into `kin-development`, then a stop for human review. No merge is authorized. Identity/relay state remains process-memory only; accepted relay data is not durable.
+**Status:** Current implementation: v0.10.3 Bounded Storage/Archive Hardening & Architecture Closure. The user authorized v0.10.2 and v0.10.3, annotated tags before updating existing PR #15 into `kin-development`, then a stop for human review. No merge is authorized. Identity/relay state remains process-memory only; accepted relay data is not durable.
 
 ## Release sequence
 

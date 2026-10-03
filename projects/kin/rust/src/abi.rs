@@ -128,6 +128,16 @@ pub extern "C" fn kin_decode_archive(pointer: u32, length: u32) -> i32 {
 }
 
 #[cfg_attr(target_arch = "wasm32", no_mangle)]
+pub extern "C" fn kin_archive_header(pointer: u32, length: u32) -> i32 {
+    operate(pointer, length, crate::archive::header_request)
+}
+
+#[cfg_attr(target_arch = "wasm32", no_mangle)]
+pub extern "C" fn kin_archive_layout(pointer: u32, length: u32) -> i32 {
+    operate(pointer, length, crate::archive::layout_request)
+}
+
+#[cfg_attr(target_arch = "wasm32", no_mangle)]
 pub extern "C" fn kin_plan_import(pointer: u32, length: u32) -> i32 {
     operate(pointer, length, crate::archive::plan_import)
 }

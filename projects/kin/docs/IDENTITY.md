@@ -1,6 +1,6 @@
 # Identity and Trusted Devices
 
-**Status:** Implemented through v0.10.0 for the local incubation service. Server member/passkey/device authorization remains distinct from the local encryption unlock. v0.10 protects successor transport private keys and epoch secrets under the local root while retaining public verification history. Identity and relay state remain in-memory; encrypted archive recovery restores local history, not an authenticated server household.
+**Status:** Implemented through v0.10.3 for the local incubation service. Server member/passkey/device authorization remains distinct from the local encryption unlock. v0.10 protects successor transport private keys and epoch secrets under the local root while retaining public verification history. Identity and relay state remain in-memory; encrypted archive recovery restores local history, not an authenticated server household.
 
 ## Separate identities
 
