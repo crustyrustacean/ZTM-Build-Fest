@@ -1,6 +1,6 @@
 # Release Process
 
-**Status:** The v0.6.0 Since You Last Looked capability is authorized on `kin-development`. Complete the v0.6.0–v0.6.3 line, then stop for evaluation. Do not create v0.6.4, begin v0.7.0, push, or merge to `kin-main`.
+**Status:** v0.6.0 capability and v0.6.1 correctness audit are complete on `kin-development`. Continue through the authorized v0.6.3 line, then stop for evaluation. Do not create v0.6.4, begin v0.7.0, push, or merge to `kin-main`.
 
 ## Release sequence
 

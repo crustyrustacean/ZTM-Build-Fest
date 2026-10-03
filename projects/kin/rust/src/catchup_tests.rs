@@ -181,3 +181,64 @@ fn cursor_resolves_to_first_occurrence_of_an_exact_duplicate() {
     assert_eq!(summary.entries.len(), 1);
     assert_eq!(summary.entries[0].text, "Wipes");
 }
+
+#[test]
+fn empty_stream_and_first_middle_latest_cursors_have_exact_boundaries() {
+    let empty = summarize(&[], None).unwrap();
+    assert!(empty.entries.is_empty());
+    assert_eq!(empty.total_count, 0);
+    assert_eq!(empty.through_event_id, None);
+
+    let events = vec![
+        item_added(1, "Milk"),
+        item_added(2, "Wipes"),
+        item_added(3, "Bread"),
+    ];
+    for (cursor, expected_ids) in [
+        (Some(EventId(id(1))), vec![EventId(id(2)), EventId(id(3))]),
+        (Some(EventId(id(2))), vec![EventId(id(3))]),
+        (Some(EventId(id(3))), Vec::new()),
+    ] {
+        let summary = summarize(&events, cursor).unwrap();
+        assert_eq!(summary.total_count as usize, expected_ids.len());
+        assert_eq!(
+            summary
+                .entries
+                .iter()
+                .map(|entry| entry.event_id)
+                .collect::<Vec<_>>(),
+            expected_ids
+        );
+        assert_eq!(summary.through_event_id, Some(EventId(id(3))));
+    }
+}
+
+#[test]
+fn exactly_eight_and_nine_meaningful_events_have_exact_truncation_counts() {
+    for count in [8u8, 9] {
+        let events: Vec<_> = (1..=count)
+            .map(|number| item_added(number, &format!("Item {number}")))
+            .collect();
+        let summary = summarize(&events, None).unwrap();
+
+        assert_eq!(summary.total_count, u32::from(count));
+        assert_eq!(summary.entries.len(), MAX_SUMMARY_ENTRIES);
+        assert_eq!(
+            summary.entries[0].event_id,
+            EventId(id(if count == 8 { 1 } else { 2 }))
+        );
+        assert_eq!(summary.through_event_id, Some(EventId(id(count))));
+    }
+}
+
+#[test]
+fn conflicting_event_id_reuse_rejects_the_entire_summary() {
+    let first = item_added(1, "Milk");
+    let mut conflict = item_added(2, "Wipes");
+    conflict.event_id = first.event_id;
+
+    assert_eq!(
+        summarize(&[first, conflict], None),
+        Err(KinError::InvalidEvent)
+    );
+}

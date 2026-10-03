@@ -2,7 +2,7 @@
 
 > A private, lightweight household coordination app for the little things families need to know, remember, hand off, or discuss.
 
-**Current status: `v0.6.0` — Since You Last Looked.** Kin now presents a bounded, event-derived catch-up summary for Items, Handoff and Talk. Catch-up position is explicit, local to this browser installation, and never records who viewed the summary. Rust owns summary selection, ordering, truncation and event boundaries through protocol v6. IndexedDB remains schema 1; canonical event bytes and event codes 1–13 are unchanged, and no view/read event is written. Existing Today/Needs, Handoff, Talk and Pulse capabilities remain local. Actor IDs are placeholders, not verified people. No runtime framework, analytics, AI or remote service is present.
+**Current status: `v0.6.1` — Summary Correctness.** Kin presents a bounded, event-derived catch-up summary for Items, Handoff and Talk. Catch-up position is explicit, local to this browser installation, and never records who viewed the summary. Rust owns summary selection, ordering, truncation and event boundaries through protocol v6. IndexedDB remains schema 1; canonical event bytes and event codes 1–13 are unchanged, and no view/read event is written. Existing Today/Needs, Handoff, Talk and Pulse capabilities remain local. Actor IDs are placeholders, not verified people. No runtime framework, analytics, AI or remote service is present.
 
 ## The problem
 
@@ -56,6 +56,7 @@ The intended technical direction is Rust compiled to WebAssembly, native Web Com
 - `v0.5.2` — Pulse Resilience & Accessibility (`kin-v0.5.2`)
 - `v0.5.3` — Pulse Hardening & Polish (`kin-v0.5.3`)
 - `v0.6.0` — Since You Last Looked (`kin-v0.6.0`)
+- `v0.6.1` — Summary Correctness (`kin-v0.6.1`)
 - See the [changelog](CHANGELOG.md) for the completed release history.
 
 ## Install, build, and run

@@ -13,20 +13,36 @@ export async function catchUpRegressions() {
   };
   const count = async () => (await app.store.loadEvents()).length;
   const context = async () => app.store.ensureContext();
+  const writeContext = async (value) => {
+    const transaction = app.store.database.transaction(
+      "local_context",
+      "readwrite",
+    );
+    transaction.objectStore("local_context").put(value);
+    await new Promise((resolve, reject) => {
+      transaction.oncomplete = resolve;
+      transaction.onabort = () => reject(transaction.error);
+    });
+  };
+  const readContext = async () => {
+    const transaction = app.store.database.transaction(
+      "local_context",
+      "readonly",
+    );
+    const request = transaction
+      .objectStore("local_context")
+      .get("installation");
+    return new Promise((resolve, reject) => {
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  };
   const resetCursor = async () => {
     const existing = await context();
     delete existing.last_looked_event_id;
     delete existing.last_looked_local_sequence;
     delete existing.last_looked_at;
-    const transaction = app.store.database.transaction(
-      "local_context",
-      "readwrite",
-    );
-    transaction.objectStore("local_context").put(existing);
-    await new Promise((resolve, reject) => {
-      transaction.oncomplete = resolve;
-      transaction.onabort = () => reject(transaction.error);
-    });
+    await writeContext(existing);
   };
   const makeBoundary = (snapshot) => ({
     eventId: snapshot.through.eventId,
@@ -261,7 +277,7 @@ export async function catchUpRegressions() {
   app.catchUp.button.focus();
   app.catchUp.button.click();
   await idle();
-  const finalSnapshot = await app.store.getCatchUpState();
+  let finalSnapshot = await app.store.getCatchUpState();
   check(
     app.state.summary.totalCount === 0 &&
       app.catchUp.empty.textContent === "You're caught up.",
@@ -276,6 +292,45 @@ export async function catchUpRegressions() {
       (await context()).next_logical_time === beforeAcknowledgementCounter,
     "explicit acknowledgement writes only local view state",
   );
+  const validContext = await context();
+  await writeContext({
+    ...validContext,
+    last_looked_event_id: new Uint8Array(16).fill(0xff),
+  });
+  let invalidBoundaryRejected = false;
+  try {
+    await app.store.getCatchUpState();
+  } catch {
+    invalidBoundaryRejected = true;
+  }
+  const invalidBoundary = await readContext();
+  check(
+    invalidBoundaryRejected &&
+      [...invalidBoundary.last_looked_event_id].every((byte) => byte === 0xff),
+    "mismatched local cursor fails closed and is not overwritten",
+  );
+
+  const partialContext = { ...validContext };
+  delete partialContext.last_looked_local_sequence;
+  await writeContext(partialContext);
+  let partialMetadataRejected = false;
+  try {
+    await app.store.ensureContext();
+  } catch {
+    partialMetadataRejected = true;
+  }
+  const persistedPartialContext = await readContext();
+  check(
+    partialMetadataRejected &&
+      !Object.prototype.hasOwnProperty.call(
+        persistedPartialContext,
+        "last_looked_local_sequence",
+      ),
+    "partial local cursor metadata fails closed and is not initialized over",
+  );
+  await writeContext(validContext);
+  await app.refreshFromEvents();
+  finalSnapshot = await app.store.getCatchUpState();
   sessionStorage.setItem(
     "kin.test.catchUpCursor",
     JSON.stringify(finalSnapshot.cursor),

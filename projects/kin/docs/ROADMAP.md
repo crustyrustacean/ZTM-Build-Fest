@@ -1,6 +1,6 @@
 # Roadmap
 
-Current release: `v0.6.0 — Since You Last Looked`. The authorized catch-up stabilization line is v0.6.0–v0.6.3; stop after v0.6.3 for evaluation.
+Current release: `v0.6.1 — Summary Correctness`. The authorized catch-up stabilization line is v0.6.0–v0.6.3; stop after v0.6.3 for evaluation.
 
 ## Planning releases
 
@@ -154,7 +154,7 @@ Completed: derive a bounded, Rust-owned summary of Item, Handoff and Talk change
 
 ### `v0.6.1` — Summary Correctness
 
-Audit cursor and projection edge cases without adding capability.
+Completed: audited empty and cursor-position cases, duplicate/conflicting event IDs, exact cap boundaries, and malformed/partial local metadata. No new capability or production behavior change.
 
 ### `v0.6.2` — Summary Resilience & Accessibility
 

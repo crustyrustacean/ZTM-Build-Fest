@@ -1,6 +1,6 @@
 # v0.1.0 Requirement Traceability
 
-**Status:** Current through v0.6.0 Since You Last Looked; earlier version sections are historical contracts. See Pulse and v0.6.0 below.
+**Status:** Current through v0.6.1 Summary Correctness; earlier version sections are historical contracts. See v0.6.0 below.
 
 | Requirement                                        | Specification authority                                                                 | v0.1.0 validation                                                                  |
 | -------------------------------------------------- | --------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
@@ -106,3 +106,7 @@ Passed 67 Rust and 24 Node/real-WASM tests, fmt, Clippy, release WASM, version c
 | Summary is capped at eight and reports exact total/omitted counts           | [V0.6.0](V0.6.0.md), [UX](UX.md)                                        | Rust cap/order/count tests and browser omitted-copy assertions.                                       |
 | Cross-tab view invalidation is content-free                                 | [STORAGE](STORAGE.md), [PRIVACY](PRIVACY.md)                            | Browser checks exact `{ type: "view-state-changed" }` and canonical convergence.                      |
 | No read receipts, member tracking, activity timeline, or history browser    | [PRINCIPLES](PRINCIPLES.md), [PRIVACY](PRIVACY.md), [V0.6.0](V0.6.0.md) | Contract and UI surface audit; no event kinds or stores added.                                        |
+
+## v0.6.1 Summary Correctness
+
+No capability was added. Rust tests cover empty/first/middle/latest/missing cursors, duplicate/conflicting event IDs, Pulse interleaving, exact eight/nine/many truncation counts, ordering, and actual through-boundaries. Browser tests verify first-run append ordering, post-render event retention, monotonic stale-tab writes, beyond-snapshot rejection, and malformed/partial local cursor metadata preservation. v1–v5 byte fixtures and the complete prior browser suite remain required.

@@ -2,6 +2,12 @@
 
 This file records completed Kin releases. The `v0.0.x` releases are planning and documentation milestones; they do not represent implemented application features. The first implementation milestone remains `v0.1.0`.
 
+## [0.6.1] — Summary Correctness
+
+No new capability. Added explicit empty/first/middle/latest cursor cases, first-occurrence handling for exact duplicate event IDs, conflicting-ID failure, exact 8/9-entry cap cases, and browser checks for mismatched/partial local cursor metadata. No production behavior change was required. Passed 81 Rust and 29 Node/real-WASM tests, fmt, Clippy, release WASM, version check, PowerShell/WSL build-run HTTP smokes, and complete Chrome 154.0.8037.95 browser regressions on Windows x64 (Rust 1.93.0, Node 22.12.0; WSL2 Ubuntu 22.04.5 POSIX validation). Native zoom, Firefox, Safari, NVDA and VoiceOver remain unverified.
+
+Detailed validation evidence is in [V0.6.0](docs/V0.6.0.md).
+
 ## [0.6.0] — Since You Last Looked
 
 Added a Rust-derived, eight-entry catch-up summary for Item, Handoff and Talk changes, with total/omitted counts and an explicit Caught up control. The local cursor is initialized at existing history on first run, stored in the existing `local_context` singleton, and advances transactionally through only the frozen snapshot boundary. Protocol v6 preserves explicit `as_of` and adds a stable event-ID cursor and structured summary result; v1–v5, event codes/bytes and IndexedDB schema 1 remain unchanged. Pulse is excluded from entries but may define the snapshot boundary. No read receipts, member tracking, actor attribution, summary history, analytics, AI, remote service, new household events, migration or dependency.

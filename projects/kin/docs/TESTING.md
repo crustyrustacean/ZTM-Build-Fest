@@ -1,6 +1,6 @@
 # v0.1.0 Testing Contract
 
-**Status:** Current through v0.6.0 Since You Last Looked; earlier version sections are historical contracts. See Pulse and v0.6.0 below.
+**Status:** Current through v0.6.1 Summary Correctness; earlier version sections are historical contracts. See v0.6.0 below.
 
 ## Rust domain tests
 
@@ -134,3 +134,7 @@ Optional local visual evidence: set `KIN_VISUAL_CHECK=1` when running the browse
 `rust/src/catchup_tests.rs` and protocol tests cover summary selection, stable cursor lookup, missing-cursor failure, duplicate delivery, Pulse exclusion, actual through-boundary, ordering, eight-entry cap, total count, and exact v6 bytes. `web/wasm/kin-engine.test.mjs` runs the real WASM ABI for v1–v6 compatibility and summary decoding. `scripts/catch-up-regression.mjs`, called by the complete browser runner, exercises legacy first-run history, cursor initialization racing with append, an event arriving after render, stale-tab monotonicity, beyond-snapshot rejection, truncation/omitted count, explicit no-event marking, keyboard/focus, and cross-tab view-state invalidation. The existing Item, Handoff, Talk, Pulse, storage, retry, 10,000-event, CSP, same-origin, and accessibility-mode regressions remain required.
 
 Do not claim Firefox, Safari, native desktop zoom, NVDA, or VoiceOver coverage unless those environments are actually exercised. Chromium 200% page-scale emulation is not native desktop zoom.
+
+## v0.6.1 Summary Correctness
+
+The correctness-only suite covers an empty event stream; cursor at first, middle, and latest event; missing cursor; first occurrence of an exact duplicate; conflicting event IDs; Pulse events between meaningful changes; exact eight/nine/many counts and omitted entries; summary order and through-boundary; append after render; stale tab writes; requested boundaries beyond the frozen snapshot; malformed/partial local metadata preservation; and strict v6 cursor/reserved fields. No capability was added.
