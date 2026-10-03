@@ -67,6 +67,14 @@ export async function householdLifecycleChecks(recovery) {
     try { await fresh.api('/api/lifecycle-denied'); } catch { denied = true; }
     finally { app.vault.checkSecurityEpoch = originalEpoch; }
     check(denied && attempted === 0, 'durable lock check rejects before household network access');
+
+    const currentApp = document.querySelector('kin-app');
+    const currentVault = currentApp.vault;
+    currentApp.handlePeerMessage({ data: { type: 'household-locked', lockEpoch: currentVault.securityEpoch } });
+    check(currentApp.vault === currentVault && !currentVault.locked, 'delayed peer notification at the current epoch cannot revoke a fresh unlock');
+    currentApp.handlePeerMessage({ data: { type: 'household-locked', lockEpoch: currentVault.securityEpoch + 1 } });
+    check(currentApp.vault === null && currentVault.locked, 'newer peer lock epoch revokes the active household');
+    await currentApp.security.run(() => currentApp.security.unlockRecovery(recovery));
   } finally {
     globalThis.fetch = originalFetch;
     navigator.credentials.get = originalGet;

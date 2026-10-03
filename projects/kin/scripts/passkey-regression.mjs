@@ -252,6 +252,7 @@ if (
       "--disable-extensions",
       "--no-first-run",
       "--no-default-browser-check",
+      "--edge-skip-compat-layer-relaunch",
       "--remote-debugging-port=0",
       `--user-data-dir=${profile}`,
       "about:blank",
@@ -329,9 +330,14 @@ if (
       socket.close();
       await Promise.race([closed, delay(1_000)]);
     }
-    browser.kill();
-    if (browser.exitCode === null)
-      await Promise.race([once(browser, "exit"), delay(2_000)]);
+    if (process.platform === "win32" && browser.pid) {
+      const killer = spawn("powershell.exe", ["-NoProfile", "-Command",
+        "for ($attempt = 0; $attempt -lt 10; $attempt++) { $targets = Get-CimInstance Win32_Process -Filter \"Name = 'msedge.exe'\" | Where-Object { $_.CommandLine -like \"*$env:KIN_TEST_PROFILE*\" }; if (-not $targets) { break }; foreach ($target in $targets) { Stop-Process -Id $target.ProcessId -Force -ErrorAction SilentlyContinue }; Start-Sleep -Milliseconds 100 }"],
+      { windowsHide: true, stdio: "ignore", env: { ...process.env, KIN_TEST_PROFILE: profile } });
+      const [code] = await once(killer, "exit");
+      if (code !== 0) console.warn(`Could not terminate Edge processes for the isolated test profile (PowerShell ${code}).`);
+    } else browser.kill();
+    if (browser.exitCode === null) await Promise.race([once(browser, "exit"), delay(2_000)]);
     browser.unref();
     server.closeAllConnections();
     await new Promise((resolve) => server.close(resolve));

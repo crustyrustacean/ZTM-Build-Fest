@@ -93,7 +93,10 @@ class KinApp extends HTMLElement {
       if (document.visibilityState === "hidden") return;
       const vault = this.vault;
       const generation = this.securityGeneration;
-      if (!vault || vault.locked) return;
+      // The vault becomes visible just before EventStore.open binds its durable
+      // epoch. A focus/visibility event in that window must not compare an
+      // unbound vault against storage and revoke an otherwise valid unlock.
+      if (!vault || vault.locked || !this.store) return;
       try {
         await EventStore.checkSecurityEpoch(vault);
       } catch {
@@ -897,7 +900,16 @@ class KinApp extends HTMLElement {
 
   handlePeerMessage(event) {
     if (event.data?.type === "household-locked") {
-      this.lockHousehold(false);
+      const peerEpoch = event.data.lockEpoch;
+      // A lock notification may be delivered after this tab has already
+      // re-unlocked at that durable epoch. Only a newer epoch revokes it.
+      if (
+        !Number.isSafeInteger(peerEpoch) ||
+        peerEpoch < 0 ||
+        !this.vault ||
+        peerEpoch > (this.vault.securityEpoch ?? -1)
+      )
+        this.lockHousehold(false);
       return;
     }
     if (!this.vault || this.vault.locked) return;
@@ -1105,6 +1117,14 @@ class KinApp extends HTMLElement {
     if (broadcast) {
       this.lockBarrier = Promise.resolve(this.lockBarrier)
         .then(() => EventStore.lockAll())
+        .then((lockEpoch) => {
+          try {
+            this.channel?.postMessage({ type: "household-locked", lockEpoch });
+          } catch {
+            // Durable epoch guards still reject stale capabilities.
+          }
+          return lockEpoch;
+        })
         .catch((error) => {
           this.security?.error(error);
         });
@@ -1156,13 +1176,6 @@ class KinApp extends HTMLElement {
       this.setBusy(false);
       this.setStatus("Household locked.");
       this.security.locked();
-    }
-    if (broadcast) {
-      try {
-        this.channel?.postMessage({ type: "household-locked" });
-      } catch {
-        /* Focus checks still fail closed. */
-      }
     }
   }
 }
