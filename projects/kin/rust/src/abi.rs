@@ -2,11 +2,7 @@ use std::collections::BTreeMap;
 use std::sync::Mutex;
 
 use crate::error::KinError;
-use crate::protocol::{
-    decode_request_with_summary, encode_state, encode_state_v6, encode_state_v7, encode_state_v8,
-    ERROR_PROTOCOL_VERSION, MAX_PROTOCOL_BYTES, PROTOCOL_V6, PROTOCOL_V7, PROTOCOL_V8,
-};
-use crate::state::{rebuild, rebuild_at, rebuild_distributed_on, rebuild_on, summarize_validated};
+use crate::protocol::{ERROR_PROTOCOL_VERSION, MAX_PROTOCOL_BYTES};
 
 struct AbiState {
     allocations: BTreeMap<u32, Box<[u8]>>,
@@ -98,10 +94,48 @@ pub extern "C" fn kin_free(pointer: u32, length: u32) -> i32 {
 
 #[cfg_attr(target_arch = "wasm32", no_mangle)]
 pub extern "C" fn kin_apply_events(pointer: u32, length: u32) -> i32 {
+    operate(pointer, length, crate::core::replay)
+}
+
+#[cfg_attr(target_arch = "wasm32", no_mangle)]
+pub extern "C" fn kin_event_metadata(pointer: u32, length: u32) -> i32 {
+    operate(pointer, length, crate::codec::encode_metadata)
+}
+
+#[cfg_attr(target_arch = "wasm32", no_mangle)]
+pub extern "C" fn kin_event_metadata_batch(pointer: u32, length: u32) -> i32 {
+    operate(pointer, length, crate::codec::encode_metadata_batch)
+}
+
+#[cfg_attr(target_arch = "wasm32", no_mangle)]
+pub extern "C" fn kin_encode_command(pointer: u32, length: u32) -> i32 {
+    operate(pointer, length, crate::command::encode_command)
+}
+
+#[cfg_attr(target_arch = "wasm32", no_mangle)]
+pub extern "C" fn kin_execute_command(pointer: u32, length: u32) -> i32 {
+    operate(pointer, length, crate::command::execute_request)
+}
+
+#[cfg_attr(target_arch = "wasm32", no_mangle)]
+pub extern "C" fn kin_encode_archive(pointer: u32, length: u32) -> i32 {
+    operate(pointer, length, crate::archive::build_request)
+}
+
+#[cfg_attr(target_arch = "wasm32", no_mangle)]
+pub extern "C" fn kin_decode_archive(pointer: u32, length: u32) -> i32 {
+    operate(pointer, length, crate::archive::validate_request)
+}
+
+#[cfg_attr(target_arch = "wasm32", no_mangle)]
+pub extern "C" fn kin_plan_import(pointer: u32, length: u32) -> i32 {
+    operate(pointer, length, crate::archive::plan_import)
+}
+
+fn operate(pointer: u32, length: u32, operation: fn(&[u8]) -> Result<Vec<u8>, KinError>) -> i32 {
     let mut state = lock_state();
     state.result.clear();
     state.error.clear();
-
     let outcome = if !request_length_is_supported(length) {
         Err(KinError::SizeLimit)
     } else if length == 0 {
@@ -112,43 +146,12 @@ pub extern "C" fn kin_apply_events(pointer: u32, length: u32) -> i32 {
             .get(&pointer)
             .map_or(Err(KinError::InvalidAbi), |input| {
                 if input.len() != length as usize {
-                    return Err(KinError::InvalidAbi);
+                    Err(KinError::InvalidAbi)
+                } else {
+                    operation(input)
                 }
-                decode_request_with_summary(input).and_then(|request| {
-                    let state = if request.protocol_version == PROTOCOL_V8 {
-                        rebuild_distributed_on(
-                            &request.events,
-                            request.as_of.unwrap(),
-                            request.civil_date.unwrap(),
-                        )
-                    } else if let Some(date) = request.civil_date {
-                        rebuild_on(&request.events, request.as_of.unwrap(), date)
-                    } else {
-                        match request.as_of {
-                            Some(time) => rebuild_at(&request.events, time),
-                            None => rebuild(&request.events),
-                        }
-                    };
-                    state.and_then(|household| {
-                        if request.protocol_version >= PROTOCOL_V6 {
-                            summarize_validated(&request.events, request.summary_cursor, &household)
-                                .and_then(|summary| {
-                                    if request.protocol_version == PROTOCOL_V8 {
-                                        encode_state_v8(&household, &summary)
-                                    } else if request.protocol_version == PROTOCOL_V7 {
-                                        encode_state_v7(&household, &summary)
-                                    } else {
-                                        encode_state_v6(&household, &summary)
-                                    }
-                                })
-                        } else {
-                            encode_state(&household, request.protocol_version)
-                        }
-                    })
-                })
             })
     };
-
     match outcome {
         Ok(result) => {
             state.result = result;
@@ -164,6 +167,15 @@ pub extern "C" fn kin_apply_events(pointer: u32, length: u32) -> i32 {
 #[cfg_attr(target_arch = "wasm32", no_mangle)]
 pub extern "C" fn kin_result_ptr() -> u32 {
     active_buffer_pointer(&lock_state().result)
+}
+
+/// Drops retained buffers on host lock, without claiming memory zeroization.
+#[cfg_attr(target_arch = "wasm32", no_mangle)]
+pub extern "C" fn kin_clear() {
+    let mut state = lock_state();
+    state.allocations.clear();
+    state.result = Vec::new();
+    state.error = Vec::new();
 }
 
 #[cfg_attr(target_arch = "wasm32", no_mangle)]

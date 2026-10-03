@@ -30,6 +30,9 @@ async function loadKinEngine(...args) {
   };
 }
 
+const initialWasm = await readFile(new URL("./kin_engine.wasm", import.meta.url));
+await loadCurrentEngine(`data:application/wasm;base64,${initialWasm.toString("base64")}`);
+
 const zeroId = new Uint8Array(16);
 
 function encodeText(text) {
@@ -655,19 +658,21 @@ test("bridge fails closed at every truncated Handoff result boundary", async (co
   const engine = await loadKinEngine(
     `data:application/wasm;base64,${wasm.toString("base64")}`,
   );
+  // Generate canonical input before fault injection alters the result-buffer ABI.
+  const canonicalInput = handoff(1);
   for (resultLength = 0; resultLength < 16 + 48 + 18; resultLength++) {
     assert.throws(
-      () => engine.applyEvents([handoff(1)], 0),
+      () => engine.applyEvents([canonicalInput], 0),
       (error) => error.code === 6,
     );
   }
   resultLength = 16 + 48 + 18 + 1;
   assert.throws(
-    () => engine.applyEvents([handoff(1)], 0),
+    () => engine.applyEvents([canonicalInput], 0),
     (error) => error.code === 6,
   );
   resultLength = undefined;
-  assert.equal(engine.applyEvents([handoff(1)], 0).handoffs.length, 1);
+  assert.equal(engine.applyEvents([canonicalInput], 0).handoffs.length, 1);
 });
 
 test("large Handoff replay grows WASM memory and preserves independent repeated results", async (context) => {
@@ -935,19 +940,21 @@ test("bridge fails closed at every truncated Talk result boundary", async (conte
   const engine = await loadKinEngine(
     `data:application/wasm;base64,${wasm.toString("base64")}`,
   );
+  // Generate canonical input before fault injection alters the result-buffer ABI.
+  const canonicalInput = talk(1);
   for (resultLength = 0; resultLength < 20 + 48 + 13; resultLength++) {
     assert.throws(
-      () => engine.applyEvents([talk(1)], 0),
+      () => engine.applyEvents([canonicalInput], 0),
       (error) => error.code === 6,
     );
   }
   resultLength = 20 + 48 + 13 + 1;
   assert.throws(
-    () => engine.applyEvents([talk(1)], 0),
+    () => engine.applyEvents([canonicalInput], 0),
     (error) => error.code === 6,
   );
   resultLength = undefined;
-  assert.equal(engine.applyEvents([talk(1)], 0).talks.length, 1);
+  assert.equal(engine.applyEvents([canonicalInput], 0).talks.length, 1);
 });
 
 test("large Talk replay grows WASM memory and preserves independent repeated results", async (context) => {
@@ -1236,18 +1243,20 @@ test("v6 bridge rejects every truncated header and Pulse record boundary", async
     };
   });
   const engine = await pulseEngine();
+  // Generate canonical input before fault injection alters the result-buffer ABI.
+  const canonicalInput = pulseRecord(1);
   for (resultLength = 0; resultLength < 92; resultLength++)
     assert.throws(
-      () => engine.applyEvents([pulseRecord(1)], 0),
+      () => engine.applyEvents([canonicalInput], 0),
       (e) => e.code === 6,
     );
   resultLength = 93;
   assert.throws(
-    () => engine.applyEvents([pulseRecord(1)], 0),
+    () => engine.applyEvents([canonicalInput], 0),
     (e) => e.code === 6,
   );
   resultLength = undefined;
-  assert.equal(engine.applyEvents([pulseRecord(1)], 0).pulses.length, 1);
+  assert.equal(engine.applyEvents([canonicalInput], 0).pulses.length, 1);
 });
 
 test("v6 rejects malformed metadata in a two-Pulse result", async (context) => {
