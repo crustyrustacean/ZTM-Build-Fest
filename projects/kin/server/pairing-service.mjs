@@ -36,6 +36,7 @@ function codeValue() {
   let value = "";
   while (value.length < 8) {
     for (const byte of randomBytes(16)) {
+      // Reject unused slots in the 32-value mask to avoid modulo bias.
       const index = byte & 31;
       if (index < PAIRING_CODE_ALPHABET.length)
         value += PAIRING_CODE_ALPHABET[index];
@@ -72,6 +73,7 @@ export class PairingService {
         .filter((device) => device.tokenHash)
         .map((device) => [device.tokenHash, device.id]),
     );
+    // Restore durable authority only; restart cancels enrollment and sessions.
     this.pairings = new Map();
     this.codeIndex = new Map();
     this.sessions = new Map();

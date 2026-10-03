@@ -1,6 +1,6 @@
 # Release Process
 
-**Status:** Last published implementation: v0.10.3 Bounded Storage/Archive Hardening & Architecture Closure. The v0.11.5 Durable Service & Deployment candidate is committed and tagged `kin-v0.11.5` for human review; it is not a published release. No v0.12 work is in scope.
+**Status:** Last published implementation: v0.10.3 Bounded Storage/Archive Hardening & Architecture Closure. The v0.11.6 Durable Service & Deployment candidate is committed and tagged `kin-v0.11.6` for human review; it is not a published release. No v0.12 work is in scope.
 
 ## Release sequence
 
@@ -8,8 +8,9 @@ The completed progression is `kin-v0.9.3` → `kin-v0.10.0` (Portable Core + Loc
 Data Security) → `kin-v0.10.1` (Security Lifecycle & Sync Recovery Correctness) →
 `kin-v0.10.2` (Local Root Rotation & Recovery Lifecycle) →
 `kin-v0.10.3` (Bounded Storage/Archive Hardening & Architecture Closure). The
-current review candidate completes the v0.11.0 through v0.11.5 Durable
-Service & Deployment gates and stops for human review. Its annotated tag
+current review candidate includes the v0.11.0 through v0.11.5 Durable
+Service & Deployment gates and the v0.11.6 documentation/comment patch, then
+stops for human review. Its annotated tag
 identifies the candidate commit and does not represent a published release.
 The remaining planned,
 unimplemented sequence is v0.12.x (Data Lifecycle, Retention & Deletion) → v0.13.x (Recovery
@@ -58,6 +59,10 @@ kin-main/kin-development merges remain separate actions.
 
 Maintain the project-scoped [changelog](../CHANGELOG.md) for each completed release. Add an entry from the validated changes before committing and tagging; summarize what actually changed, not planned or deferred behavior. Keep prior release entries intact. Planning releases should be identified as documentation/planning work rather than implemented product features.
 
+Use `vX.Y.Z` in release headings, followed by ` — Release Title` when a title
+exists. Published entries use level-two headings; unreleased candidate patches
+use level-three headings under their shared level-two candidate range.
+
 ## Semantic version intent
 
 Semantic versioning describes Kin's product release; persistent event, ABI, storage, and export versions remain independent contracts, as described in [VERSIONING](VERSIONING.md).
@@ -101,4 +106,4 @@ Follow [V0.7.0](V0.7.0.md) for capability, correctness, resilience/accessibility
 
 ## v0.8.0 Household Pairing
 
-The v0.7.x line completed at `kin-v0.7.4`, validated commit `a8ded079be6fdbedba8738a64a5f0fb753e7fdd6`, pushed to the fork. The v0.8 record is [V0.8.0](V0.8.0.md); `kin-v0.8.8` corrected active-member slots. The v0.9 record is [V0.9.0](V0.9.0.md). The merged v0.9.3 base and completed v0.10 implementation line are recorded in [V0.10.0](V0.10.0.md). v1.0 remains gated by local security, durable service, lifecycle/deletion, recovery/continuity and UX/UI readiness; v0.11–v0.14 are planned, not implemented.
+The v0.7.x line completed at `kin-v0.7.4`, validated commit `a8ded079be6fdbedba8738a64a5f0fb753e7fdd6`, pushed to the fork. The v0.8 record is [V0.8.0](V0.8.0.md); `kin-v0.8.8` corrected active-member slots. The v0.9 record is [V0.9.0](V0.9.0.md). The merged v0.9.3 base and completed v0.10 implementation line are recorded in [V0.10.0](V0.10.0.md). v1.0 remains gated by local security, durable service, lifecycle/deletion, recovery/continuity and UX/UI readiness. v0.11 is an implementation candidate awaiting human review; v0.12–v0.14 remain planned, not implemented.

@@ -186,6 +186,7 @@ pub fn decode_request_with_summary(bytes: &[u8]) -> Result<DecodedRequest, KinEr
                     && binding.legacy_actor_id == event.actor_id
                     && binding.legacy_device_id == event.device_id
             }) {
+                // Normalize replay identity only; canonical_bytes retain the signed source event.
                 event.household_id = binding.household_id;
                 event.actor_id = binding.actor_id;
                 event.device_id = binding.device_id;

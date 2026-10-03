@@ -2,10 +2,11 @@
 
 This file records completed Kin releases. The `v0.0.x` releases are planning and documentation milestones; they do not represent implemented application features. The first implementation milestone remains `v0.1.0`.
 
-## Unreleased — v0.11.0–v0.11.5 Durable Service & Deployment candidate
+## Unreleased — v0.11.0–v0.11.6 Durable Service & Deployment candidate
 
-The implementation candidate with durable semantic validation is tagged
-`kin-v0.11.5` for human review. The `kin-v0.11.3` and `kin-v0.11.4` tags are preserved.
+The implementation candidate with durable semantic validation and documentation
+clarifications is tagged `kin-v0.11.6` for human review. Earlier candidate tags
+through `kin-v0.11.5` are preserved.
 These are review candidates, not published product releases.
 
 ### v0.11.0 — Durable Identity & Relay Foundation
@@ -86,7 +87,26 @@ native Linux Node and macOS remain unverified. Server schema v1, sync envelope
 v1, client/domain formats and backup format remain unchanged. See
 [semantic-integrity evidence and measurements](docs/V0.11.0.md#v0115-semantic-integrity-evidence-2026-10-03).
 
-## [0.10.3] — Bounded Storage/Archive Hardening & Architecture Closure
+### v0.11.6 — Release Documentation & Code Clarity
+
+Standardize historical release headings on the newer `vX.Y.Z` notation without
+changing their release descriptions or grouping. Update the version checker to
+recognize those headings and align current candidate metadata and documentation.
+Clarify non-obvious code invariants and ownership with focused comments,
+especially at the Rust/WASM boundary and in deterministic replay.
+
+This patch adds no product capability or runtime behavior change. The last
+published client version remains v0.10.3; server schema v1, canonical events,
+replay protocols, local database/envelope versions and archive formats are
+unchanged. Earlier validation evidence remains attached to its original version.
+
+Passed 118 Rust tests and doc-tests, Rust formatting, 55 targeted server tests,
+JavaScript syntax checks, version consistency and heading-format checks,
+238 local Markdown file-link target checks and whitespace validation.
+This was a bounded documentation/comment pass, not a full audit or a rerun of
+the browser, cross-platform and security release gates.
+
+## v0.10.3 — Bounded Storage/Archive Hardening & Architecture Closure
 
 Page protected reads and bound decryption concurrency, remove redundant migration
 and restore copies, and preserve exact comparison, full Rust replay and atomic
@@ -106,7 +126,7 @@ assertions, the complete product browser gate and PowerShell/POSIX launch workfl
 Maximum-history sampled renderer memory fell from 2.82 to 1.32 GiB; typical 10k
 unlock measured 9% slower. KARC v1 archive sizes and canonical bytes are unchanged.
 
-## [0.10.2] — Local Root Rotation & Recovery Lifecycle
+## v0.10.2 — Local Root Rotation & Recovery Lifecycle
 
 Replace recovery protection with an independent random root and a new, re-entered
 256-bit recovery key. Durable staging verifies every protected record, canonical
@@ -121,7 +141,7 @@ v2 with authenticated root versions; original v1 remains readable. Canonical
 events, replay protocols, sync-envelope v1 and KARC v1 remain compatible. See
 [the release record](docs/V0.10.0.md) and [rotation contract](docs/ROOT-ROTATION.md).
 
-## [0.10.1] — Security Lifecycle & Sync Recovery Correctness
+## v0.10.1 — Security Lifecycle & Sync Recovery Correctness
 
 - Keep cancelled security operations from changing a newer unlock's status, controls or busy state. Late completion cannot label an unlocked household as locked or remove its lock control.
 - Verify a stable copy of a trusted device's public keys before opening its pinning transaction. Slow fingerprint hashing no longer lets IndexedDB commit before the pin is saved; conflicting pins still fail atomically.
@@ -130,7 +150,7 @@ events, replay protocols, sync-envelope v1 and KARC v1 remain compatible. See
 
 Passed 117 Rust and 140 Node/WASM/server tests, formatting, Clippy, release WASM build, version consistency, the complete product browser suite, 78 security UI assertions, 18 virtual-authenticator assertions, and encrypted storage/migration/pinning checks including 12 new rotation-storage assertions. Validation and remaining readiness work are recorded in [V0.10.0](docs/V0.10.0.md). Published as annotated tag `kin-v0.10.1` at `e65db23`; the release branch is pushed for PR review into `kin-development`. Merging remains separate.
 
-## [0.10.0] — Portable Core + Local Data Security
+## v0.10.0 — Portable Core + Local Data Security
 
 Implemented and validated on the v0.10 development branch; the missing annotated tag `kin-v0.10.0` was restored at `2dc94f8` and pushed at the user's request. Startup now requires recovery or verified PRF unlock before loading protected history. A random local root encrypts complete event/context/outbox values and private sync material; independent credential wrappers avoid corpus re-encryption. Revision checks and a durable lock epoch prevent stale-tab wrapper resurrection and protected writes after lock. Drafts are memory-only.
 
@@ -140,123 +160,123 @@ Migration preserves legacy data until exact-byte decryption and full Rust replay
 
 Encrypted archives restore into an empty installation with fresh local author identity; restored history stays local and does not recreate device trust. The service worker caches static shell assets only and supports offline recovery unlock. Event DB schema is 3, key DB schema 4, local envelope/archive/successor format 1; canonical protocols v1–v8 and sync envelope v1 remain compatible. See [V0.10.0](docs/V0.10.0.md) for actual validation counts, measurements, limitations and v0.11 handoff. The memory-only identity/relay service, lack of in-place local-root rotation, maximum-history latency and broader platform/security review remain explicit limitations.
 
-## [0.9.3] — Recovery, Privacy, and Feedback Readiness
+## v0.9.3 — Recovery, Privacy, and Feedback Readiness
 
 Completed the v0.9 recovery, metadata, logging, corruption, storage-bound, and UX audit. Added same-member trusted-device pairing, fingerprint-confirmed approval, exact-envelope retry after relay cursor reset, and explicit process-local acknowledgement semantics. An exact identity-binding retry remains idempotent at the 256-record capacity boundary; conflicting or new bindings remain rejected, and rejected batches do not partially commit. Canonical IndexedDB event bytes remain authoritative. The identity service and relay remain memory-only; there is no all-device recovery, durable remote history, independent security audit, or cross-browser certification. Ready for product feedback only after the complete release gates pass.
 
 Final pre-merge correction: fixed provisioned epoch-key fingerprint calculation before raw-key zeroization, added cross-device fingerprint and conflicting-key regression coverage, and removed duplicate trusted-device pinning helpers.
 
-## [0.9.2] — Offline Reconciliation and Conflict Semantics
+## v0.9.2 — Offline Reconciliation and Conflict Semantics
 
 Added the separate transport cursor/high-water, atomic remote canonical-event/replay/cursor commit, local device sequence and Lamport advancement, additive Rust v8 identity-binding interpretation, deterministic equal-time reducer order, and persistent exact-envelope outbox. Archive wins over an equal-time concurrent mutation from another device; accepted bytes remain stored and a later causally invalid mutation pauses replay. Catch-up remains arrival-ordered and independent of transport progress.
 
-## [0.9.1] — Device Provisioning, Epochs, and Revocation
+## v0.9.1 — Device Provisioning, Epochs, and Revocation
 
 Added recipient-bound ECDH/HKDF/AES-GCM key provisioning, device-key fingerprint comparison, separate member/device/household keys, one-use grant handling, compare-and-advance epoch rotation, member/device revocation hooks, and historical-key entitlement rules. Same-member additional-device enrollment uses the existing pairing code/passkey approval flow. Revocation prevents future access but cannot erase prior keys or plaintext.
 
-## [0.9.0] — Encrypted Event Sync
+## v0.9.0 — Encrypted Event Sync
 
 Added the v0.9 threat/key-lifecycle contract, versioned AES-GCM and ECDSA event envelopes, authenticated opaque push/pull relay, bounded process-local cursors, additive IndexedDB schema 2, and offline multi-device fixtures. Sync encrypts exact canonical Kin event bytes; the service receives no plaintext event semantics or content key. Relay state is in-memory and acknowledgements are not durable.
 
-## [0.8.8] — Active-Member Slot Correctness
+## v0.8.8 — Active-Member Slot Correctness
 
 Count active memberships rather than retained historical member records when enforcing household capacity. After an adult leaves or is removed, the remaining adult can pair a replacement while the inactive historical membership remains stored. Invitation creation and final approval both enforce the two-active-adult limit, and a full-household approval fails before creating any member, device, credential, session, or confirmed pairing state.
 
-## [0.8.7] — Pairing Security and State Hygiene
+## v0.8.7 — Pairing Security and State Hygiene
 
 Bind pairing approval assertions to the authenticated adult's credential, eagerly remove every session for a revoked device, lazily prune expired sessions and terminal pairing capabilities, and normalize malformed WebAuthn/CBOR/COSE input into controlled verification failures. Clarify realistic signature-counter semantics and retain fresh-session behavior without adding product scope.
 
-## [0.8.6] — Pairing Feedback-Gate Corrections
+## v0.8.6 — Pairing Feedback-Gate Corrections
 
 Use rejection sampling for valid, uniformly selected pairing-code characters; validate invitations before WebAuthn; and give claimed requests a separate 15-minute approval window. Add trusted-device-bound passkey reauthentication, action-bound fresh authentication for adult removal, terminal-claim recovery, early invitation-URL cleanup, HTTPS-aware Secure cookies, and bounded/pruned transient security state. No sync or new household scope is added.
 
-## [0.8.5] — Auth Panel Text Contrast
+## v0.8.5 — Auth Panel Text Contrast
 
 Set the household authentication panel's text to the app's dark ink color so headings, form labels, explanatory text, and status messages remain readable against its light background. Button-specific and alert colors are unchanged. No authentication behavior or product capability changed.
 
-## [0.8.4] — Pairing Creation Response Correctness
+## v0.8.4 — Pairing Creation Response Correctness
 
 Return the initial `Pending` state from pairing creation so the initiating-adult UI can render a newly created code without dereferencing an absent state. Add an exact response-contract regression and defensive UI fallback for malformed or incomplete pairing status responses.
 
-## [0.8.3] — Household Pairing Pre-Feedback Stabilization
+## v0.8.3 — Household Pairing Pre-Feedback Stabilization
 
 Polish the two-adult journey with URL prefill, clipboard/native sharing fallbacks, readable selectable codes, quiet countdowns, semantic status/error regions, keyboard-native controls, forced-color styling, destructive-action explanations, and actionable passkey errors. Hide local household content on `/pair` before authorization, recover safely from stale claim cookies, reconcile security/recovery documentation, and retain the complete v0.7.x regression suite.
 
-## [0.8.2] — Trusted Devices, Authorization, and Security UX
+## v0.8.2 — Trusted Devices, Authorization, and Security UX
 
 Make device trust inspectable and revocable, add logout with session-only semantics, define leaving and other-adult removal, revoke all target sessions/devices on membership removal, and prohibit the last active adult from leaving without a supported deletion/recovery path. Add an authorization matrix and actionable passkey, expiry, revocation, trust, and recovery messages without exposing household details before approval.
 
-## [0.8.1] — Pairing Hardening and Failure Recovery
+## v0.8.1 — Pairing Hardening and Failure Recovery
 
 Separate membership approval from joining-device activation: after atomic approval, the joining adult must prove continued possession of the enrolled passkey before receiving a session. Lost-passkey, response-loss, duplicate approval, revoke/approve, server-time expiry, simultaneous invitation, replay, logout, and device-revocation paths fail closed or retry idempotently. Logout invalidates a session without conflating it with device trust.
 
-## [0.8.0] — Household Pairing Foundation
+## v0.8.0 — Household Pairing Foundation
 
 Add the first two-adult household identity model, passkey registration and approval, a ten-minute single-use human-readable pairing code, `/pair` manual entry and invitation links, explicit Pending/Claimed/Confirmed/Expired/Revoked states, server-side attempt/rate limits, atomic membership confirmation, trusted-device inspection/revocation, privacy-safe audit events, and lifecycle tests. The same-origin service stores only a keyed code verifier and never logs codes. Existing local event protocol v1–v7 and IndexedDB schema 1 remain unchanged.
 
-## [0.7.4] — Routine Stale-Action Correctness
+## v0.7.4 — Routine Stale-Action Correctness
 
 Reject routine completion unless the latest occurrence is open, and reject reopen unless it is completed, even when the submitted period key remains current. Preserve existence, archive and period-key preflight checks and the existing stale-state error code. Add two-tab persistence regressions for stale completion and reopen. Harden the manual Wasm ABI so `kin_apply_events` accepts only the exact tracked allocation returned by `kin_alloc`, with expanded ownership regressions. Refresh pairing-planning status through the v0.8.0 checkpoint and update current release metadata. Protocol layouts, persisted event bytes and product capability remain unchanged.
 
-## [0.7.3] — Routine Hardening & Polish
+## v0.7.3 — Routine Hardening & Polish
 
 No capability added. Completed the v0.7.x ABI and parser boundary audit, maximum replay and Wasm memory-growth checks, protocol and allocation ownership review, local-only privacy review, and documentation reconciliation. The full hardening gate passed without changing protocol v7, IndexedDB schema 1, or earlier event bytes. See [V0.7.0](docs/V0.7.0.md).
 
-## [0.7.2] — Routine Resilience & Accessibility
+## v0.7.2 — Routine Resilience & Accessibility
 
 No capability added. Validated suspended-tab, midnight, focus and visibility reprojection; stale-tab convergence; failed-write rollback and retry; keyboard focus restoration; semantic routine controls; narrow reflow, forced colors, text spacing and reduced motion. The full Rust, bridge, launcher and Chrome gates passed. See [V0.7.0](docs/V0.7.0.md).
 
-## [0.7.1] — Routine Correctness
+## v0.7.1 — Routine Correctness
 
 No capability added. Audited mixed legacy/Routine replay, civil-date context validation, duplicate/conflicting IDs, logical ordering over wall-clock timestamps, cursor boundaries, historical compatibility and v7 malformed input. Passed 105 Rust tests plus the existing bridge and browser gates. See [V0.7.0](docs/V0.7.0.md).
 
-## [0.7.0] — Routines
+## v0.7.0 — Routines
 
 Added Daily and Monday-start Weekly Routines with create, complete/reopen current occurrence and terminal archive. Rust owns civil-date validation, deterministic period identity and replay; protocol v7 carries explicit local civil context without changing exports, old protocol bytes or IndexedDB schema 1. Atomic preflight rejects stale period actions instead of retargeting them. Human Routine actions participate in catch-up; timers/focus/visibility only reproject and create no facts. Native controls preserve drafts, keyboard focus and failed-command recovery. No reminders, calendar, assignments, streaks, framework, dependency or backend.
 
 Release validation and remaining platform gaps are recorded in [V0.7.0](docs/V0.7.0.md). The first calendar/contract checkpoint is `f3065fd`; the release includes the end-to-end capability and its regression coverage.
 
-## [0.6.3] — Summary Hardening & Polish
+## v0.6.3 — Summary Hardening & Polish
 
 Fixed committed catch-up cursor recovery after a failed snapshot reload in commit `45ca041`: immediately send content-free peer invalidation, preserve the displayed summary, and offer a refresh-only retry without another cursor write. Added two-tab recovery coverage and explicit no-broadcast checks for quota/abort failures; corrected the raw copied-result test to use a v6 summary result. Revalidation passed 82 Rust tests, 31 Node/real-WASM tests, the complete Chrome runner (12 initial scenarios and 21 PASS groups), and the established release checks and PowerShell/WSL HTTP smokes. Moved the misplaced v0.6.2 validation paragraph to its proper section.
 
 Hardening and polish added malformed v6 summary record/count/classification/UTF-8/length/trailing-byte coverage, every truncated v6 summary-result boundary, and a 10,000-event real-WASM v6 summary replay with memory-growth and copied-result lifetime checks. Completed the summary privacy and UI polish audit. Passed 82 Rust and 31 Node/real-WASM tests, fmt, Clippy, release WASM, version check, PowerShell/WSL build-run HTTP smokes and complete Chrome 154.0.8037.95 browser regressions. Firefox, Safari, macOS, native zoom, NVDA and VoiceOver remain unverified; no screen-reader certification is claimed. Full environment details are in [V0.6.0](docs/V0.6.0.md).
 
-## [0.6.2] — Summary Resilience & Accessibility
+## v0.6.2 — Summary Resilience & Accessibility
 
 No new capability. Added catch-up cursor quota/abort rollback and retry, repeated snapshot-read failure recovery, pending cursor-write reconnect, missed view-state notification recovery, both stale/new tab write orders, and Pulse timer refresh while the summary is visible. Extended keyboard, focus, semantic status, reflow, forced-colors, text-spacing and reduced-motion checks. Passed 81 Rust and 29 Node/real-WASM tests, fmt, Clippy, release WASM, version check, PowerShell/WSL build-run HTTP smokes, and complete Chrome 154.0.8037.95 browser regressions. Firefox, Safari, macOS, native zoom, NVDA and VoiceOver remain unverified. Full environment details are in [V0.6.0](docs/V0.6.0.md).
 
-## [0.6.1] — Summary Correctness
+## v0.6.1 — Summary Correctness
 
 No new capability. Added explicit empty/first/middle/latest cursor cases, first-occurrence handling for exact duplicate event IDs, conflicting-ID failure, exact 8/9-entry cap cases, and browser checks for mismatched/partial local cursor metadata. No production behavior change was required. Passed 81 Rust and 29 Node/real-WASM tests, fmt, Clippy, release WASM, version check, PowerShell/WSL build-run HTTP smokes, and complete Chrome 154.0.8037.95 browser regressions on Windows x64 (Rust 1.93.0, Node 22.12.0; WSL2 Ubuntu 22.04.5 POSIX validation). Native zoom, Firefox, Safari, NVDA and VoiceOver remain unverified.
 
 Detailed validation evidence is in [V0.6.0](docs/V0.6.0.md).
 
-## [0.6.0] — Since You Last Looked
+## v0.6.0 — Since You Last Looked
 
 Added a Rust-derived, eight-entry catch-up summary for Item, Handoff and Talk changes, with total/omitted counts and an explicit Caught up control. The local cursor is initialized at existing history on first run, stored in the existing `local_context` singleton, and advances transactionally through only the frozen snapshot boundary. Protocol v6 preserves explicit `as_of` and adds a stable event-ID cursor and structured summary result; v1–v5, event codes/bytes and IndexedDB schema 1 remain unchanged. Pulse is excluded from entries but may define the snapshot boundary. No read receipts, member tracking, actor attribution, summary history, analytics, AI, remote service, new household events, migration or dependency.
 
 Passed 78 Rust and 29 Node/real-WASM tests, formatting, Clippy with warnings denied, release WASM build, version consistency, PowerShell and WSL build/run workflows (page and WASM HTTP 200), and the complete Chrome browser regression suite. Windows x64, Rust 1.93.0, Node 22.12.0, Chrome 154.0.8037.95; POSIX build/run via WSL2 Ubuntu 22.04.5. Catch-up keyboard/focus, 48px targets, 320px reflow, forced colors, increased spacing, reduced motion and 200% page-scale emulation passed. Firefox, Safari, macOS, native desktop zoom, NVDA and VoiceOver remain unverified; no screen-reader certification is claimed. Full evidence is in [V0.6.0](docs/V0.6.0.md).
 
-## [0.5.3] — Pulse Hardening & Polish
+## v0.5.3 — Pulse Hardening & Polish
 
 Added every v5 request/header/envelope/payload and result truncation boundary, 10,000-event mixed replay, memory-growth and copied-result lifetime tests. Made numeric enum identifiers explicit and prefilled Change with the current capacity. Completed time/domain/privacy audit and 320px visual review. No new capability; the authorized Pulse line stops here. Passed 69 Rust and 28 Node/real-WASM tests, the complete Chrome browser suite, fmt/Clippy/version checks, both WASM builds and PowerShell/WSL build-run workflows. Accessibility modes and remaining unverified environments are recorded in [V0.5.0](docs/V0.5.0.md).
 
-## [0.5.2] — Pulse Resilience & Accessibility
+## v0.5.2 — Pulse Resilience & Accessibility
 
 Restored capacity-selector focus when expiry hides an active Pulse control. Added late timer, simulated sleep/wake, focus/visibility, clock forward/backward, missed invalidation, original SET/CLEAR quota/abort retry, repeated refresh failures, supersession, rapid intent, reconnect/busy, native keyboard and accessibility-mode coverage. No new capability; evidence is in docs/V0.5.0.md.
 
-## [0.5.1] — Pulse Correctness
+## v0.5.1 — Pulse Correctness
 
 Added exhaustive Pulse payload lengths, schemas, reserved/value codes, timestamp bounds, mixed entity invariance, exact v5 layouts, malformed results and combined count limits. Legacy byte fixtures remain unchanged. No new capability or production defect found; validation evidence is in docs/V0.5.0.md.
 
-## [0.5.0] — Pulse
+## v0.5.0 — Pulse
 
 Added fixed actor-scoped capacity, set/replace/clear and explicit expiry. Rust owns rebuild_at(events, as_of); protocol v5 preserves v1–v4 layouts. Native controls and canonical timer/visibility/focus refresh reuse IndexedDB schema 1 and original-command retry. No migration, acknowledgement, analytics, identity inference, automation or dependency.
 
 Validation evidence: [V0.5.0](docs/V0.5.0.md).
 
-## [0.4.3] — Talk Hardening & Polish
+## v0.4.3 — Talk Hardening & Polish
 
 Added every truncated v4 result-header/Talk-record boundary, malformed request headers and extreme lengths, 10,000-event mixed replay, and 10,000-Talk real-WASM growth with independent copied results across repeated success/error/empty calls. Retained explicit v3 Handoff truncation/trailing-byte coverage. Visual inspection found and fixed horizontal overflow caused by a 320px page minimum width when a desktop scrollbar consumes space; reflow assertions now compare scrollWidth with clientWidth. The corrected 320px screen preserves full input focus outlines and wrapping actions.
 
@@ -264,15 +284,15 @@ Passed 58 Rust tests and 19 Node bridge/real-WASM tests, formatting, Clippy with
 
 Architecture/product/privacy audit confirms Rust-only reduction; separate Item/Handoff/Talk semantics; immutable canonical IndexedDB schema-1 events; no migration; unchanged v1/v2/v3 contracts and explicit v4; content-free invalidation; textContent rendering; same-origin static requests; no framework/runtime dependency, analytics, AI, remote service, sentiment, scores, blame, identity inference, resolver attribution or response metrics. Resolved is workflow state only and claims neither agreement nor an objective solution. No remaining release-blocking defect was found in exercised environments. Cross-browser, assistive-technology and native-zoom checks remain validation gaps, not certifications. No additional UI feature was added. Duplication remains manageable, so no orchestration refactor was introduced.
 
-## [0.4.2] — Talk Resilience & Accessibility
+## v0.4.2 — Talk Resilience & Accessibility
 
 Expanded Talk browser checks for keyboard resolve/reopen/archive, native input-to-Add focus order, semantic headings/lists, labels, polite status/assertive errors, visible focus and 48px targets under forced colors. Added independent draft assertions and direct stale retries with missed invalidation, alongside repeated-refresh recovery. Retained delayed saves, reconnect, queued peer refresh, sessionStorage denial, quota/abort rollback, rapid retry once and supersession. No production defect was found. Passed 56 Rust and 17 Node/real-WASM tests, formatting, Clippy, version consistency, release WASM, both build scripts/launchers (page/WASM HTTP 200), and complete browser suite in Windows x64/Chrome 154.0.8037.59/Node 22.12.0, POSIX via WSL. 320px, increased spacing, forced colors, reduced motion and 200% page-scale emulation pass; native zoom, Firefox, Safari, NVDA and VoiceOver remain unverified. No new product capability.
 
-## [0.4.1] — Talk Correctness
+## v0.4.1 — Talk Correctness
 
 Talk correctness audit passes the full lifecycle matrix, every truncated payload, overlong references, unsupported schemas, empty/oversized/invalid UTF-8 and blank text, exact v4 records, malformed status/reserved/count/length fields and combined entity limits. Exact pre-Talk writer/result fixtures remain unchanged. Browser tests verify event/counter rollback, retry once, metadata preservation and invalid-transition non-append. No production defect was found. Passed 56 Rust and 17 Node/real-WASM tests, formatting, Clippy, version consistency, release WASM, both build scripts and both launchers (page/WASM HTTP 200), and the complete Chrome 154.0.8037.59 browser suite on Windows x64/Node 22.12.0; POSIX via WSL. Previously listed platform/assistive-technology gaps remain. No new product capability.
 
-## [0.4.0] — Talk
+## v0.4.0 — Talk
 
 - Added one-field topic capture, Open/Resolved lists, resolve, reopen and terminal archive. Resolution is workflow state only; no agreement, blame or verified-person claim is made.
 - Added distinct Rust Talk types and schema-1 event codes 8–11, with explicit protocol v4. Protocols 1–3 and prior event bytes remain unchanged; older protocols reject Talk. IndexedDB stays schema 1 with no migration.
@@ -280,7 +300,7 @@ Talk correctness audit passes the full lifecycle matrix, every truncated payload
 
 Validation evidence is recorded in [V0.4.0](docs/V0.4.0.md).
 
-## [0.3.5] — Build & Run Convenience
+## v0.3.5 — Build & Run Convenience
 
 ### Improved
 
@@ -294,7 +314,7 @@ Validation evidence is recorded in [V0.4.0](docs/V0.4.0.md).
 - Windows x64 used PowerShell 5.1, Rust 1.93.0, Python 3.13.14, Node 22.12.0, and headless Edge 154.0.4258.48. POSIX validation used WSL Ubuntu 22.04.5, Rust 1.93.0, and Python 3.10.12. Each launcher served the page and WASM asset successfully with HTTP 200.
 - No product capability, event format, protocol, IndexedDB schema, or runtime dependency changed.
 
-## [0.3.4] — Handoff Retry Recovery
+## v0.3.4 — Handoff Retry Recovery
 
 ### Fixed
 
@@ -308,26 +328,26 @@ Validation evidence is recorded in [V0.4.0](docs/V0.4.0.md).
 - Tested with Windows x64, Node 22.12.0, headless Chrome 154.0.8037.59; POSIX build ran in WSL Ubuntu 22.04. Existing 320px/accessibility-mode, storage, protocol, CSP and same-origin regressions remain passing. Firefox, Safari, native desktop zoom, NVDA and VoiceOver remain unverified.
 - No new product capability, persisted event change, IndexedDB migration, protocol change, or dependency. Earlier release tags remain unchanged.
 
-## [0.3.3] — Handoff Hardening & Polish
+## v0.3.3 — Handoff Hardening & Polish
 
 - Added deterministic Handoff header/extreme-length checks, 10,000-event mixed replay, every truncated result boundary, trailing result rejection, and real WASM memory growth with repeated success/error/empty replay.
 - Reconciled current product, protocol, storage, component, accessibility, roadmap and release documentation. Confirmed Rust remains the sole reducer, IndexedDB schema 1 is canonical, history is immutable, peer messages carry no content, and no runtime dependencies, remote services, identity claims or timing analytics were introduced.
 - Passed 51 Rust tests, 13 Node bridge/real-WASM tests, formatting, Clippy, release WASM compilation, both build scripts, version consistency and the full browser suite (Windows x64, Node 22.12.0, headless Chrome 154.0.8037.59; POSIX build in WSL Ubuntu 22.04).
 - Native desktop 200% zoom, Firefox, Safari, NVDA and VoiceOver remain untested. The planned Handoff line stops here for user evaluation; v0.3.4 and v0.4.0 have not begun.
 
-## [0.3.2] — Handoff Resilience & Accessibility
+## v0.3.2 — Handoff Resilience & Accessibility
 
 - Extended browser regression coverage for Handoff delayed saves, reconnect and queued peer refresh, newer draft ownership, sessionStorage denial, acknowledgement/archive write failures, abort rollback, and rapid retry exactly once.
 - Verified stale acknowledgement/archive recovery even with missed invalidation, peer-action focus restoration, labeled input, semantic headings/lists, polite status, assertive errors, all busy controls, 48px targets, 320px reflow, forced colors, text spacing, reduced motion and 200% page-scale emulation. No product capability or domain rule changed.
 - Passed 49 Rust tests, 11 Node bridge/real-WASM tests, formatting, Clippy, release WASM compilation, both build scripts, version consistency and full browser regressions (Windows x64, Node 22.12.0, headless Chrome 154.0.8037.59; POSIX build in WSL Ubuntu 22.04). Native desktop zoom, Firefox, Safari, NVDA and VoiceOver remain untested.
 
-## [0.3.1] — Handoff Correctness
+## v0.3.1 — Handoff Correctness
 
 - Added exhaustive Handoff payload truncation, exact reference lengths, schema rejection, extreme lengths, invalid Unicode, actor provenance, separate ID namespace, and exact result-layout regressions.
 - Added malformed result-field recovery and Handoff-specific event/counter rollback, exactly-once retry, metadata mismatch and canonical-byte preservation tests. No new capability or contract change.
 - Passed 49 Rust tests, 11 Node bridge/real-WASM tests, formatting, Clippy, release WASM build, both build scripts, version check, and the full browser regression runner (Windows x64, Node 22.12.0, headless Chrome 154.0.8037.59; POSIX build in WSL Ubuntu 22.04). Native desktop zoom, Firefox, Safari, NVDA and VoiceOver remain unverified.
 
-## [0.3.0] — Handoff
+## v0.3.0 — Handoff
 
 ### Added
 
@@ -341,7 +361,7 @@ Validation evidence is recorded in [V0.4.0](docs/V0.4.0.md).
 - Full browser regression suite passed on Windows x64, Node 22.12.0, headless Chrome 154.0.8037.59, including prior Today/Needs checks and Handoff lifecycle, mixed replay/reload, invalid-reference non-append, retries/drafts, cross-tab stale acknowledgement, keyboard/focus, 320px, forced colors, text spacing, reduced motion, page-scale emulation, CSP and same-origin requests. POSIX build ran in WSL Ubuntu 22.04.
 - Native desktop zoom, Firefox, Safari, NVDA and VoiceOver remain untested. Page-scale emulation is not native desktop 200% zoom.
 
-## [0.2.4] — Today + Needs Compatibility Fixes
+## v0.2.4 — Today + Needs Compatibility Fixes
 
 ### Fixed
 
@@ -355,7 +375,7 @@ Validation evidence is recorded in [V0.4.0](docs/V0.4.0.md).
 - The Windows x64 browser runner passed in headless Chrome 154.0.8037.59 with Node 22.12.0: legacy replay, Today/Needs, complete/reopen/archive, pending busy controls, retries, draft ownership, cross-tab canonical refresh, malformed-storage preservation, 320px reflow, CSP/console, and same-origin requests. Existing forced-colors, reduced-motion, text-spacing, and 200% page-scale checks also passed.
 - Native desktop 200% zoom, Firefox, Safari, NVDA, and VoiceOver were not tested. No product capability, persisted event change, IndexedDB schema change, or runtime dependency was introduced. Published `kin-v0.2.0`–`kin-v0.2.3` tags remain unchanged.
 
-## [0.2.3] — Today + Needs Hardening & Polish
+## v0.2.3 — Today + Needs Hardening & Polish
 
 ### Hardened
 
@@ -370,7 +390,7 @@ Validation evidence is recorded in [V0.4.0](docs/V0.4.0.md).
 - Native desktop 200% browser zoom, Firefox, Safari, NVDA, and VoiceOver were not tested. The 200% check was Chromium page-scale emulation, not native desktop zoom; no screen-reader certification is claimed.
 - No product capability, IndexedDB schema change, runtime dependency, framework, backend, or remote service was added.
 
-## [0.2.2] — Today + Needs Resilience & Accessibility
+## v0.2.2 — Today + Needs Resilience & Accessibility
 
 ### Improved
 
@@ -386,7 +406,7 @@ Validation evidence is recorded in [V0.4.0](docs/V0.4.0.md).
 - Native desktop 200% browser zoom, Firefox, Safari, NVDA, and VoiceOver were not tested. The 200% check used Chromium page-scale emulation, not native desktop zoom; no screen-reader certification is claimed.
 - No product capability, IndexedDB schema change, framework, or runtime dependency was added.
 
-## [0.2.1] — Today + Needs Correctness
+## v0.2.1 — Today + Needs Correctness
 
 ### Hardened
 
@@ -400,7 +420,7 @@ Validation evidence is recorded in [V0.4.0](docs/V0.4.0.md).
 - The Windows x64 browser runner passed in Chrome 154.0.8037.59 with Node 22.12.0, including exact v0.1 byte preservation, malformed lifecycle payloads, event/counter rollback and retry, metadata mismatch preservation, the 10,000-event cap, cross-tab replay, CSP, same-origin requests, keyboard submission, focus, and 320px reflow. The shell build ran in WSL Ubuntu 22.04 with Rust 1.93.0.
 - No product capability, IndexedDB schema change, framework, or runtime dependency was added.
 
-## [0.2.0] — Today + Needs
+## v0.2.0 — Today + Needs
 
 ### Added
 
@@ -416,7 +436,7 @@ Validation evidence is recorded in [V0.4.0](docs/V0.4.0.md).
 - Forced-colors, 200% zoom, Firefox, Safari, NVDA, and VoiceOver were not tested for this milestone.
 - No new IndexedDB schema, framework, runtime dependency, backend, or remote service was added.
 
-## [0.1.5] — Final 0.1.x Stabilization
+## v0.1.5 — Final 0.1.x Stabilization
 
 ### Fixed
 
@@ -437,7 +457,7 @@ Validation evidence is recorded in [V0.4.0](docs/V0.4.0.md).
 - Firefox, Safari, standalone Chrome, native browser zoom, NVDA, and VoiceOver were not tested for this patch. Quota failures were injected; the host disk was not filled.
 - No new product capability or dependency was added. This closes planned 0.1.x stabilization; the next development target is v0.2.0.
 
-## [0.1.4]
+## v0.1.4
 
 ### Fixed
 
@@ -460,7 +480,7 @@ Validation evidence is recorded in [V0.4.0](docs/V0.4.0.md).
 - Tested on Windows 10 x64 with Rust 1.93.0, Node 22.12.0, and headless Edge 154.0.4258.48 through local CDP; CSP loaded with no CSP violations. An automatic `/favicon.ico` request returned 404.
 - Forced-colors, increased text spacing, and 320px reflow were checked in the integrated VS Code browser (Code 1.139.1, Electron 43.6.0, Chromium 150). Native 200% browser zoom, Firefox, Safari, standalone Chrome, NVDA, and VoiceOver remain unverified.
 
-## [0.1.3]
+## v0.1.3
 
 ### Audited
 
@@ -474,7 +494,7 @@ Validation evidence is recorded in [V0.4.0](docs/V0.4.0.md).
 - Full Rust, bridge, WASM, reload, malformed-storage, Unicode, keyboard, and narrow-viewport regressions were run for the v0.1.x line.
 - The release review records remaining platform and assistive-technology gaps and makes no certification claim for untested environments.
 
-## [0.1.2]
+## v0.1.2
 
 ### Improved
 
@@ -489,7 +509,7 @@ Validation evidence is recorded in [V0.4.0](docs/V0.4.0.md).
 - Confirmed primary controls are at least 48px high. Testing used Windows 10 x64 with the integrated VS Code browser (Code 1.139.1, Electron 43.6.0, Chromium 150.0.7871.250).
 - Screen-reader and non-Chromium browser testing remain unverified.
 
-## [0.1.1]
+## v0.1.1
 
 ### Fixed
 
@@ -503,7 +523,7 @@ Validation evidence is recorded in [V0.4.0](docs/V0.4.0.md).
 - Verified invalid completion does not append, corrupted rows remain stored, concurrent tabs preserve contiguous event order, and rapid duplicate submission creates one event.
 - Re-ran 24 Rust tests, 3 built-in Node bridge tests, formatting, Clippy, the WASM build, and browser reload checks.
 
-## [0.1.0]
+## v0.1.0
 
 ### Added
 
@@ -518,7 +538,7 @@ Validation evidence is recorded in [V0.4.0](docs/V0.4.0.md).
 - Browser checks passed for add, complete, reload, inert rendering of script-like text, keyboard submission, narrow layout, and same-origin-only requests.
 - Windows 10 x64 was exercised using the integrated VS Code browser (Code 1.139.1, Electron 43.6.0, Chromium 150.0.7871.250). Firefox, Safari, standalone Chrome, and assistive-technology testing were not performed.
 
-## [0.0.12]
+## v0.0.12
 
 ### Added
 
@@ -528,7 +548,7 @@ Validation evidence is recorded in [V0.4.0](docs/V0.4.0.md).
 
 - Updated Kin's current release references through `v0.0.12`; `v0.0.9` remains the specification freeze and `v0.1.0` remains the first implementation milestone.
 
-## [0.0.11]
+## v0.0.11
 
 ### Added
 
@@ -538,62 +558,62 @@ Validation evidence is recorded in [V0.4.0](docs/V0.4.0.md).
 
 - Corrected stale current-version references and confirmed that `v0.1.0` is the first implementation milestone.
 
-## [0.0.10]
+## v0.0.10
 
 ### Added
 
 - Added project-scoped Code of Conduct, security, support, contribution, issue-template, and pull-request guidance.
 - Documented GitHub's discovery limitations for community files nested in the ZTM Build Fest monorepo.
 
-## [0.0.9]
+## v0.0.9
 
 ### Added
 
 - Completed the implementation preflight, accepted architecture decisions, canonical test vectors, and requirement traceability for the frozen `v0.1.0` scope.
 
-## [0.0.8]
+## v0.0.8
 
 ### Added
 
 - Documented contributor expectations, cross-platform development guidance, code style, release process, and privacy-safe debugging.
 
-## [0.0.7]
+## v0.0.7
 
 ### Added
 
 - Specified persistent-contract versioning, migration safety, portability, retention, and event-log evolution.
 
-## [0.0.6]
+## v0.0.6
 
 ### Added
 
 - Froze the initial implementation contract for the manual JS/WASM ABI, binary protocol, IndexedDB event store, components, tests, and accessibility.
 
-## [0.0.5]
+## v0.0.5
 
 ### Added
 
 - Specified household/member/device identity, pairing, cryptographic posture, threat model, and synchronization design.
 
-## [0.0.4]
+## v0.0.4
 
 ### Added
 
 - Defined the household domain, immutable event semantics, entity lifecycles, and deterministic state reconstruction.
 
-## [0.0.3]
+## v0.0.3
 
 ### Added
 
 - Documented initial UX flows, the release roadmap, and the first implementation specification.
 
-## [0.0.2]
+## v0.0.2
 
 ### Added
 
 - Established the technical foundation: architecture, event model, local-first direction, privacy posture, and dependency policy.
 
-## [0.0.1]
+## v0.0.1
 
 ### Added
 
