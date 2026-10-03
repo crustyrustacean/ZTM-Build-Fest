@@ -1,6 +1,6 @@
 # GitHub Community Files
 
-**Status:** community documentation for Kin as a project nested in the ZTM Build Fest monorepo.
+**Status:** Current through v0.7.4 Routine Stale-Action Correctness; community documentation for Kin as a project nested in the ZTM Build Fest monorepo.
 
 ## Project files
 

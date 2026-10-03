@@ -2,8 +2,7 @@ use std::collections::BTreeMap;
 use std::sync::Mutex;
 
 use crate::error::KinError;
-use crate::protocol::{decode_request, encode_state, MAX_PROTOCOL_BYTES, PROTOCOL_VERSION};
-use crate::state::rebuild;
+use crate::protocol::{ERROR_PROTOCOL_VERSION, MAX_PROTOCOL_BYTES};
 
 struct AbiState {
     allocations: BTreeMap<u32, Box<[u8]>>,
@@ -29,30 +28,8 @@ fn lock_state() -> std::sync::MutexGuard<'static, AbiState> {
         .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
-fn range_is_valid(pointer: u32, length: u32, memory_length: u64) -> bool {
-    if length == 0 {
-        return true;
-    }
-    if pointer == 0 {
-        return false;
-    }
-    u64::from(pointer)
-        .checked_add(u64::from(length))
-        .is_some_and(|end| end <= memory_length)
-}
-
 fn request_length_is_supported(length: u32) -> bool {
     usize::try_from(length).is_ok_and(|size| size <= MAX_PROTOCOL_BYTES)
-}
-
-#[cfg(target_arch = "wasm32")]
-fn linear_memory_length() -> u64 {
-    u64::from(core::arch::wasm32::memory_size(0) as u32) * 65_536
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-fn linear_memory_length() -> u64 {
-    u64::MAX
 }
 
 fn error_buffer(error: KinError) -> Vec<u8> {
@@ -62,7 +39,7 @@ fn error_buffer(error: KinError) -> Vec<u8> {
         return bytes;
     }
     bytes.extend_from_slice(b"KERR");
-    bytes.extend_from_slice(&PROTOCOL_VERSION.to_le_bytes());
+    bytes.extend_from_slice(&ERROR_PROTOCOL_VERSION.to_le_bytes());
     bytes.extend_from_slice(&(error.code() as u16).to_le_bytes());
     bytes.extend_from_slice(&(message.len() as u32).to_le_bytes());
     bytes.extend_from_slice(message);
@@ -117,26 +94,74 @@ pub extern "C" fn kin_free(pointer: u32, length: u32) -> i32 {
 
 #[cfg_attr(target_arch = "wasm32", no_mangle)]
 pub extern "C" fn kin_apply_events(pointer: u32, length: u32) -> i32 {
+    operate(pointer, length, crate::core::replay)
+}
+
+#[cfg_attr(target_arch = "wasm32", no_mangle)]
+pub extern "C" fn kin_event_metadata(pointer: u32, length: u32) -> i32 {
+    operate(pointer, length, crate::codec::encode_metadata)
+}
+
+#[cfg_attr(target_arch = "wasm32", no_mangle)]
+pub extern "C" fn kin_event_metadata_batch(pointer: u32, length: u32) -> i32 {
+    operate(pointer, length, crate::codec::encode_metadata_batch)
+}
+
+#[cfg_attr(target_arch = "wasm32", no_mangle)]
+pub extern "C" fn kin_encode_command(pointer: u32, length: u32) -> i32 {
+    operate(pointer, length, crate::command::encode_command)
+}
+
+#[cfg_attr(target_arch = "wasm32", no_mangle)]
+pub extern "C" fn kin_execute_command(pointer: u32, length: u32) -> i32 {
+    operate(pointer, length, crate::command::execute_request)
+}
+
+#[cfg_attr(target_arch = "wasm32", no_mangle)]
+pub extern "C" fn kin_encode_archive(pointer: u32, length: u32) -> i32 {
+    operate(pointer, length, crate::archive::build_request)
+}
+
+#[cfg_attr(target_arch = "wasm32", no_mangle)]
+pub extern "C" fn kin_decode_archive(pointer: u32, length: u32) -> i32 {
+    operate(pointer, length, crate::archive::validate_request)
+}
+
+#[cfg_attr(target_arch = "wasm32", no_mangle)]
+pub extern "C" fn kin_archive_header(pointer: u32, length: u32) -> i32 {
+    operate(pointer, length, crate::archive::header_request)
+}
+
+#[cfg_attr(target_arch = "wasm32", no_mangle)]
+pub extern "C" fn kin_archive_layout(pointer: u32, length: u32) -> i32 {
+    operate(pointer, length, crate::archive::layout_request)
+}
+
+#[cfg_attr(target_arch = "wasm32", no_mangle)]
+pub extern "C" fn kin_plan_import(pointer: u32, length: u32) -> i32 {
+    operate(pointer, length, crate::archive::plan_import)
+}
+
+fn operate(pointer: u32, length: u32, operation: fn(&[u8]) -> Result<Vec<u8>, KinError>) -> i32 {
     let mut state = lock_state();
     state.result.clear();
     state.error.clear();
-
     let outcome = if !request_length_is_supported(length) {
         Err(KinError::SizeLimit)
-    } else if !range_is_valid(pointer, length, linear_memory_length()) {
-        Err(KinError::InvalidAbi)
     } else if length == 0 {
         Err(KinError::MalformedProtocol)
     } else {
-        let input = unsafe {
-            // The WASM caller borrows an in-bounds byte range for this call only.
-            std::slice::from_raw_parts(pointer as *const u8, length as usize)
-        };
-        decode_request(input)
-            .and_then(|events| rebuild(&events))
-            .and_then(|household| encode_state(&household))
+        state
+            .allocations
+            .get(&pointer)
+            .map_or(Err(KinError::InvalidAbi), |input| {
+                if input.len() != length as usize {
+                    Err(KinError::InvalidAbi)
+                } else {
+                    operation(input)
+                }
+            })
     };
-
     match outcome {
         Ok(result) => {
             state.result = result;
@@ -152,6 +177,15 @@ pub extern "C" fn kin_apply_events(pointer: u32, length: u32) -> i32 {
 #[cfg_attr(target_arch = "wasm32", no_mangle)]
 pub extern "C" fn kin_result_ptr() -> u32 {
     active_buffer_pointer(&lock_state().result)
+}
+
+/// Drops retained buffers on host lock, without claiming memory zeroization.
+#[cfg_attr(target_arch = "wasm32", no_mangle)]
+pub extern "C" fn kin_clear() {
+    let mut state = lock_state();
+    state.allocations.clear();
+    state.result = Vec::new();
+    state.error = Vec::new();
 }
 
 #[cfg_attr(target_arch = "wasm32", no_mangle)]
@@ -171,17 +205,8 @@ pub extern "C" fn kin_error_len() -> u32 {
 
 #[cfg(test)]
 mod tests {
-    use super::{range_is_valid, request_length_is_supported};
+    use super::request_length_is_supported;
     use crate::protocol::MAX_PROTOCOL_BYTES;
-
-    #[test]
-    fn memory_ranges_reject_null_overflow_and_out_of_bounds() {
-        assert!(range_is_valid(12, 8, 20));
-        assert!(range_is_valid(20, 0, 20));
-        assert!(!range_is_valid(0, 1, 20));
-        assert!(!range_is_valid(19, 2, 20));
-        assert!(!range_is_valid(u32::MAX, 2, u64::from(u32::MAX) + 1));
-    }
 
     #[test]
     fn request_size_is_bounded_before_pointer_dereference() {

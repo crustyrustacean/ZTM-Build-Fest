@@ -1,6 +1,6 @@
 # ADR 0001 — Event-Sourced Household State
 
-Status: Accepted
+Status: Current through v0.7.4 Routine Stale-Action Correctness; Accepted
 
 ## Context
 

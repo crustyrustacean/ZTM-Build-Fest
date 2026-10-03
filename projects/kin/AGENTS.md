@@ -100,7 +100,7 @@ If an unrelated parent-repository file was modified accidentally, revert that ch
 
 # Current Development Stage
 
-Kin uses semantic versions. The current release is `v0.1.5` — Final 0.1.x Stabilization. This closes the 0.1.x stabilization line; the next development target is `v0.2.0`. Use `kin-v0.1.5-development` → `kin-development` → `kin-main` for this patch.
+Kin's last published release is `v0.10.3` — Bounded Storage/Archive Hardening & Architecture Closure. The `v0.11.5` Durable Service & Deployment implementation candidate is committed and tagged `kin-v0.11.5` for human review; the tag is not a published release. Preserve every published tag exactly. Root replacement follows [ROOT-ROTATION](docs/ROOT-ROTATION.md); archive recovery remains intentionally local-only and KARC v1 remains supported. Do not begin v0.12 or create/publish further release commits/tags without explicit authorization. The forward roadmap is v0.12 data lifecycle/deletion, v0.13 recovery/continuity, v0.14 UX/UI consolidation, then v1.0 stability. No production certification, mobile readiness or independent audit is claimed. No automatic kin-main or kin-development merge. See [V0.10.0](docs/V0.10.0.md) and [V0.11.0](docs/V0.11.0.md) for actual evidence and limitations.
 
 The pre-implementation releases are:
 
@@ -615,7 +615,9 @@ PULSE_SET
 PULSE_CLEARED
 
 ROUTINE_CREATED
-ROUTINE_COMPLETED
+ROUTINE_OCCURRENCE_COMPLETED
+ROUTINE_OCCURRENCE_REOPENED
+ROUTINE_ARCHIVED
 
 AGREEMENT_CREATED
 AGREEMENT_REVISED
@@ -1003,7 +1005,13 @@ v0.6.0 — Since You Last Looked
 v0.7.0 — Routines
 v0.8.0 — Household Pairing
 v0.9.0 — Encrypted Sync
-v1.0.0 — Build Fest release
+v0.9.3 — Encrypted Event Sync Stabilization
+v0.10.x — Portable Core + Local Security
+v0.11.x — Durable Service & Deployment (implementation candidate; awaiting human review)
+v0.12.x — Data Lifecycle, Retention & Deletion (planned)
+v0.13.x — Recovery & Household Continuity (planned)
+v0.14.x — UX/UI Consolidation (planned)
+v1.0.0 — Stable Kin Platform (planned)
 ```
 
 This roadmap may evolve.
@@ -1033,7 +1041,9 @@ After `.3`, stop and ask the user whether the minor release line is satisfactory
 
 Kin uses namespaced Git tags because it lives inside the multi-project ZTM Build Fest repository. Tag every completed Kin version, including planning, documentation, implementation, patch, and other milestone releases.
 
-Use the `kin-` prefix for every tag:
+Use the `kin-` prefix for every tag. Names listed for releases after the current
+implementation are guidance only, not evidence that a tag exists. Verify before
+reporting a release; a roadmap-only task creates no tags.
 
 ```text
 kin-v0.0.1
@@ -1054,6 +1064,55 @@ kin-v0.1.2
 kin-v0.1.3
 kin-v0.1.4
 kin-v0.1.5
+kin-v0.2.0
+kin-v0.2.1
+kin-v0.2.2
+kin-v0.2.3
+kin-v0.2.4
+kin-v0.3.0
+kin-v0.3.1
+kin-v0.3.2
+kin-v0.3.3
+kin-v0.3.4
+kin-v0.3.5
+kin-v0.4.0
+kin-v0.4.1
+kin-v0.4.2
+kin-v0.4.3
+kin-v0.5.0
+kin-v0.5.1
+kin-v0.5.2
+kin-v0.5.3
+kin-v0.6.0
+kin-v0.6.1
+kin-v0.6.2
+kin-v0.6.3
+kin-v0.7.0
+kin-v0.7.1
+kin-v0.7.2
+kin-v0.7.3
+kin-v0.7.4
+kin-v0.8.0
+kin-v0.8.1
+kin-v0.8.2
+kin-v0.8.3
+kin-v0.8.4
+kin-v0.8.5
+kin-v0.8.6
+kin-v0.8.7
+kin-v0.8.8
+kin-v0.9.0
+kin-v0.9.1
+kin-v0.9.2
+kin-v0.9.3
+kin-v0.10.0
+kin-v0.10.1
+kin-v0.10.2
+kin-v0.10.3
+kin-v0.11.0
+kin-v0.12.0
+kin-v0.13.0
+kin-v0.14.0
 kin-v1.0.0
 ```
 

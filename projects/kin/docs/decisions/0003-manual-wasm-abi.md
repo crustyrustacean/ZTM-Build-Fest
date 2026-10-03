@@ -1,6 +1,6 @@
 # ADR 0003 — Manual JavaScript/WASM ABI
 
-Status: Accepted
+Status: Current through v0.7.4 Routine Stale-Action Correctness; Accepted
 
 ## Context
 

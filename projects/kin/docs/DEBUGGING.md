@@ -1,6 +1,6 @@
 # Debugging and Diagnostics
 
-**Status:** safe diagnostic policy for future implementation. No runtime logging or diagnostics exist.
+**Status:** Current through v0.7.4 Routine Stale-Action Correctness; privacy-safe diagnostic policy. Current ABI errors and UI feedback use bounded messages; no household-content logging exists. Symbolic diagnostics below remain future vocabulary.
 
 ## Useful diagnostic categories
 
@@ -35,7 +35,7 @@ storage_schema_version
 application_version
 ```
 
-Do not log event payloads, item text, Talk topics, Pulse values, member display names, passkey assertions, encryption keys, pairing secrets, or decrypted exports. Avoid URLs, exception messages, and browser storage dumps that may include content.
+Do not log event payloads, item text, Handoff text, Talk topics, Pulse values, member display names, passkey assertions, encryption keys, pairing secrets, or decrypted exports. Avoid URLs, exception messages, and browser storage dumps that may include content.
 
 If a developer explicitly opts into inspecting local synthetic test data, keep it local, visible, narrowly scoped, and off by default. Never upload diagnostic bundles containing household content automatically. Bug reports should include repro steps, browser/OS version, and redacted diagnostic codes rather than private messages.
 

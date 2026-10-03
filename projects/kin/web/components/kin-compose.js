@@ -1,5 +1,4 @@
 const MAX_ITEM_TEXT_BYTES = 4096;
-const DRAFT_STORAGE_KEY = "kin.compose.draft";
 const textEncoder = new TextEncoder();
 
 class KinCompose extends HTMLElement {
@@ -27,6 +26,27 @@ class KinCompose extends HTMLElement {
     this.input.maxLength = MAX_ITEM_TEXT_BYTES;
     this.input.required = true;
     this.input.setAttribute("aria-describedby", "compose-message");
+    this.classificationLabel = document.createElement("label");
+    this.classificationLabel.htmlFor = "item-classification";
+    this.classificationLabel.textContent = "Add to";
+    this.classification = document.createElement("select");
+    this.classification.id = "item-classification";
+    this.classification.name = "classification";
+    for (const [value, text] of [
+      ["need", "Needs"],
+      ["today", "Today"],
+    ]) {
+      const option = document.createElement("option");
+      option.value = value;
+      option.textContent = text;
+      this.classification.append(option);
+    }
+    this.classificationField = document.createElement("div");
+    this.classificationField.className = "classification-field";
+    this.classificationField.append(
+      this.classificationLabel,
+      this.classification,
+    );
     this.button = document.createElement("button");
     this.button.className = "add-button";
     this.button.type = "submit";
@@ -37,29 +57,36 @@ class KinCompose extends HTMLElement {
     this.message.setAttribute("aria-live", "polite");
     this.restoreDraft();
     this.input.addEventListener("input", () => this.saveDraft());
-    this.form.append(this.label, this.input, this.button, this.message);
+    this.form.append(
+      this.label,
+      this.input,
+      this.classificationField,
+      this.button,
+      this.message,
+    );
     this.replaceChildren(this.form);
     this.form.addEventListener("submit", (event) => this.submit(event));
+    this.classification.addEventListener("change", () => this.saveDraft());
   }
 
   set disabled(value) {
     this.isDisabled = Boolean(value);
     this.input.disabled = this.isDisabled;
+    this.classification.disabled = this.isDisabled;
     this.button.disabled = this.isDisabled;
   }
 
-  clearIfMatches(submittedText) {
+  clearIfMatches(submittedDraft) {
     // Completion belongs to the submitted draft, not a newer edit.
-    if (this.input.value !== submittedText) {
+    if (
+      this.input.value !== submittedDraft.text ||
+      this.classification.value !== submittedDraft.classification
+    ) {
       return;
     }
     this.input.value = "";
+    this.classification.value = "need";
     this.message.textContent = "";
-    try {
-      sessionStorage.removeItem(DRAFT_STORAGE_KEY);
-    } catch {
-      // Draft retention is best-effort when browser storage is unavailable.
-    }
   }
 
   focusInput() {
@@ -67,23 +94,12 @@ class KinCompose extends HTMLElement {
   }
 
   restoreDraft() {
-    try {
-      this.input.value = sessionStorage.getItem(DRAFT_STORAGE_KEY) ?? "";
-    } catch {
-      this.input.value = "";
-    }
+    this.input.value = "";
+    this.classification.value = "need";
   }
 
   saveDraft() {
-    try {
-      if (this.input.value) {
-        sessionStorage.setItem(DRAFT_STORAGE_KEY, this.input.value);
-      } else {
-        sessionStorage.removeItem(DRAFT_STORAGE_KEY);
-      }
-    } catch {
-      // Draft retention is best-effort when browser storage is unavailable.
-    }
+    // Drafts remain in the unlocked input only; lock replaces the component.
   }
 
   submit(event) {
@@ -92,6 +108,7 @@ class KinCompose extends HTMLElement {
       return;
     }
     const text = this.input.value;
+    const classification = this.classification.value;
     const textLength = textEncoder.encode(text).length;
     if (!text.trim()) {
       this.message.textContent = "Add a few words first.";
@@ -106,7 +123,7 @@ class KinCompose extends HTMLElement {
     this.message.textContent = "";
     this.dispatchEvent(
       new CustomEvent("kin:add-item", {
-        detail: { text },
+        detail: { text, classification },
         bubbles: true,
         composed: true,
         cancelable: false,

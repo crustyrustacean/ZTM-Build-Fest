@@ -1,6 +1,26 @@
 # Roadmap
 
-This roadmap is a planning baseline, not a promise of delivery dates. Releases may change as the product is tested. Kin's current release is `v0.1.5` Final 0.1.x Stabilization, closing the local prototype stabilization line without introducing a new product capability. The next development target is `v0.2.0`. The `v0.0.1`–`v0.0.12` planning and documentation history remains preserved; later product increments remain future work.
+Last published release: `v0.10.3 — Bounded Storage/Archive Hardening & Architecture Closure`. The `v0.11.5` Durable Service & Deployment implementation candidate is complete and tagged `kin-v0.11.5` for human review; it is not a published release. Do not begin v0.12.
+
+```text
+v0.9.3 — Encrypted Event Sync Stabilization
+	↓
+v0.10.x — Portable Core + Local Security
+	↓
+v0.11.x — Durable Service & Deployment
+	↓
+v0.12.x — Data Lifecycle, Retention & Deletion
+	↓
+v0.13.x — Recovery & Household Continuity
+	↓
+v0.14.x — UX/UI Consolidation
+	↓
+v1.0.0 — Stable Kin Platform
+```
+
+Kin supports encrypted local storage, recovery/optional PRF unlock, verified migration, Rust commands/codecs, encrypted archives and a static offline shell alongside opt-in encrypted sync. The v0.11 candidate adds durable server identity/relay state and service database backup/restore. Archives recover local history, not server identity. Independent security review and broader browser/authenticator coverage remain outstanding.
+
+The v0.11 candidate follows the v0.10 human review gate and deliberately settles service durability before lifecycle/deletion, recovery authority and holistic UX/UI work. The [v0.11](V0.11.0.md) record contains implementation gates and candidate evidence; [v0.12](V0.12.0.md), [v0.13](V0.13.0.md) and [v0.14](V0.14.0.md) remain planning contracts.
 
 ## Planning releases
 
@@ -86,40 +106,185 @@ Associates draft clearing with the successfully persisted submission, preserves 
 
 ### `v0.2.0` — Today + Needs
 
-Add the Today and Needs views, fast capture, lightweight classification, and active/completed household items.
+Implemented: Today and Needs views, lightweight fixed classification, fast capture defaulting to Needs, complete/reopen/archive item transitions, and local deterministic replay. Legacy v0.1.x unclassified items appear in Today. Protocol v2 carries the new projection while protocol v1 and IndexedDB schema 1 remain unchanged.
+
+### `v0.2.1` — Today + Needs Correctness
+
+Completed: added exact reopen/archive payload-boundary tests, ensured protocol v1 fails closed for unrepresentable state, and checked event/logical-counter atomicity through failures, aborts, and retries. No product concept was added.
+
+### `v0.2.2` — Today + Needs Resilience & Accessibility
+
+Completed: drafts and item actions recover across failures/retries and peer state changes; stale retries clear against Rust-derived state. Keyboard focus, forced colors, reduced motion, increased text spacing, 320px reflow, and 200% page-scale emulation were checked. No new capability.
+
+### `v0.2.3` — Today + Needs Hardening & Polish
+
+Completed: verified the architecture/privacy boundary, parser/version handling, 10,000-event/64 MiB behavior, and current Today + Needs clarity. No new capability. Stop here for release-line evaluation.
+
+### `v0.2.4` — Today + Needs Compatibility Fixes
+
+Completed: corrected protocol-v1 result headers without changing the historical byte layout, disabled every item action while busy, and added exact WASM ABI and browser regression coverage. No new capability. Stop for user review before further work.
 
 ### `v0.3.0` — Handoff
 
-Add short parent-to-parent handoffs, acknowledgement, recent handoff state, and household context transfer.
+Implemented locally: short Handoff capture, acknowledgement, recent context, and terminal archival. Protocol v3 preserves Item history and adds Handoff projection; actors remain local placeholders. Stabilization through v0.3.3 is complete; stop for user evaluation.
+
+### `v0.3.1` — Handoff Correctness
+
+Completed: lifecycle, protocol/payload/result boundaries, actor provenance, event/counter rollback and canonical-byte preservation.
+
+### `v0.3.2` — Handoff Resilience & Accessibility
+
+Completed: interrupted capture, drafts, failed-action retries, stale peers, focus, keyboard, busy state and accessibility modes.
+
+### `v0.3.3` — Handoff Hardening & Polish
+
+Completed: parser boundaries, 10,000-event replay, real WASM memory growth, architecture/privacy audit and documentation reconciliation. Stop for evaluation.
+
+### `v0.3.4` — Handoff Retry Recovery
+
+Completed: preserve failed command retries through repeated canonical-refresh failures. Reconcile stale actions after recovery and discard superseded retries. No new capability. Stop for evaluation.
+
+### `v0.3.5` — Build & Run Convenience
+
+Completed: add project-local PowerShell and POSIX shell launchers that build the WASM module through the established scripts and serve the web app on loopback port 8000. No product capability or runtime dependency added.
 
 ### `v0.4.0` — Talk
 
-Add capture and revisit state for topics to discuss later, including resolved/unresolved state. Keep the experience nonjudgmental: no blame or scoring.
+Implemented: short Talk capture, Open/Resolved lists, resolve, reopen and terminal archive. Resolution is workflow state only. See [V0.4.0](V0.4.0.md).
+
+### `v0.4.1` — Talk Correctness
+
+Completed: lifecycle/payload/result/compatibility audit, exact legacy bytes, combined limits and atomic storage regressions.
+
+### `v0.4.2` — Talk Resilience & Accessibility
+
+Completed: keyboard lifecycle/focus, semantic controls, native focus order, independent drafts and stale retries with/without invalidation or refresh recovery.
+
+### `v0.4.3` — Talk Hardening & Polish
+
+Completed: parser truncation/length boundaries, maximum mixed replay, real WASM growth/copied results, architecture/privacy review and documentation reconciliation. Pulse preserves all Talk regressions.
 
 ### `v0.5.0` — Pulse
 
-Explore a lightweight current-capacity signal with expiration and acknowledgement only if useful. No scoring or historical ranking.
+Implemented: fixed actor-scoped capacity, set/replace/clear, deterministic explicit-time expiry and protocol v5. No acknowledgement, scoring or interpretation. See [V0.5.0](V0.5.0.md).
 
 ### `v0.6.0` — Since You Last Looked
 
-Derive a compact summary from event additions, completions, changes, new handoffs, and Talk updates. This is intended to become a signature capability while respecting member expectations and privacy.
+Completed: derive a bounded, Rust-owned summary of Item, Handoff and Talk changes since this installation's explicit local cursor. Pulse is excluded. Protocol v6 preserves the exact snapshot boundary; IndexedDB remains schema 1 and no household event records a view. See [V0.6.0](V0.6.0.md).
+
+### `v0.6.1` — Summary Correctness
+
+Completed: audited empty and cursor-position cases, duplicate/conflicting event IDs, exact cap boundaries, and malformed/partial local metadata. No new capability or production behavior change.
+
+### `v0.6.2` — Summary Resilience & Accessibility
+
+Completed: audited cursor write failures/abort, refresh recovery, pending-write reconnect, missed invalidation, cross-tab orderings, Pulse timer refresh, keyboard/focus and accessibility modes. No new capability.
+
+### `v0.6.3` — Summary Hardening & Polish
+
+Completed: audited v6 parser/result boundaries, 10,000-event replay, WASM memory/copy behavior, privacy and restrained UI polish without adding capability. Stop for user evaluation.
 
 ### `v0.7.0` — Routines
 
-Add recurring household needs and lightweight routines, with recurrence logic in Rust. Avoid turning Kin into a traditional calendar.
+Implemented: Daily and Monday-start Weekly Routines with deterministic civil-date occurrence keys, current-period complete/reopen, terminal archive, catch-up summary integration and browser lifecycle reprojection. See [V0.7.0](V0.7.0.md).
+
+### `v0.7.1` — Routine Correctness
+
+Audit recurrence boundaries, replay, malformed protocol, duplicates/conflicts and historical compatibility. No new capability.
+
+### `v0.7.2` — Routine Resilience & Accessibility
+
+Audit suspended/stale tabs, midnight/focus/visibility, failed writes/retries, keyboard/focus and accessibility modes. No new capability.
+
+### `v0.7.3` — Routine Hardening & Polish
+
+Audit ABI/allocation/maximum replay, privacy and documentation consistency; restrained UX polish only. Stop for evaluation.
+
+### `v0.7.4` — Routine Stale-Action Correctness
+
+Reject stale same-period completion/reopen commands before persistence, add multi-client regression coverage, harden manual Wasm ABI allocation ownership, and refresh pairing-document status for the v0.8.0 planning checkpoint. No product capability, protocol-layout or persistent-storage change.
 
 ### `v0.8.0` — Household Pairing
 
-Begin multi-user household identity. Explore one household with two adult members, QR pairing, a short-lived pairing code, passkeys, and trusted devices. Define authorization and recovery before shipping pairing.
+Completed through v0.8.8: one household with exactly two active adult-member slots, manual pairing codes/invitation URLs, passkeys, member-bound approval and activation, trusted-device controls and session invalidation, reauthentication, protected membership removal, replacement after removal or leave with historical membership retention, terminal-claim cleanup, and bounded authentication flows. QR is deferred. At the v0.8.8 boundary, household content sync remained unimplemented; v0.9.x adds it. The implementation record is [V0.8.0](V0.8.0.md).
 
 ### `v0.9.0` — Encrypted Sync
 
-Explore encrypted event synchronization across trusted devices, revocation, and offline reconciliation. Minimize what the service can know about household content. This release depends on a reviewed threat model and a clear key lifecycle.
+Completed as the first encrypted-sync iteration: reviewed threat/key lifecycle contract, versioned AES-GCM event envelopes with device signatures, opaque authorized push/pull relay, exact retry outbox, bounded cursoring, additive IndexedDB schema 2, and offline Rust/WASM/browser fixtures. Existing canonical bytes remain unchanged. See [V0.9.0](V0.9.0.md).
 
-### `v1.0.0` — Build Fest release
+### `v0.9.1` — Device Provisioning, Epochs, and Revocation
 
-Focus on polish, reliability, accessibility, mobile UX, privacy documentation, onboarding, a clear demo, and real daily usability. Do not use the release as a reason to add major new architecture.
+Completed: locally generated non-extractable device keys, same-member trusted-device pairing with fingerprint comparison, recipient-bound key wrapping, atomic epoch compare-and-advance, revocation/member-removal rotation gates, historical-key entitlements, and retry/stale epoch coverage. Revocation cannot erase prior keys/plaintext.
+
+### `v0.9.2` — Offline Reconciliation and Conflict Semantics
+
+Completed: persistent exact-envelope outbox, crash-safe remote commit/cursor advancement, separate catch-up cursor, additive Rust v8 identity resolution, equal-Lamport deterministic replay, stale local-clock advancement, documented archive conflict behavior, and relay-cursor reset detection/retry.
+
+### `v0.9.3` — Recovery, Privacy, and Feedback Readiness
+
+Completed: recovery and metadata threat assessment, encrypted logging/privacy boundary, bounds and malformed-envelope handling, same-member device enrollment, relay restart semantics, browser storage migration verification, and product-facing sync states. The identity service/relay remain memory-only and no independent security audit is claimed. This is the final v0.9.x encrypted-sync stabilization gate.
+
+### `v0.10.x` — Portable Core + Local Security
+
+The final local architecture/security development line. v0.10.0 implements cryptographically locked local household data, independent credential/recovery wrappers, recoverable plaintext migration, Rust-owned command semantics and canonical codecs, encrypted export/import, native domain tests, a static offline shell and signed transport-key migration. v0.10.1 corrects overlapping unlock feedback, asynchronous trusted-device pinning and interrupted key-rotation recovery; v0.10.2 adds local root rotation; v0.10.3 hardens bounded storage/archive processing and closes this implementation line. The evidence inventory, compatibility, measured limits and readiness work are in [V0.10.0](V0.10.0.md). Human review of the v0.10 gate precedes the next implementation line.
+
+Increase the Rust footprint by increasing the amount of Kin that is deterministic, portable, invariant-driven, and independently testable — not by moving browser-native capabilities into Wasm. Web Crypto and networking remain browser/server adapter responsibilities.
+
+### `v0.11.x` — Durable Service & Deployment (implementation candidate)
+
+The candidate implements SQLite server schema v1, durable identity/authorization
+and opaque relay state, commit-before-acknowledgement, fail-closed migration and
+corruption handling, an exclusive production-process lock, and verified
+online-backup/offline-restore commands. Automated tests include a spawned HTTP
+process restart and persistence of reauthentication, event identity, cursor and
+device sequence. The last published version remains v0.10.3; the candidate
+awaits human review and release authorization. See [V0.11.0](V0.11.0.md).
+
+### `v0.12.x` — Data Lifecycle, Retention & Deletion
+
+Define what Kin keeps, archives, deletes, compacts and cannot erase. Specify
+household deletion, offline-device tombstones, service-controlled ciphertext,
+backup/log retention and event-history growth without conflating deletion with
+archival, revocation or member removal. See [V0.12.0](V0.12.0.md).
+
+### `v0.13.x` — Recovery & Household Continuity
+
+Define explicit recovery outcomes for lost credentials, devices, server state and
+archives; preserve the boundary between household history and identity/device
+authority; and ensure replacement enrollment is not an authorization bypass.
+Unrecoverable cases must be stated honestly. See [V0.13.0](V0.13.0.md).
+
+### `v0.14.x` — UX/UI Consolidation
+
+After the preceding platform semantics are settled, consolidate information
+architecture, navigation, onboarding, security/recovery/deletion presentation,
+responsive behavior, accessibility, interaction and visual consistency across
+Kin's existing product areas. This line presents stable platform behavior; it
+does not redesign encryption, storage, service durability, deletion, recovery,
+canonical events or sync semantics. See [V0.14.0](V0.14.0.md).
+
+### `v1.0.0` — Stable Kin Platform
+
+Begin implementation only after v0.10 local architecture/security, v0.11 durable
+service/deployment, v0.12 data lifecycle/deletion, v0.13 recovery/continuity and
+v0.14 coherent UX/UI readiness properties are satisfied. These are property gates,
+not arbitrary version-number gates. Stabilize what the preceding lines secured
+and refined; do not introduce another major architecture at v1.0.
+
+Likely v0.14 work is information architecture/unified app shell, interaction/state
+correctness, accessibility/responsive resilience, then visual/interaction
+hardening. v1.0 is for release-candidate validation, compatibility/support
+commitments, upgrade guarantees, documentation, final defect resolution and
+stable packaging—not unresolved architecture.
+
+## Product scope boundary
+
+These platform-completion lines do not expand Kin sideways. Unless separately
+approved, third adults, child accounts, arbitrary roles/RBAC, chat/messages,
+attachments, notifications, calendar integration, AI, analytics, sentiment,
+household scoring, admin dashboards, themes and generic workflow/task-manager
+features remain deferred.
 
 ## Scope discipline
 
-Each roadmap item is future work unless explicitly marked as completed. Authentication, passkeys, encryption, remote services, pairing, and synchronization remain unimplemented and out of scope for the v0.1.x line. Releases through `v0.0.12` were documentation-only; v0.1.0 is the first coded release, and v0.1.3 remains solely its hardening line.
+Each roadmap item is future work unless explicitly marked as implemented. v0.9.3 supplies authentication, pairing and encrypted sync; v0.10.x adds local security, portable commands/codecs and encrypted recovery archives. v0.11–v0.14 and v1.0 remain planned. Do not present them as implemented or begin v1.0 before all five required readiness properties pass. Releases through `v0.0.12` were documentation-only; v0.1.0 was the first coded release. Earlier version sections preserve release history, including draft persistence later removed by v0.10.

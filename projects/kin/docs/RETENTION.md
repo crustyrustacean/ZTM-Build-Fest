@@ -1,6 +1,6 @@
 # Retention, Archival, and Deletion
 
-**Status:** lifecycle policy for future implementation. No archive, export, household-erasure, backup, or deletion feature exists. Event/projection rules are in [EVENTS](EVENTS.md) and [STATE](STATE.md); portability is in [PORTABILITY](PORTABILITY.md).
+**Status:** Current through v0.10.3. Domain Item, Handoff and Talk archival and encrypted user-created archives are implemented. Full household deletion, service/backup retention policy and event-log compaction remain unimplemented and are planned for v0.12. Event/projection rules are in [EVENTS](EVENTS.md) and [STATE](STATE.md); portability is in [PORTABILITY](PORTABILITY.md).
 
 ## Distinct operations
 
@@ -56,3 +56,9 @@ canonical events N+1 onward
 A snapshot is derived, never the authoritative history. It should identify the last included sequence/event, projection/schema version, and enough integrity metadata to detect accidental mismatch. A snapshot must be verifiable against its event prefix when created or restored; a digest is not authentication against a malicious actor. Full state must remain reconstructable from preserved source events until a separately approved and tested archival/compaction policy says otherwise.
 
 Do not compact merely because the log is large. Safe compaction must account for offline devices that may later submit old events, exported backups, legal/user deletion expectations, migration rollback, and tombstone resurrection. The final compaction policy is deferred.
+
+The planned v0.12 contract ([V0.12.0](V0.12.0.md)) must settle deletion
+propagation, service-controlled primary/backup/log retention and whether verified
+checkpoints or compaction can preserve state and offline-device semantics. Until
+that work is implemented and verified, the event cap is only a prototype bound
+and there is no promise of household-wide erasure.
