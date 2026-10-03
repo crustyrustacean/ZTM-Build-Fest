@@ -1,6 +1,6 @@
 # Development Workflow
 
-**Status:** Current through v0.6.0 Since You Last Looked; earlier version sections are historical contracts. See Pulse and v0.6.0 below.
+**Status:** Current through v0.6.3 Summary Hardening & Polish; earlier version sections are historical contracts. See Pulse and v0.6.0 below.
 
 ## Build and run
 

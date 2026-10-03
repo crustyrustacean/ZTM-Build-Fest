@@ -1,6 +1,6 @@
 # Cryptographic Posture
 
-**Status:** security requirements and conceptual key model only. No cryptography is implemented or security-reviewed. Threats and residual risks are in [THREAT-MODEL](THREAT-MODEL.md); identity and pairing boundaries are in [IDENTITY](IDENTITY.md) and [PAIRING](PAIRING.md).
+**Status:** Current through v0.6.3 Summary Hardening & Polish; security requirements and conceptual key model only. No cryptography is implemented or security-reviewed. Threats and residual risks are in [THREAT-MODEL](THREAT-MODEL.md); identity and pairing boundaries are in [IDENTITY](IDENTITY.md) and [PAIRING](PAIRING.md).
 
 ## Non-negotiable rule
 

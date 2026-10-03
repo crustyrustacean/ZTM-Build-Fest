@@ -1,6 +1,6 @@
 # Retention, Archival, and Deletion
 
-**Status:** lifecycle policy for future implementation. No archive, export, household-erasure, backup, or deletion feature exists. Event/projection rules are in [EVENTS](EVENTS.md) and [STATE](STATE.md); portability is in [PORTABILITY](PORTABILITY.md).
+**Status:** Current through v0.6.3 Summary Hardening & Polish; local Item, Handoff, and Talk archival is implemented; export, household erasure, backup, and deletion remain future work. Event/projection rules are in [EVENTS](EVENTS.md) and [STATE](STATE.md); portability is in [PORTABILITY](PORTABILITY.md).
 
 ## Distinct operations
 

@@ -8,6 +8,7 @@ import {
 } from "./pulse-regression.mjs";
 import { talkRegressions, talkPeerRegressions } from "./talk-regression.mjs";
 import assert from "node:assert/strict";
+import { routineRegressions, routinePeerRegressions, routineKeyboardRegressions } from "./routine-regression.mjs";
 import {
   handoffRegressions,
   handoffPeerRegressions,
@@ -298,12 +299,12 @@ async function regressions() {
   const replayRecords = (await app.store.loadEvents()).map(
     (event) => event.encoded_event,
   );
-  const replayBeforeFailure = app.engine.applyEvents(replayRecords, 0);
+  const replayBeforeFailure = app.engine.applyEvents(replayRecords, 0, null, 20261002);
   const malformedRecord = new Uint8Array(replayRecords.at(-1));
   new DataView(malformedRecord.buffer).setUint16(0, 3, true);
   let replayFailureCode;
   try {
-    app.engine.applyEvents([...replayRecords.slice(0, -1), malformedRecord], 0);
+    app.engine.applyEvents([...replayRecords.slice(0, -1), malformedRecord], 0, null, 20261002);
   } catch (error) {
     replayFailureCode = error.code;
   }
@@ -312,11 +313,11 @@ async function regressions() {
     "unsupported replay exposes stable error code",
   );
   check(
-    app.engine.applyEvents([], 0).items.length === 0,
+    app.engine.applyEvents([], 0, null, 20261002).items.length === 0,
     "empty replay replaces previous result",
   );
   check(
-    JSON.stringify(app.engine.applyEvents(replayRecords, 0)) ===
+    JSON.stringify(app.engine.applyEvents(replayRecords, 0, null, 20261002)) ===
       JSON.stringify(replayBeforeFailure),
     "success/failure/empty/repeated WASM calls do not retain stale output",
   );
@@ -345,7 +346,7 @@ async function regressions() {
       classification: index % 2 === 0 ? "need" : "today",
     }),
   );
-  const workloadState = app.engine.applyEvents(workloadRecords, 0);
+  const workloadState = app.engine.applyEvents(workloadRecords, 0, null, 20261002);
   check(
     workloadState.items.length === 10_000,
     "WASM replays maximum event count",
@@ -850,6 +851,7 @@ try {
     await first.evaluate(`(${pulseResilienceRegressions.toString()})()`),
   );
   console.log(await first.evaluate(`(${catchUpRegressions.toString()})()`));
+  console.log(await first.evaluate(`(${routineRegressions.toString()})()`));
   await first.evaluate(
     'sessionStorage.setItem("kin.test.expectedState", JSON.stringify(document.querySelector("kin-app").state))',
   );
@@ -1073,7 +1075,7 @@ try {
   await second.evaluate(`window.peerReads=0; window.peerReplays=0; window.peerMessages=[];
     { const a=document.querySelector('kin-app'); const load=a.store.getCatchUpState.bind(a.store); const replay=a.engine.applyEvents;
       a.store.getCatchUpState=async()=>{window.peerReads++;return load();};
-      a.engine.applyEvents=(events,asOf,cursor)=>{window.peerReplays++;return replay(events,asOf,cursor);};
+      a.engine.applyEvents=(...args)=>{window.peerReplays++;return replay(...args);};
       a.channel.addEventListener('message',e=>window.peerMessages.push(e.data)); }`);
   await first.evaluate(
     `{const a=document.querySelector('kin-app');a.compose.input.value='Peer addition';a.compose.saveDraft();a.compose.form.requestSubmit();}`,
@@ -1257,6 +1259,8 @@ try {
   await pulsePeerRegressions(first, second, until);
   await catchUpPeerRegressions(first, second, until);
   await pulseKeyboardRegressions(first, until);
+  await routinePeerRegressions(first, second, until);
+  await routineKeyboardRegressions(first, until);
   await first.evaluate(`(()=>{
     const app=document.querySelector('kin-app');
     const item=[...app.querySelectorAll('kin-item')]
@@ -1398,6 +1402,16 @@ try {
     true,
     "Pulse semantics, native labels, focus and targets in forced colors",
   );
+  assert.equal(
+    await first.evaluate(`(()=>{
+      const app=document.querySelector('kin-app'),ui=app.routines;ui.cadence.focus();
+      return ui.querySelector('h2').textContent==='Routines' && ui.input.labels.length===1 && ui.cadence.labels[0].textContent==='Repeat' &&
+        ui.querySelectorAll('ul > li').length>0 && ui.textContent.includes('today') &&
+        getComputedStyle(ui.cadence).outlineWidth==='3px' &&
+        [...ui.querySelectorAll('button,select,input')].every(control=>control.getBoundingClientRect().height>=48) &&
+        app.status.getAttribute('aria-live')==='polite' && app.alert.getAttribute('role')==='alert';
+    })()`), true, "Routine semantics, labels, textual state, focus and targets in forced colors",
+  );
   const spacingResult = await first.evaluate(`(()=>{
     const sheet=[...document.styleSheets].find(candidate=>candidate.href?.endsWith('/styles/app.css'));
     const ruleIndex=sheet.cssRules.length;
@@ -1414,6 +1428,8 @@ try {
   // Keep optional visual evidence under ignored project build output.
   if (process.env.KIN_VISUAL_CHECK === "1") {
     await first.send("Emulation.setEmulatedMedia", { features: [] });
+    await first.evaluate("document.querySelector('kin-app').routines.scrollIntoView({block:'start'})");
+    await writeFile(resolve(webRoot, "../target/routines-320.png"), Buffer.from((await first.send("Page.captureScreenshot", { format: "png" })).data, "base64"));
     await first.evaluate(
       `(async()=>{const a=document.querySelector('kin-app'),timestamp=Date.now();await a.savePulse({type:'set-pulse',value:'need-quiet',timestamp,expiresAt:timestamp+14400000});a.pulse.scrollIntoView({block:'center'});})()`,
     );

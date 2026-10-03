@@ -1,6 +1,6 @@
 # Derived Household State
 
-**Status:** Current through v0.6.0 Since You Last Looked; earlier version sections are historical contracts. See Pulse and v0.6.0 below.
+**Status:** Current through v0.7.0 Routines; earlier version sections are historical contracts. See v0.7.0 below.
 
 ## Projection pipeline
 
@@ -17,7 +17,7 @@ apply deterministic reducer
 HouseholdState
 ```
 
-The same valid ordered event stream and explicit as_of must always derive the same household state. Current state is a projection of events; the event history remains the underlying record. Do not persist an independently editable state snapshot as a second source of truth. A future cache may accelerate replay only if it can be discarded and rebuilt from events.
+The same valid ordered event stream and explicit as_of/civil_date must always derive the same household state. Current state is a projection of events; the event history remains the underlying record. Do not persist an independently editable state snapshot as a second source of truth. A future cache may accelerate replay only if it can be discarded and rebuilt from events.
 
 If replay later becomes expensive, a snapshot/checkpoint may accelerate reconstruction only as a verified derived projection. It is not authoritative and cannot justify deleting source events by itself. Optimization must not change observable household state; see [Retention](RETENTION.md) for the deferred event-compaction policy.
 
@@ -97,3 +97,7 @@ HouseholdState adds pulses sorted by actor ID. Explicit rebuild_at(events, as_of
 ## v0.6.0 Since You Last Looked
 
 Protocol v6 derives a structured summary after an optional stable event-ID cursor. Rust validates the cursor against the supplied ordered stream, deduplicates exact repeated delivery, excludes Pulse entries, retains the latest eight entries in event order, counts all meaningful events, and reports the actual last stream event as the through-boundary. This summary is not a second authoritative household state and contains no actor attribution. See [V0.6.0](V0.6.0.md).
+
+## v0.7.0 Routines
+
+HouseholdState adds Routine definitions/tombstones and their current occurrence key/status. Rust replay retains historical completion by Routine ID and period key in transient memory, then projects the supplied civil date. Same events, as_of, civil_date and cursor yield identical results. Dates before creation have no occurrence; old completion never carries over. See [V0.7.0](V0.7.0.md).

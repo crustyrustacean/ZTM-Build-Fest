@@ -13,8 +13,14 @@ import {
   encodeHandoffAddedRecord,
   encodeHandoffAcknowledgedRecord,
   encodeHandoffArchivedRecord,
-  loadKinEngine,
+  loadKinEngine as loadCurrentEngine,
 } from "./kin-engine.js";
+
+// Existing scenarios use a fixed explicit civil context; raw legacy fixtures stay unchanged.
+async function loadKinEngine(...args) {
+  const engine = await loadCurrentEngine(...args);
+  return { applyEvents: (records, asOf, cursor = null, civilDate = 20261002) => engine.applyEvents(records, asOf, cursor, civilDate) };
+}
 
 const zeroId = new Uint8Array(16);
 
@@ -125,12 +131,13 @@ function expectedState(version, status = null, classification = 0) {
   return bytes;
 }
 
-function emptyV6State() {
+function emptyV7State() {
   return {
     items: [],
     handoffs: [],
     talks: [],
     pulses: [],
+    routines: [],
     summary: { entries: [], totalCount: 0, throughEventId: null },
   };
 }
@@ -246,7 +253,7 @@ test("real WASM ABI clears stale result and error buffers across versions", asyn
 test("bridge decodes real v1 and v2 completed results as Today, not Need", async (context) => {
   const instantiate = WebAssembly.instantiate;
   let requestedVersion = 1;
-  // The browser writes v6 only. A test transport shim requests v1 from the
+  // The browser writes v7 only. A test transport shim requests v1 from the
   // real encoder so the bridge's historical decoder is exercised as well.
   context.mock.method(WebAssembly, "instantiate", async (...args) => {
     const { instance } = await instantiate(...args);
@@ -504,7 +511,7 @@ test("large Handoff replay grows WASM memory and preserves independent repeated 
       () => engine.applyEvents([bad], 0),
       (error) => error.code === 3,
     );
-    assert.deepEqual(engine.applyEvents([], 0), emptyV6State());
+    assert.deepEqual(engine.applyEvents([], 0), emptyV7State());
     assert.deepEqual(engine.applyEvents(records, 0), state);
   }
   assert.equal(
@@ -784,7 +791,7 @@ test("large Talk replay grows WASM memory and preserves independent repeated res
       () => engine.applyEvents([bad], 0),
       (error) => error.code === 3,
     );
-    assert.deepEqual(engine.applyEvents([], 0), emptyV6State());
+    assert.deepEqual(engine.applyEvents([], 0), emptyV7State());
     assert.deepEqual(engine.applyEvents(records, 0), state);
   }
   assert.equal(
@@ -806,9 +813,9 @@ function applyLegacy(abi, pointer, length) {
     bytes.byteOffset,
     bytes.byteLength,
   ).getUint16(4, true);
-  const headerLength = version >= 5 ? 20 : 12;
-  bytes.copyWithin(headerLength, 40);
-  return abi.kin_apply_events(pointer, length - (40 - headerLength));
+  const headerLength = version === 6 ? 40 : version >= 5 ? 20 : 12;
+  bytes.copyWithin(headerLength, 44);
+  return abi.kin_apply_events(pointer, length - (44 - headerLength));
 }
 
 function pulseRecord(
@@ -906,7 +913,7 @@ test("v5 exact request/result time fields and immutable v4 Talk bytes", async ()
     apply(5, [], 2, time);
 });
 
-test("v5 bridge rejects malformed Pulse fields and combined counts then recovers", async (context) => {
+test("v6 bridge rejects malformed Pulse fields and combined counts then recovers", async (context) => {
   const instantiate = WebAssembly.instantiate;
   let mutate = () => {};
   context.mock.method(WebAssembly, "instantiate", async (...args) => {
@@ -917,7 +924,8 @@ test("v5 bridge rejects malformed Pulse fields and combined counts then recovers
         exports: {
           ...abi,
           kin_apply_events(pointer, length) {
-            const status = abi.kin_apply_events(pointer, length);
+            new DataView(abi.memory.buffer).setUint16(pointer + 4, 6, true);
+            const status = applyLegacy(abi, pointer, length);
             if (status === 0)
               mutate(
                 new Uint8Array(
@@ -1031,7 +1039,7 @@ test("v6 bridge rejects every truncated header and Pulse record boundary", async
   assert.equal(engine.applyEvents([pulseRecord(1)], 0).pulses.length, 1);
 });
 
-test("v5 rejects duplicate or unordered actor records", async (context) => {
+test("v6 rejects malformed metadata in a two-Pulse result", async (context) => {
   const instantiate = WebAssembly.instantiate;
   let reverse = false;
   context.mock.method(WebAssembly, "instantiate", async (...args) => {
@@ -1042,15 +1050,16 @@ test("v5 rejects duplicate or unordered actor records", async (context) => {
         exports: {
           ...abi,
           kin_apply_events(pointer, length) {
-            const status = abi.kin_apply_events(pointer, length);
+            new DataView(abi.memory.buffer).setUint16(pointer + 4, 6, true);
+            const status = applyLegacy(abi, pointer, length);
             if (status === 0) {
               const bytes = new Uint8Array(
                 abi.memory.buffer,
                 abi.kin_result_ptr(),
                 abi.kin_result_len(),
               );
-              bytes.copyWithin(64, 24, 40);
-              if (reverse) bytes.fill(0xff, 24, 40);
+              bytes.copyWithin(92, 52, 68);
+              if (reverse) bytes.fill(0xff, 52, 68);
             }
             return status;
           },
@@ -1070,7 +1079,7 @@ test("v5 rejects duplicate or unordered actor records", async (context) => {
     );
 });
 
-test("10,000 mixed v5 events grow memory and retain copied results across success error empty", async (context) => {
+test("10,000 mixed events through v7 grow memory and retain copied results across success error empty", async (context) => {
   const instantiate = WebAssembly.instantiate;
   let memory;
   context.mock.method(WebAssembly, "instantiate", async (...args) => {
@@ -1132,7 +1141,7 @@ test("10,000 mixed v5 events grow memory and retain copied results across succes
       () => engine.applyEvents([bad], 0),
       (e) => e.code === 3,
     );
-    assert.deepEqual(engine.applyEvents([], 0), emptyV6State());
+    assert.deepEqual(engine.applyEvents([], 0), emptyV7State());
     assert.deepEqual(engine.applyEvents(records, 1999), snapshot);
   }
   assert.throws(
@@ -1215,7 +1224,8 @@ test("v6 rejects every truncated summary boundary and malformed summary field", 
         exports: {
           ...abi,
           kin_apply_events(pointer, length) {
-            const status = abi.kin_apply_events(pointer, length);
+            new DataView(abi.memory.buffer).setUint16(pointer + 4, 6, true);
+            const status = applyLegacy(abi, pointer, length);
             if (status === 0) {
               validResultLength = abi.kin_result_len();
               mutate(
@@ -1298,7 +1308,7 @@ test("v6 rejects every truncated summary boundary and malformed summary field", 
   assert.deepEqual(engine.applyEvents(records, 0), valid);
 });
 
-test("v6 10,000-event history permits bounded summary records and copied results", async (context) => {
+test("v7 10,000-event history permits bounded summary records and copied results", async (context) => {
   const instantiate = WebAssembly.instantiate;
   let memory;
   context.mock.method(WebAssembly, "instantiate", async (...args) => {
@@ -1348,7 +1358,7 @@ test("v6 10,000-event history permits bounded summary records and copied results
       () => engine.applyEvents([invalid], 0),
       (error) => error.code === 3,
     );
-    assert.deepEqual(engine.applyEvents([], 0), emptyV6State());
+    assert.deepEqual(engine.applyEvents([], 0), emptyV7State());
     assert.deepEqual(engine.applyEvents(records, 1_760_000_020_000), snapshot);
   }
   assert.deepEqual(state, snapshot, "host-owned summary survives later calls");

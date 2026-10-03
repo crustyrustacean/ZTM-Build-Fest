@@ -1,6 +1,6 @@
 # Synchronization Design
 
-**Status:** future architecture design. No server, network protocol, event encryption, or multi-device reconciliation is implemented. Event identity and ordering requirements are specified in [EVENTS](EVENTS.md); the threat model and cryptographic boundary are in [THREAT-MODEL](THREAT-MODEL.md) and [CRYPTOGRAPHY](CRYPTOGRAPHY.md).
+**Status:** Current through v0.6.3 Summary Hardening & Polish; future architecture design. No server, network protocol, event encryption, or multi-device reconciliation is implemented. Event identity and ordering requirements are specified in [EVENTS](EVENTS.md); the threat model and cryptographic boundary are in [THREAT-MODEL](THREAT-MODEL.md) and [CRYPTOGRAPHY](CRYPTOGRAPHY.md).
 
 ## Intended direction
 

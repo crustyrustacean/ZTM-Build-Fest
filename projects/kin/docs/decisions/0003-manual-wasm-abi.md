@@ -1,6 +1,6 @@
 # ADR 0003 — Manual JavaScript/WASM ABI
 
-Status: Accepted
+Status: Current through v0.6.3 Summary Hardening & Polish; Accepted
 
 ## Context
 

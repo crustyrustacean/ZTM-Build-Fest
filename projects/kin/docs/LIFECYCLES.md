@@ -1,6 +1,6 @@
 # Entity Lifecycles
 
-**Status:** Current through v0.6.0 Since You Last Looked; earlier version sections are historical contracts. See Pulse and v0.6.0 below.
+**Status:** Current through v0.7.0 Routines; earlier version sections are historical contracts. See v0.7.0 below.
 
 ## Item
 
@@ -78,7 +78,7 @@ Setting a Pulse creates time-bounded context with an explicit expiry. Expiry is 
 
 ## Future entity lifecycles
 
-Routine occurrences, Agreements, Household membership, credentials, and trusted devices need explicit transitions before their respective implementation milestones. They must not inherit Item transitions by analogy. Member invitation/removal and device revocation are planned for the v0.0.5 identity and pairing specifications.
+Agreements, Household membership, credentials, and trusted devices need explicit transitions before their respective implementation milestones. They must not inherit Item transitions by analogy. Member invitation/removal and device revocation are planned for the v0.0.5 identity and pairing specifications.
 
 ## v0.5.0 Pulse
 
@@ -87,3 +87,7 @@ SET replaces its actor’s context; CLEAR removes it (absent clear is valid). Ex
 ## v0.6.0 Since You Last Looked
 
 No household entity lifecycle or domain event is added. The summary describes existing Item, Handoff and Talk lifecycle events. The local installation cursor is view metadata, not a household lifecycle or acknowledgement event. See [V0.6.0](V0.6.0.md).
+
+## v0.7.0 Routines
+
+Create Routine → complete/reopen current occurrence → terminal archive. Repeated completion/reopen is a valid state no-op; distinct actions after archive are invalid. Exact duplicate event delivery is ignored before transition checks. Advancing time derives a new period without an event. See [V0.7.0](V0.7.0.md).

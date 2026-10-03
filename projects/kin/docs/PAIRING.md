@@ -1,6 +1,6 @@
 # Pairing and Device Enrollment
 
-**Status:** conceptual protocol and UX specification. QR generation, pairing codes, identity, device trust, and key exchange are not implemented. Identity distinctions are in [IDENTITY](IDENTITY.md); key handling is in [CRYPTOGRAPHY](CRYPTOGRAPHY.md).
+**Status:** Current through v0.6.3 Summary Hardening & Polish; conceptual protocol and UX specification. QR generation, pairing codes, identity, device trust, and key exchange are not implemented. Identity distinctions are in [IDENTITY](IDENTITY.md); key handling is in [CRYPTOGRAPHY](CRYPTOGRAPHY.md).
 
 ## Distinct operations
 

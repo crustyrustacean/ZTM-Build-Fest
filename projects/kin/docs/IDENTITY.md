@@ -1,6 +1,6 @@
 # Identity and Trusted Devices
 
-**Status:** design specification for future releases. No accounts, credentials, device registry, authentication, or trusted-device implementation exists. Pairing, sync, and cryptographic boundaries are specified in [PAIRING](PAIRING.md), [SYNC](SYNC.md), and [CRYPTOGRAPHY](CRYPTOGRAPHY.md).
+**Status:** Current through v0.6.3 Summary Hardening & Polish; design specification for future releases. No accounts, credentials, device registry, authentication, or trusted-device implementation exists. Pairing, sync, and cryptographic boundaries are specified in [PAIRING](PAIRING.md), [SYNC](SYNC.md), and [CRYPTOGRAPHY](CRYPTOGRAPHY.md).
 
 ## Separate identities
 

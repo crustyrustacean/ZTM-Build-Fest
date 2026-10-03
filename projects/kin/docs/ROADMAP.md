@@ -1,6 +1,6 @@
 # Roadmap
 
-Current release: `v0.6.3 — Summary Hardening & Polish`. The authorized catch-up stabilization line is complete; stop for evaluation and do not begin v0.7.0.
+Current release: `v0.7.0 — Routines`. Daily/Weekly capability is implemented; the next authorized step is v0.7.1 correctness. Stabilization must not add feature scope.
 
 ## Planning releases
 
@@ -166,7 +166,19 @@ Completed: audited v6 parser/result boundaries, 10,000-event replay, WASM memory
 
 ### `v0.7.0` — Routines
 
-Add recurring household needs and lightweight routines, with recurrence logic in Rust. Avoid turning Kin into a traditional calendar.
+Implemented: Daily and Monday-start Weekly Routines with deterministic civil-date occurrence keys, current-period complete/reopen, terminal archive, catch-up summary integration and browser lifecycle reprojection. See [V0.7.0](V0.7.0.md).
+
+### `v0.7.1` — Routine Correctness
+
+Audit recurrence boundaries, replay, malformed protocol, duplicates/conflicts and historical compatibility. No new capability.
+
+### `v0.7.2` — Routine Resilience & Accessibility
+
+Audit suspended/stale tabs, midnight/focus/visibility, failed writes/retries, keyboard/focus and accessibility modes. No new capability.
+
+### `v0.7.3` — Routine Hardening & Polish
+
+Audit ABI/allocation/maximum replay, privacy and documentation consistency; restrained UX polish only. Stop for evaluation.
 
 ### `v0.8.0` — Household Pairing
 
@@ -182,4 +194,4 @@ Focus on polish, reliability, accessibility, mobile UX, privacy documentation, o
 
 ## Scope discipline
 
-Each roadmap item is future work unless explicitly marked as completed. Authentication, passkeys, encryption, remote services, pairing, synchronization and Routines remain unimplemented and out of scope for v0.6.x. Releases through `v0.0.12` were documentation-only; v0.1.0 is the first coded release. Handoff is implemented in v0.3.0; Talk in v0.4.0; Pulse in v0.5.0; Since You Last Looked in v0.6.0.
+Each roadmap item is future work unless explicitly marked as completed. Authentication, passkeys, encryption, remote services, pairing, synchronization remain unimplemented and out of scope for v0.7.x. Releases through `v0.0.12` were documentation-only; v0.1.0 is the first coded release. Handoff is implemented in v0.3.0; Talk in v0.4.0; Pulse in v0.5.0; Since You Last Looked in v0.6.0.

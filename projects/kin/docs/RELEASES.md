@@ -1,6 +1,6 @@
 # Release Process
 
-**Status:** The authorized v0.6.0–v0.6.3 Since You Last Looked line is complete on `kin-development`. Stop for release-line evaluation. Do not create v0.6.4, begin v0.7.0, push, or merge to `kin-main`.
+**Status:** v0.7.0 Routines release gate. Complete validation and create its annotated tag before starting v0.7.1 correctness. No push or kin-main merge is authorized.
 
 ## Release sequence
 
@@ -70,3 +70,7 @@ Dedicated validated commits and annotated kin-v0.5.0 through kin-v0.5.3 tags. St
 ## v0.6.x Since You Last Looked
 
 Create dedicated validated commits and annotated `kin-v0.6.0` through `kin-v0.6.3` tags. Preserve protocol v1–v5, schema-1 event bytes, and IndexedDB schema 1. Do not push or merge automatically. Stop after v0.6.3 and hand control back for release-line evaluation. See [V0.6.0](V0.6.0.md).
+
+## v0.7.x Routines
+
+Follow [V0.7.0](V0.7.0.md) for capability, correctness, resilience/accessibility and hardening gates. Release protocol v7 and new schema-1 kinds 14–17 without altering older contracts. Keep IndexedDB schema 1. Each completed milestone gets its own validated commit and annotated tag.

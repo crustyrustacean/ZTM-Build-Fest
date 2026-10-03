@@ -1,6 +1,6 @@
 # ADR 0007 — Zero Runtime Frameworks by Default
 
-Status: Accepted
+Status: Current through v0.6.3 Summary Hardening & Polish; Accepted
 
 ## Context
 

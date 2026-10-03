@@ -1,6 +1,6 @@
 # v0.1.0 Testing Contract
 
-**Status:** Current through v0.6.3 Summary Hardening & Polish; earlier version sections are historical contracts. See v0.6.0 below.
+**Status:** Current through v0.7.0 Routines; earlier version sections are historical contracts. See v0.7.0 below.
 
 ## Rust domain tests
 
@@ -146,3 +146,7 @@ The browser suite injects cursor quota failure and transaction abort, verifies e
 ## v0.6.3 Summary Hardening & Polish
 
 Run every truncated v6 result boundary and malformed summary count, kind, entity/classification combination, reserved byte, UTF-8 sequence, extreme length and trailing-byte check. Verify combined 10,000-entity plus summary bounds, a 10,000-event v6 summary-source replay, real WASM memory growth, and copied-result lifetime. Retain every previous Node, Rust, browser, storage, privacy, and accessibility regression.
+
+## v0.7.0 Routines
+
+Run `cargo test`, `node web/wasm/kin-engine.test.mjs`, `node web/wasm/routines.test.mjs`, and the complete browser runner after a release Wasm build. `rust/src/routine_tests.rs` holds independent v7 wire fixtures; `recurrence.rs` covers Gregorian calendar primitives. `scripts/routine-regression.mjs` exercises real IndexedDB/Wasm lifecycle, boundaries, stale keys, quota/abort/retry, cross-tab races and keyboard focus. Existing suites retain explicit legacy protocol fixtures. See [V0.7.0](V0.7.0.md) for the full matrix and actual release evidence.

@@ -1,6 +1,6 @@
 # ADR 0006 — Local-First Foundation
 
-Status: Accepted
+Status: Current through v0.6.3 Summary Hardening & Polish; Accepted
 
 ## Context
 

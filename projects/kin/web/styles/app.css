@@ -287,6 +287,31 @@ kin-item {
   font-weight: 600;
 }
 
+.routine-form {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+.routine-form input,
+.routine-form > label,
+.routine-form > p {
+  grid-column: 1 / -1;
+}
+.routine-form select {
+  min-width: 0;
+  min-height: 54px;
+  padding: 0 12px;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid #89998e;
+  border-radius: 5px;
+}
+.routine-row > div:first-child { min-width: 0; }
+.routine-status { margin: 6px 0 0; color: var(--muted); overflow-wrap: anywhere; }
+kin-routines { display: block; margin-top: 32px; }
+@media (max-width: 600px) {
+  .routine-row { grid-template-columns: minmax(0, 1fr); }
+  .routine-row .item-action { justify-content: flex-start; max-width: none; }
+}
+
 .compose-form input,
 .classification-field select {
   width: 100%;

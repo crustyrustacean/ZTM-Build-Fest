@@ -1,6 +1,6 @@
 # GitHub Community Files
 
-**Status:** community documentation for Kin as a project nested in the ZTM Build Fest monorepo.
+**Status:** Current through v0.6.3 Summary Hardening & Polish; community documentation for Kin as a project nested in the ZTM Build Fest monorepo.
 
 ## Project files
 

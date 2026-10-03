@@ -1,6 +1,6 @@
 # v0.0.9 Implementation Preflight
 
-**Status:** historical v0.0.9 record. At the time of this preflight, the review was planning-only and no functional application code was present or authorized. v0.1.0 implementation followed this Specification Freeze A in later commits.
+**Status:** Current through v0.6.3 Summary Hardening & Polish; historical v0.0.9 record. At the time of this preflight, the review was planning-only and no functional application code was present or authorized. v0.1.0 implementation followed this Specification Freeze A in later commits.
 
 ## Review scope and method
 

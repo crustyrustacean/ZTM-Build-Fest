@@ -1,6 +1,6 @@
 # ADR 0004 — IndexedDB Event Store
 
-Status: Accepted
+Status: Current through v0.6.3 Summary Hardening & Polish; Accepted
 
 ## Context
 

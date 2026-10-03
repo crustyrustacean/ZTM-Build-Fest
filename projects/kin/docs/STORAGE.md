@@ -1,6 +1,6 @@
 # Local Event Storage
 
-**Status:** Current through v0.6.0 Since You Last Looked; earlier version sections are historical contracts. See Pulse and v0.6.0 below.
+**Status:** Current through v0.7.0 Routines; earlier version sections are historical contracts. See v0.7.0 below.
 
 The compose input keeps a best-effort in-progress text and classification draft in the current tab's `sessionStorage`, retaining the existing text key for legacy drafts. This transient data is not an event or household-state source of truth, is cleared only when the exact submitted draft succeeds or the user clears text, and is unavailable across tabs.
 
@@ -85,3 +85,7 @@ IndexedDB remains schema 1; no migration or second authority. Pulse shares atomi
 The three catch-up fields extend the existing `local_context` singleton; database version remains 1 with no store, key, or index change. A legacy context with all three fields absent is initialized in a read/write transaction over `events` and `local_context`, capturing the current tail without changing events or `next_logical_time`. Partial/corrupt metadata fails closed. `getCatchUpState()` reads ordered events and the local cursor in one readonly transaction. `markCaughtUpThrough(snapshotBoundary)` verifies the request and captured snapshot tail rows, then transactionally advances only when its local sequence is newer. It changes no canonical event and preserves `next_logical_time`.
 
 Protocol v6 carries the stable cursor event ID; IndexedDB `local_sequence` stays browser-only. `events-changed` remains content-free. After a cursor commit, tabs send only `{ type: "view-state-changed" }`; receivers reread IndexedDB and recompute. Neither message includes an ID, cursor, count, text, actor, or device. See [V0.6.0](V0.6.0.md).
+
+## v0.7.0 Routines
+
+Routine kinds 14–17 share schema-1 atomic event/counter transactions. Current-period writes first project saved bytes in Rust inside the transaction and compare the intent key; stale keys never retarget. No occurrence table or source-byte migration. `kin.routine.draft` is best-effort tab-local text/cadence, not household truth. See [V0.7.0](V0.7.0.md).

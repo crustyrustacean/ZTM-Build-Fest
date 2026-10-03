@@ -1,6 +1,6 @@
 # Persistent Contract Versioning
 
-**Status:** Current through v0.6.0 Since You Last Looked; earlier version sections are historical contracts. See Pulse and v0.6.0 below.
+**Status:** Current through v0.7.0 Routines; earlier version sections are historical contracts. See v0.7.0 below.
 
 ## Independent version axes
 
@@ -63,3 +63,7 @@ Supported protocols 1/2/3/4/5; writer v5; Pulse kinds 12/13 schema 1; previous s
 ## v0.6.0 Since You Last Looked
 
 Supported protocols 1–6; current writer v6. Protocol v6 preserves explicit v5 `as_of` and adds the stable summary cursor/result; v1–v5 bytes and behavior remain unchanged. Event schema stays 1/2 for existing kinds, codes 1–13 remain unchanged, and IndexedDB remains schema 1 with no migration. See [V0.6.0](V0.6.0.md).
+
+## v0.7.0 Routines
+
+Supported protocols 1–7; current writer v7. New Routine kinds 14–17 use event schema 1. Old event kinds/schemas and bytes are unchanged; old protocols fail closed for Routine history. IndexedDB stays schema 1. See [V0.7.0](V0.7.0.md).

@@ -1,6 +1,6 @@
 # ADR 0001 — Event-Sourced Household State
 
-Status: Accepted
+Status: Current through v0.6.3 Summary Hardening & Polish; Accepted
 
 ## Context
 

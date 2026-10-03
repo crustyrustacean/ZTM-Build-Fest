@@ -1,3 +1,4 @@
+use crate::recurrence::{Cadence, CivilDate};
 use core::fmt;
 
 macro_rules! id_type {
@@ -23,6 +24,7 @@ id_type!(DeviceId);
 id_type!(ItemId);
 id_type!(HandoffId);
 id_type!(TalkId);
+id_type!(RoutineId);
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ItemClassification {
@@ -48,6 +50,23 @@ pub fn valid_timestamp(value: i64) -> bool {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum EventKind {
+    RoutineCreated {
+        routine_id: RoutineId,
+        text: String,
+        cadence: Cadence,
+        created_on: CivilDate,
+    },
+    RoutineOccurrenceCompleted {
+        routine_id: RoutineId,
+        key: CivilDate,
+    },
+    RoutineOccurrenceReopened {
+        routine_id: RoutineId,
+        key: CivilDate,
+    },
+    RoutineArchived {
+        routine_id: RoutineId,
+    },
     PulseSet {
         value: PulseValue,
         expires_at: i64,
