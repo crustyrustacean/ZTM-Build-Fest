@@ -2,11 +2,11 @@
 
 This file records completed Kin releases. The `v0.0.x` releases are planning and documentation milestones; they do not represent implemented application features. The first implementation milestone remains `v0.1.0`.
 
-## Unreleased — v0.11.0–v0.11.6 Durable Service & Deployment candidate
+## Unreleased — v0.11.0–v0.11.7 Durable Service & Deployment candidate
 
-The implementation candidate with durable semantic validation and documentation
-clarifications is tagged `kin-v0.11.6` for human review. Earlier candidate tags
-through `kin-v0.11.5` are preserved.
+The implementation candidate with durable semantic validation, October planning
+and startup diagnostics is tagged `kin-v0.11.7` for human review. Earlier candidate
+tags through `kin-v0.11.6` are preserved.
 These are review candidates, not published product releases.
 
 ### v0.11.0 — Durable Identity & Relay Foundation
@@ -105,6 +105,36 @@ JavaScript syntax checks, version consistency and heading-format checks,
 238 local Markdown file-link target checks and whitespace validation.
 This was a bounded documentation/comment pass, not a full audit or a rerun of
 the browser, cross-platform and security release gates.
+
+### v0.11.7 — October Roadmap & Startup Diagnostics
+
+Blend the October plan into the existing README and roadmap while preserving
+project setup, milestone history and platform contracts. Target one small minor
+line per day from v0.12.x on October 3 through v0.40.x on October 31; retain
+v0.41–v0.45 as undated follow-up proposals. Add planning contracts, daily cadence,
+product boundaries and handoff guidance without implementing future features.
+
+Report listener startup failures with the attempted host/port, a bounded OS error
+code and safe recovery guidance. Release the database process lock after both
+asynchronous bind errors and synchronous listener configuration failures.
+Launchers wait for `service_ready` before claiming readiness, and PowerShell
+propagates a nonzero server exit. Document port conflicts and configuration
+overrides without encouraging automatic port switching or database deletion.
+
+Passed all 287 Node/real-WASM tests, including six startup regressions for an
+occupied port, denied/unavailable addresses, unknown/malformed error codes and
+synchronous configuration failure. Verified database-lock cleanup, valid reopen
+and exclusion of private exception details from listener diagnostics.
+
+The Windows PowerShell launcher built release WASM, reached `service_ready` and
+served the app, health and readiness endpoints successfully with isolated test
+storage. Version metadata, the 29 daily targets, local planning links and
+whitespace checks passed. Browser/security and POSIX execution gates were not
+rerun for this patch; previous results retain their original release attribution.
+
+The published client remains v0.10.3; server schema v1, canonical events,
+WASM/browser storage contracts and archive formats are unchanged. This patch
+remains a review candidate; no v0.12 capability or broader certification is claimed.
 
 ## v0.10.3 — Bounded Storage/Archive Hardening & Architecture Closure
 

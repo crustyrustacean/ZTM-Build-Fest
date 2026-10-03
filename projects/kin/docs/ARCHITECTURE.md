@@ -1,6 +1,6 @@
 # Architecture
 
-**Status:** v0.11.6 implementation candidate; awaiting human review. Rust owns portable commands, canonical codecs, replay and archive framing/import validation. JavaScript owns root rotation, local encryption/unlock, bounded persistence and browser capabilities. Event DB schema 3 and key DB schema 4 persist encrypted protected values. The same-origin identity/relay service uses SQLite server schema v1 for durable authorization and opaque relay state.
+**Status:** v0.11.7 implementation candidate; awaiting human review. Rust owns portable commands, canonical codecs, replay and archive framing/import validation. JavaScript owns root rotation, local encryption/unlock, bounded persistence and browser capabilities. Event DB schema 3 and key DB schema 4 persist encrypted protected values. The same-origin identity/relay service uses SQLite server schema v1 for durable authorization and opaque relay state.
 
 ## v0.10 implementation boundary
 

@@ -1,6 +1,6 @@
 # Release Process
 
-**Status:** Last published implementation: v0.10.3 Bounded Storage/Archive Hardening & Architecture Closure. The v0.11.6 Durable Service & Deployment candidate is committed and tagged `kin-v0.11.6` for human review; it is not a published release. No v0.12 work is in scope.
+**Status:** Last published implementation: v0.10.3 Bounded Storage/Archive Hardening & Architecture Closure. The v0.11.7 Durable Service & Deployment candidate (October Roadmap & Startup Diagnostics) is committed and tagged `kin-v0.11.7` for human review; it is not a published release. No v0.12 implementation work is in scope.
 
 ## Release sequence
 
@@ -9,13 +9,14 @@ Data Security) → `kin-v0.10.1` (Security Lifecycle & Sync Recovery Correctness
 `kin-v0.10.2` (Local Root Rotation & Recovery Lifecycle) →
 `kin-v0.10.3` (Bounded Storage/Archive Hardening & Architecture Closure). The
 current review candidate includes the v0.11.0 through v0.11.5 Durable
-Service & Deployment gates and the v0.11.6 documentation/comment patch, then
-stops for human review. Its annotated tag
+Service & Deployment gates, the v0.11.6 documentation/comment patch, and the
+v0.11.7 October Roadmap & Startup Diagnostics patch, then stops for human review. Its annotated tag
 identifies the candidate commit and does not represent a published release.
-The remaining planned,
-unimplemented sequence is v0.12.x (Data Lifecycle, Retention & Deletion) → v0.13.x (Recovery
-& Household Continuity) → v0.14.x (UX/UI Consolidation) → v1.0.0 (Stable Kin
-Platform). v1.0 requires the readiness properties of every preceding line, not
+The remaining planned, unimplemented sequence follows the [roadmap](ROADMAP.md):
+v0.12.x through v0.40.x are daily October 3–31 targets, v0.41.x through v0.45.x
+are undated follow-ups, and v1.0.0 depends on readiness. The platform work
+through v0.14 and foundation work through v0.16 occupy their own days.
+v1.0 requires the readiness properties of every preceding line, not
 only architecture/security and UX/UI. Use the release-specific planning contracts
 and [V0.10.0](V0.10.0.md); do not manufacture patch releases or knowingly defer a
 necessary correctness fix. Create tags only after completed validation and

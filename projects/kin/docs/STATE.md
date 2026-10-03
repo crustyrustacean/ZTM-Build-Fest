@@ -1,6 +1,6 @@
 # Derived Household State
 
-**Status:** v0.11.6 implementation candidate; awaiting human review. Rust owns deterministic commands and projection/replay; synchronized v8 replay resolves verified identities and orders equal-time concurrent events without changing canonical bytes. Browser startup obtains authorized local unlock before decrypting and replaying; locked state holds no household projection.
+**Status:** v0.11.7 implementation candidate; awaiting human review. Rust owns deterministic commands and projection/replay; synchronized v8 replay resolves verified identities and orders equal-time concurrent events without changing canonical bytes. Browser startup obtains authorized local unlock before decrypting and replaying; locked state holds no household projection.
 
 ## Projection pipeline
 
