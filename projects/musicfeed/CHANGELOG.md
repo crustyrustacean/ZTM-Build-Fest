@@ -15,13 +15,13 @@ The API is deployed and serving the blog from production.
 
 ### Added
 
-- `Dockerfile` adapted from the Zero to Production in Rust, with a `chef` / `builder` / `runtime`
+- `Dockerfile` adapted from the Zero to Production in Rust (Zero2Prod), with a `chef` / `builder` / `runtime`
   shape so dependency compilation is cached independently of our own source.
 - `.dockerignore`, keeping `target/`, `.git` and scratch files out of the build context.
 
 ### Notes
 
-- Four deviations from the ZTM Dockerfile, each forced by this project rather than chosen:
+- Four deviations from the Zero2Prod Dockerfile, each forced by this project rather than chosen:
   the `latest-rust-1-bookworm` chef tag, because the plain `latest-rust-1` image is Debian
   trixie (glibc 2.41) while the runtime stage is bookworm (2.38), and a binary built against
   the newer glibc will not start on the older one; Rust 1.99 rather than 1.80.1, because
