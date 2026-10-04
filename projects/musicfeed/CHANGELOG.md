@@ -9,6 +9,45 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 Nothing yet.
 
+## [0.3.1] - 2026-10-04
+
+The API is deployed and serving the blog from production.
+
+### Added
+
+- `Dockerfile` adapted from the Zero to Production in Rust, with a `chef` / `builder` / `runtime`
+  shape so dependency compilation is cached independently of our own source.
+- `.dockerignore`, keeping `target/`, `.git` and scratch files out of the build context.
+
+### Notes
+
+- Four deviations from the ZTM Dockerfile, each forced by this project rather than chosen:
+  the `latest-rust-1-bookworm` chef tag, because the plain `latest-rust-1` image is Debian
+  trixie (glibc 2.41) while the runtime stage is bookworm (2.38), and a binary built against
+  the newer glibc will not start on the older one; Rust 1.99 rather than 1.80.1, because
+  edition 2024 does not compile on 1.80; `cmake` alongside `clang`/`lld`, because
+  `aws-lc-sys` (a rustls backend) builds C; and `static/` plus `templates/` copied into the
+  runtime image, because the app reads both from the working directory at startup.
+  `openssl` is not needed — the TLS stack is rustls, not OpenSSL.
+- No test stage. The suite is hermetic and fast enough to run locally, and a failing test should
+  fail `cargo test` rather than the container build.
+- Deployed on Railway at `musicfeed-production.up.railway.app`, verified end to end: form post,
+  live MusicBrainz lookup returning cover art and year, rendered and streamed to the taxus blog.
+  The port mapping on the Railway domain targets 8000, which `production.toml` already sets, so no
+  `APP_APPLICATION__PORT` is required.
+- The runtime image is 148MB, of which the binary is 15MB and the Debian base is the rest.
+  `cargo-chef` buys rebuild speed, not size; real reduction means distroless or scratch.
+
+### Known issues
+
+- Storage is in memory, so every deploy empties the rotation.
+- `POST /rotation` is publicly reachable and unauthenticated. CORS only stops browsers from
+  posting cross-origin; `curl` bypasses it entirely.
+- `allow_origin(Any)` still permits any site to read the rotation.
+- *Invincible Shield* resolves to a release MusicBrainz has no artwork for, so it renders without
+  a cover or year.
+- The `year` field does not visually clear after submission in Firefox.
+
 ## [0.3.0] - 2026-10-04
 
 The blog island is live. `crusty-metallian.net` now loads `datastar.js` and pulls one entry from the
@@ -120,6 +159,7 @@ Initial scaffold, renamed from the `axum-tera-datastar` starter.
   tracing, and graceful shutdown.
 - `GET /health_check` and a starter to-do demo.
 
-[Unreleased]: https://github.com/crustyrustacean/ZTM-Build-Fest/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/crustyrustacean/ZTM-Build-Fest/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/crustyrustacean/ZTM-Build-Fest/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/crustyrustacean/ZTM-Build-Fest/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/crustyrustacean/ZTM-Build-Fest/releases/tag/musicfeed-v0.2.0
