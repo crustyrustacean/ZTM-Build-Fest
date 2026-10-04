@@ -101,8 +101,11 @@ struct Release {
     /// right release was chosen out of several matches.
     #[allow(dead_code)]
     title: String,
-    /// Full ISO date, e.g. `"2006-07-28"`. May be partial (`"2000"`) or absent
-    /// entirely on some releases.
+    /// Full ISO date, e.g. `"2006-07-28"`. May be partial (`"2000"`), may be
+    /// an EMPTY STRING, or may be absent entirely. MusicBrainz uses all three:
+    /// Judas Priest's Invincible Shield comes back with `"date": ""` on one of
+    /// eleven score-100 results. An empty string is not a date, so
+    /// [`parse_year`] treats it as unknown.
     date: Option<String>,
     /// Search relevance, 0-100. An exact match scores 100; reissues score lower.
     score: i32,
@@ -218,21 +221,67 @@ impl MetadataClient {
     /// save the entry. Only a genuine failure — network, bad status, unparseable
     /// body — produces an `Err`.
     pub async fn lookup(&self, query: &AlbumQuery) -> Result<AlbumMetadata, MetadataError> {
-        let Some(release) = self.find_release(query).await? else {
+        let Some(releases) = self.find_releases(query).await? else {
             return Ok(NOT_FOUND);
         };
 
-        let year = release_year(&release);
-        let cover = self.find_cover(&release.id).await?;
+        // Walk the ranked candidates until one yields an image.
+        //
+        // Ranking alone is not enough to pick a winner: Judas Priest's *Invincible
+        // Shield* returns ten score-100 releases, two of which share the earliest
+        // date. One has art; the other 404s. Deciding by date alone picks whichever
+        // happened to sort last, so whether a cover exists has to be part of the
+        // decision rather than a consequence of it.
+        //
+        // Candidates arrive best-first, so the first with a cover is the best one
+        // that actually has one. If none do, the earliest year still survives.
+        let mut first_with_year = None;
 
-        Ok(AlbumMetadata { cover, year })
+        for release in releases {
+            let year = release_year(&release);
+
+            match (year, self.find_cover(&release.id).await) {
+                // Best case: this release has both. Take it and stop.
+                (Some(year), Ok(Some(cover))) => {
+                    return Ok(AlbumMetadata {
+                        cover: Some(cover),
+                        year: Some(year),
+                    });
+                }
+                // A cover beats a year, so keep looking - but hold this year in case
+                // no later candidate offers an image.
+                (Some(year), _) => {
+                    if first_with_year.is_none() {
+                        first_with_year = Some(year);
+                    }
+                }
+                (None, Ok(Some(cover))) => {
+                    return Ok(AlbumMetadata {
+                        cover: Some(cover),
+                        year: None,
+                    });
+                }
+                (None, _) => {}
+            }
+        }
+
+        Ok(AlbumMetadata {
+            cover: None,
+            year: first_with_year,
+        })
     }
 
-    /// Search for a release matching an artist and title.
+    /// Search for releases matching an artist and title.
+    ///
+    /// Returns candidates **ordered best-first**, not a single winner — see
+    /// [`Self::lookup`] for why the caller needs to see more than one.
     ///
     /// Returns `None` when nothing matches. The query is quoted because album
     /// titles contain characters Lucene would otherwise read as operators.
-    async fn find_release(&self, query: &AlbumQuery) -> Result<Option<Release>, MetadataError> {
+    async fn find_releases(
+        &self,
+        query: &AlbumQuery,
+    ) -> Result<Option<Vec<Release>>, MetadataError> {
         let search = format!(
             r#"release:"{}" AND artist:"{}""#,
             escape_lucene(&query.album),
@@ -246,16 +295,24 @@ impl MetadataClient {
         );
 
         let response: ReleaseSearchResponse = self.get_json(&url).await?;
-        Ok(select_release(response.releases))
+        Ok(rank_releases(response.releases))
     }
 
     /// Fetch cover art for a MusicBrainz release ID.
     ///
     /// Returns `Ok(None)` when the archive has no art for that release, which
-    /// is common for bootlegs and compilations.
+    /// is common for bootlegs and compilations. A **404 means exactly that** —
+    /// the archive does not serve a 404 for a release that exists — so it is
+    /// treated as a miss, not a failure. Otherwise one album with no art would
+    /// discard the year we already resolved.
     async fn find_cover(&self, release_id: &str) -> Result<Option<String>, MetadataError> {
         let url = format!("{}/release/{release_id}", self.cover_art_base_url);
-        let response: CoverArtResponse = self.get_json(&url).await?;
+
+        let response = match self.get_json_opt::<CoverArtResponse>(&url).await? {
+            Some(response) => response,
+            None => return Ok(None),
+        };
+
         Ok(response
             .images
             .into_iter()
@@ -264,6 +321,34 @@ impl MetadataClient {
             // rare release that only has larger art.
             .and_then(|image| image.thumbnails.small.or(image.thumbnails.medium))
             .map(|url| to_https(&url)))
+    }
+
+    /// GET a JSON document, treating 404 as "absent" rather than "failed".
+    ///
+    /// Used where a missing resource is an ordinary outcome. A 404 from the
+    /// Cover Art Archive means it has no art for that release, which is not an
+    /// error worth losing an otherwise-good lookup over.
+    async fn get_json_opt<T: serde::de::DeserializeOwned>(
+        &self,
+        url: &str,
+    ) -> Result<Option<T>, MetadataError> {
+        let response = self.http.get(url).send().await?;
+
+        let status = response.status();
+        if status == reqwest::StatusCode::NOT_FOUND {
+            return Ok(None);
+        }
+        if !status.is_success() {
+            return Err(MetadataError::Status {
+                status: status.as_u16(),
+            });
+        }
+
+        response
+            .json::<T>()
+            .await
+            .map(Some)
+            .map_err(|_| MetadataError::Decode)
     }
 
     async fn get_json<T: serde::de::DeserializeOwned>(
@@ -306,7 +391,7 @@ impl Default for MetadataClient {
 /// 2. Within that, prefer the highest search score — an exact title match beats
 ///    a near match.
 /// 3. Keep the earliest date, so the original release wins over reissues.
-fn select_release(releases: Vec<Release>) -> Option<Release> {
+fn rank_releases(releases: Vec<Release>) -> Option<Vec<Release>> {
     // Prefer albums, but if every match was a Single or EP, fall back to the
     // whole set rather than reporting nothing. Better to offer a slightly
     // wrong-shaped answer than none at all — the caller treats a miss as
@@ -328,19 +413,21 @@ fn select_release(releases: Vec<Release>) -> Option<Release> {
     // Highest score wins. Ties go to the earliest dated release, so the original
     // beats a reissue of the same album. A release with no date sorts last, because
     // it can supply neither a year nor, in practice, cover art.
-    pool.into_iter().max_by(|a, b| {
-        a.score.cmp(&b.score).then_with(|| {
+    let mut ranked = pool;
+    ranked.sort_by(|a, b| {
+        b.score.cmp(&a.score).then_with(|| {
             match (release_year_key(&a.date), release_year_key(&b.date)) {
-                // Both dated: earliest wins, so reverse the comparison for max_by.
+                // Both dated: earliest first, so the original beats a reissue.
                 (Some(a_year), Some(b_year)) => a_year.cmp(&b_year),
-                // Only `a` is dated, so `a` is the better-informed choice.
-                (Some(_), None) => Ordering::Greater,
-                (None, Some(_)) => Ordering::Less,
-                // Neither is dated; nothing to separate them.
+                // A dated release outranks one with no date at all.
+                (Some(_), None) => Ordering::Less,
+                (None, Some(_)) => Ordering::Greater,
                 (None, None) => Ordering::Equal,
             }
         })
-    })
+    });
+
+    (!ranked.is_empty()).then_some(ranked)
 }
 
 /// Year from a release date such as `"2006-07-28"` or `"2006"`.
@@ -351,6 +438,13 @@ fn release_year(release: &Release) -> Option<i32> {
 }
 
 fn parse_year(date: &str) -> Option<i32> {
+    // An empty string is not a year. `Option<String>` only covers a *missing*
+    // key, so `"date": ""` would otherwise sail through as a "dated" release
+    // and win the ranking tiebreak — while contributing no year at all.
+    let date = date.trim();
+    if date.is_empty() {
+        return None;
+    }
     let head = date.split(['-', 'T']).next()?;
     head.parse().ok()
 }
@@ -442,7 +536,7 @@ mod tests {
     fn prefers_the_album_over_a_reissue() {
         // The real search for this returned seven results; #2 was
         // "Attero Dominatus (Re-Armed)", a 2015 reissue.
-        let chosen = select_release(vec![
+        let ranked = rank_releases(vec![
             release(
                 "Attero Dominatus (Re-Armed)",
                 Some("2015-12-23"),
@@ -451,14 +545,14 @@ mod tests {
             ),
             release("Attero Dominatus", Some("2006-07-28"), 100, Some("Album")),
         ]);
-        let chosen = chosen.expect("an album match");
-        assert_eq!(chosen.title, "Attero Dominatus");
-        assert_eq!(release_year(&chosen), Some(2006));
+        let first = ranked.expect("albums ranked").remove(0);
+        assert_eq!(first.title, "Attero Dominatus");
+        assert_eq!(release_year(&first), Some(2006));
     }
 
     #[test]
     fn drops_singles_and_eps() {
-        let chosen = select_release(vec![
+        let ranked = rank_releases(vec![
             release("Cocoon", Some("2020-01-01"), 100, Some("Single")),
             release(
                 "Curse of the Crystal Coconut",
@@ -467,15 +561,15 @@ mod tests {
                 Some("Album"),
             ),
         ]);
-        let chosen = chosen.expect("an album match");
-        assert_eq!(chosen.title, "Curse of the Crystal Coconut");
+        let first = ranked.expect("albums ranked").remove(0);
+        assert_eq!(first.title, "Curse of the Crystal Coconut");
     }
 
     #[test]
     fn keeps_an_untyped_release_rather_than_reporting_nothing() {
         // Some releases carry no primary-type. Better to offer them than nothing.
-        let chosen = select_release(vec![release("Obscure", Some("2001"), 70, None)]);
-        assert!(chosen.is_some());
+        let ranked = rank_releases(vec![release("Obscure", Some("2001"), 70, None)]);
+        assert!(ranked.is_some_and(|r| !r.is_empty()));
     }
 
     #[test]
@@ -483,14 +577,14 @@ mod tests {
         // The real search for Judas Priest's Invincible Shield returns eleven
         // results, all scoring 100. The top one has NO date, and its MBID has no
         // cover art — so ranking it first cost us both the year and the image.
-        let chosen = select_release(vec![
+        let ranked = rank_releases(vec![
             release("Invincible Shield", None, 100, Some("Album")),
             release("Invincible Shield", Some("2024-03-08"), 100, Some("Album")),
             release("Invincible Shield", Some("2024-03-06"), 100, Some("Album")),
         ]);
-        let chosen = chosen.expect("an album match");
+        let first = ranked.expect("albums ranked").remove(0);
         assert_eq!(
-            release_year(&chosen),
+            release_year(&first),
             Some(2024),
             "a dateless release should never outrank a dated one"
         );
@@ -500,8 +594,27 @@ mod tests {
     fn a_dateless_release_is_still_usable_when_it_is_all_there_is() {
         // Nothing to compare against, so it must not be discarded — a year of
         // `None` is better than reporting nothing at all.
-        let chosen = select_release(vec![release("Obscure", None, 100, Some("Album"))]);
-        assert!(chosen.is_some());
+        let ranked = rank_releases(vec![release("Obscure", None, 100, Some("Album"))]);
+        assert!(ranked.is_some_and(|r| !r.is_empty()));
+    }
+
+    #[test]
+    fn an_empty_date_string_counts_as_no_date() {
+        // MusicBrainz returns `"date": ""`, not a missing key, for some real
+        // releases. `Option<String>` covers the missing case only, so without
+        // this the dateless record still won the ranking and lost the cover.
+        let blank = release("Invincible Shield", Some(""), 100, Some("Album"));
+        assert_eq!(release_year(&blank), None);
+
+        let ranked = rank_releases(vec![
+            release("Invincible Shield", Some(""), 100, Some("Album")),
+            release("Invincible Shield", Some("2024-03-08"), 100, Some("Album")),
+        ]);
+        assert_eq!(
+            release_year(&ranked.expect("albums ranked").remove(0)),
+            Some(2024),
+            "an empty date string should not outrank a real one"
+        );
     }
 
     #[test]

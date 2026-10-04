@@ -34,7 +34,10 @@ async fn post_rotation_entry_returns_append_patch_and_clears_signals() {
     assert!(body.contains("data: selector #rotation-list"));
     assert!(body.contains("data: mode append"));
     // the app stamps id 0 for the first entry and the date itself
-    assert!(body.contains(r#"id="rotation-0""#), "body was: {body}");
+    assert!(
+        body.contains(r#"class="rotation-artist""#),
+        "body was: {body}"
+    );
     assert!(body.contains("Sabaton"));
     assert!(body.contains("Attero Dominatus"));
     // and every bound signal is reset so the form is ready for the next entry
@@ -94,7 +97,7 @@ async fn cleared_signals_must_be_deserializable() {
     // And it must be the *second* entry, proving the first was not re-sent.
     let body = response.text().await.unwrap();
     assert!(
-        body.contains(r#"id="rotation-1""#),
+        body.contains(r#"class="rotation-artist""#),
         "expected the second entry, got: {body}"
     );
 }
@@ -125,7 +128,10 @@ async fn posted_entry_appears_in_index_list() {
         .unwrap();
 
     // Assert — the shared partial supplies the id and the fields on both paths
-    assert!(body.contains(r#"id="rotation-0""#), "body was: {body}");
+    assert!(
+        body.contains(r#"class="rotation-artist""#),
+        "body was: {body}"
+    );
     assert!(body.contains("Sabaton"));
     assert!(body.contains("2006"));
 }
@@ -152,10 +158,7 @@ async fn an_empty_note_is_omitted_rather_than_rendered_empty() {
     assert!(response.status().is_success());
     let sse_body = response.text().await.unwrap();
     assert!(sse_body.contains("Sabaton"));
-    assert!(
-        !sse_body.contains("rotation-entry-note"),
-        "sse was: {sse_body}"
-    );
+    assert!(!sse_body.contains("rotation-note"), "sse was: {sse_body}");
 }
 
 #[tokio::test]
@@ -226,7 +229,7 @@ async fn a_successful_lookup_fills_in_the_cover_and_year() {
         .await
         .unwrap();
     assert!(
-        page.contains("rotation-entry-cover"),
+        page.contains("rotation-widget"),
         "the cover was not rendered:\n{page}"
     );
     assert!(
@@ -234,7 +237,7 @@ async fn a_successful_lookup_fills_in_the_cover_and_year() {
         "the wrong thumbnail was chosen:\n{page}"
     );
     assert!(
-        page.contains("(2006)"),
+        page.contains(r#"class="rotation-year">2006<"#),
         "the looked-up year is missing:\n{page}"
     );
 }
@@ -268,7 +271,7 @@ async fn a_cover_is_absent_when_the_release_has_no_art() {
         .await
         .unwrap();
     assert!(
-        page.contains("(2006)"),
+        page.contains(r#"class="rotation-year">2006<"#),
         "the year should still land:\n{page}"
     );
     assert!(
@@ -276,7 +279,7 @@ async fn a_cover_is_absent_when_the_release_has_no_art() {
         "a missing cover rendered an empty src:\n{page}"
     );
     assert!(
-        !page.contains("rotation-entry-cover"),
+        !page.contains("<img"),
         "an image was rendered for a release with no art:\n{page}"
     );
 }
@@ -547,12 +550,12 @@ async fn every_posted_entry_appears_in_the_index_list() {
     for artist in ["Sabaton", "Alestorm", "Alice Cooper"] {
         assert!(page.contains(artist), "{artist} missing from:\n{page}");
     }
-    for id in 0..3 {
-        assert!(
-            page.contains(&format!(r#"id="rotation-{id}""#)),
-            "entry {id} missing from:\n{page}"
-        );
-    }
+    // Each entry renders its own widget.
+    assert_eq!(
+        page.matches("rotation-artist").count(),
+        3,
+        "expected three rendered widgets:\n{page}"
+    );
 }
 
 #[tokio::test]
@@ -658,7 +661,7 @@ async fn random_entry_is_one_of_the_entered_entries() {
     assert!(response.status().is_success());
     let body = response.text().await.unwrap();
     assert!(
-        body.contains("rotation-entry-artist"),
+        body.contains("rotation-artist"),
         "expected a rendered entry, got: {body}"
     );
 }

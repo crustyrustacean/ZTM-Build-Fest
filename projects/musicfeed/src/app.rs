@@ -6,12 +6,16 @@ use crate::shutdown_signal;
 use crate::telemetry::{MakeRequestUuid, request_span};
 use axum::{
     Router,
-    http::HeaderName,
+    http::{
+        HeaderName, Method,
+        header::{ACCEPT, CONTENT_TYPE},
+    },
     routing::{get, post},
 };
 use tokio::net::TcpListener;
 use tower::ServiceBuilder;
 use tower_http::{
+    cors::{Any, CorsLayer},
     request_id::{PropagateRequestIdLayer, SetRequestIdLayer},
     services::ServeDir,
     trace::TraceLayer,
@@ -19,6 +23,11 @@ use tower_http::{
 use tracing::info;
 
 const X_REQUEST_ID: HeaderName = HeaderName::from_static("x-request-id");
+
+/// Datastar marks its own requests with this header so a handler can tell them
+/// apart from an ordinary fetch. Without it in `allow_headers` the browser's preflight
+/// fails and the island never reaches the API.
+const DATASTAR_REQUEST: HeaderName = HeaderName::from_static("datastar-request");
 
 pub struct Application {
     listener: TcpListener,
@@ -52,6 +61,20 @@ impl Application {
 pub fn build_router(state: AppState) -> Router {
     let trace_layer = TraceLayer::new_for_http().make_span_with(request_span);
 
+    // CORS has to sit on the whole router, not on the GET route. A browser's
+    // preflight is an `OPTIONS /rotation`, which matches no registered method, so a
+    // route-scoped layer never runs: axum answers 405 before CORS can add headers, and
+    // the browser blocks the request with "Access-Control-Allow-Origin missing".
+    //
+    // Restricting `allow_methods` to GET and HEAD is therefore what actually keeps the
+    // write endpoint out of reach cross-origin — a browser may not issue the POST. That
+    // is a convenience, NOT authentication: `curl -X POST` bypasses CORS entirely, so
+    // `POST /rotation` still needs an API key before this is deployed publicly.
+    let cors = CorsLayer::new()
+        .allow_methods([Method::GET, Method::HEAD])
+        .allow_origin(Any)
+        .allow_headers([CONTENT_TYPE, ACCEPT, DATASTAR_REQUEST]);
+
     Router::new()
         .route("/", get(get_index_page))
         .route("/health_check", get(health_check))
@@ -64,7 +87,10 @@ pub fn build_router(state: AppState) -> Router {
                     MakeRequestUuid,
                 ))
                 .layer(trace_layer)
-                .layer(PropagateRequestIdLayer::new(X_REQUEST_ID)),
+                .layer(PropagateRequestIdLayer::new(X_REQUEST_ID))
+                // Outermost, so preflight requests are answered with CORS headers
+                // before anything else can reject them.
+                .layer(cors),
         )
         .nest_service("/static", ServeDir::new("static"))
         .with_state(state)

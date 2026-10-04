@@ -1,6 +1,6 @@
 [package]
 name = "musicfeed"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 
 [[bin]]
@@ -21,7 +21,7 @@ thiserror = "2"
 tokio = { version = "1", features = ["full"] }
 tokio-stream = "0.1"
 tower = "0.5"
-tower-http = { version = "0.7", features = ["fs", "request-id", "trace"] }
+tower-http = { version = "0.7", features = ["cors", "fs", "request-id", "trace"] }
 tracing = { version = "0.1", features = ["log"] }
 tracing-bunyan-formatter = "0.3"
 tracing-log = "0.2"

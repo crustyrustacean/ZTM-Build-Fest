@@ -9,6 +9,59 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 Nothing yet.
 
+## [0.3.0] - 2026-10-04
+
+The blog island is live. `crusty-metallian.net` now loads `datastar.js` and pulls one entry from the
+API over SSE, so the "Currently Spinning" widget reflects real data instead of a hand-maintained
+JSON file that was rarely updated.
+
+Cover art and release year are now looked up from MusicBrainz and the Cover Art Archive rather than
+typed by hand — the reason the project exists.
+
+### Added
+
+- `MetadataClient` (`src/metadata.rs`) for MusicBrainz release search plus Cover Art Archive lookup,
+  borrowed in shape from the `OpenRouterClient` in the user's `flux-learner` repo: `new()` delegates
+  to `with_base_urls()` so tests point it at a local stub. No trait, no mocking framework in the
+  production code.
+- `MetadataSettings` in `configuration/`, so both service base URLs are environment-configurable
+  rather than hardcoded.
+- CORS on the read endpoint, allowing the blog origin to fetch one rotation entry cross-origin.
+- `datastar-request` in `allow_headers` — Datastar tags its own fetches, and without it the
+  browser's preflight fails and the island never connects.
+- Tests for the lookup: release selection, year parsing from partial and empty dates, cover
+  selection, Lucene escaping, and the fact that a miss is an ordinary outcome rather than an error.
+
+### Changed
+
+- The form takes artist, album, and note only. Cover and year are looked up, which also removed the
+  field whose type mismatch caused the third-entry `400`.
+- Entry markup now matches the blog's existing `.rotation-*` classes, so the widget's own CSS applies
+  and the rendered `<li>` is no longer required.
+- `year` is `Option<i32>`, and every optional field is `{% if %}`-guarded in the template. A field
+  carrying `skip_serializing_if` is absent from the JSON when `None`, and Tera treats an absent field
+  as a render error rather than a blank.
+
+### Fixed
+
+- Some albums resolved to a year but no cover art. Selecting the best match by date alone picked a
+  release whose MBID had no art at all, so ranking now returns candidates best-first and the lookup
+  walks them until one yields both a year and an image.
+- A release with no date could outrank one that had a year, and an empty date string (`"date": ""`)
+  counted as a date. Both meant the dateless record won, which cost us the year *and* the cover.
+- A failed cover request no longer discards the year already resolved, and a 404 from the archive is
+  treated as "no art" rather than a failure.
+
+### Known issues
+
+- The `year` field does not visually clear after submission in Firefox. It is `required` and is
+  excluded from the signal reset, so the value persists by design — but the browser is not
+  clearing the input itself.
+- `allow_origin(Any)` is still in place and localhost is not yet allowed. Neither breaks the
+  island; both are tightening to do before deploying.
+- `POST /rotation` has no authentication. CORS only stops *browsers* from issuing a cross-origin
+  POST — `curl` bypasses it entirely. An API key is required before this is publicly reachable.
+
 ## [0.2.0] - 2026-10-03
 
 The first real feature: the to-do starter demo is gone, replaced by a music rotation log. Entries
@@ -57,12 +110,6 @@ can be added through a form and appear live in the list.
 - Entries after the second silently failed with a `400`. The form reset sent `"year":""`, which
   serde rejects for an `i32`; `year` is no longer cleared.
 
-### Known issues
-
-- The `year` field does not visually clear after submission in Firefox. It is `required` and is
-  excluded from the signal reset, so the value persists by design — but the browser is not
-  clearing the input itself.
-
 ## [0.1.0] - 2026-10-02
 
 Initial scaffold, renamed from the `axum-tera-datastar` starter.
@@ -73,5 +120,6 @@ Initial scaffold, renamed from the `axum-tera-datastar` starter.
   tracing, and graceful shutdown.
 - `GET /health_check` and a starter to-do demo.
 
-[Unreleased]: https://github.com/crustyrustacean/ZTM-Build-Fest/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/crustyrustacean/ZTM-Build-Fest/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/crustyrustacean/ZTM-Build-Fest/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/crustyrustacean/ZTM-Build-Fest/releases/tag/musicfeed-v0.2.0
