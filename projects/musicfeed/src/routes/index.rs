@@ -33,10 +33,7 @@ impl IntoResponse for IndexError {
 
 #[debug_handler]
 pub async fn get_index_page(State(state): State<AppState>) -> Result<Html<String>, IndexError> {
-    let rotation_entries = state
-        .rotation_entries
-        .lock()
-        .map_err(|_| IndexError::StateLock)?;
+    let rotation_entries = state.rotation_entries.lock().await;
     let mut context = Context::new();
     context.insert("rotation_entries", &*rotation_entries);
 

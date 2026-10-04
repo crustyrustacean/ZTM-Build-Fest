@@ -17,8 +17,6 @@ use tera::Context;
 
 #[derive(thiserror::Error)]
 pub enum RotationEntryError {
-    #[error("shared state lock poisoned")]
-    StateLock,
     #[error("rotation entry not found")]
     NotFound,
     #[error("template rendering failed")]
@@ -36,9 +34,7 @@ impl IntoResponse for RotationEntryError {
         tracing::error!(error = ?self, "request failed");
         let status = match self {
             RotationEntryError::NotFound => StatusCode::NOT_FOUND,
-            RotationEntryError::StateLock | RotationEntryError::Template(_) => {
-                StatusCode::INTERNAL_SERVER_ERROR
-            }
+            RotationEntryError::Template(_) => StatusCode::INTERNAL_SERVER_ERROR,
         };
         (status, "Something went wrong.").into_response()
     }
@@ -75,10 +71,7 @@ pub async fn post_rotation_entry_ds(
     // Claim an id before touching the entries, so the counter lock is released
     // before we hold the longer-lived entries lock.
     let id = {
-        let mut next = state
-            .next_id
-            .lock()
-            .map_err(|_| RotationEntryError::StateLock)?;
+        let mut next = state.next_id.lock().await;
         let id = *next;
         *next += 1;
         id
@@ -100,11 +93,7 @@ pub async fn post_rotation_entry_ds(
     // Render before pushing: a template failure should not leave a half-added entry.
     let rendered = render_rotation(&state, &entry)?;
 
-    state
-        .rotation_entries
-        .lock()
-        .map_err(|_| RotationEntryError::StateLock)?
-        .push(entry);
+    state.rotation_entries.lock().await.push(entry);
 
     let patch = PatchElements::new(rendered)
         .selector("#rotation-list")
@@ -135,6 +124,40 @@ pub async fn post_rotation_entry_ds(
         Ok(clear_empty),
         Ok(clear),
     ]));
+
+    Ok(sse_event)
+}
+
+#[debug_handler]
+pub async fn get_rotation_entry(
+    State(state): State<AppState>,
+) -> Result<Sse<impl tokio_stream::Stream<Item = Result<Event, Infallible>>>, RotationEntryError> {
+    // Pick a random entry to hand back.
+    //
+    // The emptiness check MUST come before the index is drawn: `rand::random_range`
+    // panics on an empty range, so asking for a random entry from nothing would take the
+    // request down instead of returning a 404. `entries.get(..)` returning `None` is
+    // therefore not sufficient on its own - `.ok_or(NotFound)` never gets the chance.
+    let entry = {
+        let entries = state.rotation_entries.lock().await;
+
+        if entries.is_empty() {
+            return Err(RotationEntryError::NotFound);
+        }
+
+        let index = rand::random_range(0..entries.len());
+        entries.get(index).cloned()
+    }
+    .ok_or(RotationEntryError::NotFound)?;
+
+    let rendered = render_rotation(&state, &entry)?;
+
+    let patch = PatchElements::new(rendered)
+        .selector("#rotation-list")
+        .mode(ElementPatchMode::Append)
+        .write_as_axum_sse_event();
+
+    let sse_event = Sse::new(tokio_stream::iter(vec![Ok(patch)]));
 
     Ok(sse_event)
 }

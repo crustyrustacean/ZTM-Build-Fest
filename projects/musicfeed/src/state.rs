@@ -1,8 +1,9 @@
 // src/state.rs
 
 use crate::domain::RotationEntry;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use tera::Tera;
+use tokio::sync::Mutex;
 
 #[derive(Clone, Debug)]
 pub struct AppState {

@@ -2,6 +2,8 @@
 
 use crate::helpers::spawn_app;
 
+use reqwest::StatusCode;
+
 fn payload() -> serde_json::Value {
     serde_json::json!({
         "artist": "Sabaton",
@@ -417,4 +419,71 @@ async fn entry_text_is_escaped_in_the_sse_patch() {
         "raw payload leaked into the page: {page}"
     );
     assert!(page.contains("&lt;img src=x onerror=alert(1)&gt;"));
+}
+#[tokio::test]
+async fn random_entry_with_no_entries_returns_404() {
+    // Arrange — a fresh app has nothing in its rotation
+    let app = spawn_app().await;
+
+    // Act — ask for one anyway
+    let response = app
+        .api_client
+        .get(format!("{}/rotation", &app.address))
+        .send()
+        .await
+        .expect("Failed to execute request.");
+
+    // Assert — a 404, not a dropped connection.
+    //
+    // This is the case that catches a missing emptiness guard: drawing a random
+    // index from an empty range panics, so the request is killed mid-response and the
+    // client sees a transport error rather than any status at all.
+    assert_eq!(
+        response.status(),
+        StatusCode::NOT_FOUND,
+        "an empty rotation should be a 404, not a dropped connection"
+    );
+
+    // And the server must still be healthy afterwards — a panic in a handler would
+    // leave the app unable to serve the next request.
+    let health = app
+        .api_client
+        .get(format!("{}/health_check", &app.address))
+        .send()
+        .await
+        .expect("app did not survive the empty-rotation request");
+    assert!(health.status().is_success());
+}
+
+#[tokio::test]
+async fn random_entry_is_one_of_the_entered_entries() {
+    // Arrange — enter three entries
+    let app = spawn_app().await;
+    for artist in ["Sabaton", "Alestorm", "Alice Cooper"] {
+        app.api_client
+            .post(format!("{}/rotation", &app.address))
+            .json(&serde_json::json!({
+                "artist": artist, "album": "X",
+                "cover": "", "year": 2000, "note": ""
+            }))
+            .send()
+            .await
+            .unwrap();
+    }
+
+    // Act — ask for one
+    let response = app
+        .api_client
+        .get(format!("{}/rotation", &app.address)) // ← the endpoint you haven't built
+        .send()
+        .await
+        .unwrap();
+
+    // Assert — 200, and the artist is one we entered
+    assert!(response.status().is_success());
+    let body = response.text().await.unwrap();
+    assert!(
+        body.contains("rotation-entry-artist"),
+        "expected a rendered entry, got: {body}"
+    );
 }

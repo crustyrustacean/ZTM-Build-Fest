@@ -1,7 +1,7 @@
 // src/app.rs
 
 use crate::AppState;
-use crate::routes::{get_index_page, health_check, post_rotation_entry_ds};
+use crate::routes::{get_index_page, get_rotation_entry, health_check, post_rotation_entry_ds};
 use crate::shutdown_signal;
 use crate::telemetry::{MakeRequestUuid, request_span};
 use axum::{
@@ -55,6 +55,7 @@ pub fn build_router(state: AppState) -> Router {
     Router::new()
         .route("/", get(get_index_page))
         .route("/health_check", get(health_check))
+        .route("/rotation", get(get_rotation_entry))
         .route("/rotation", post(post_rotation_entry_ds))
         .layer(
             ServiceBuilder::new()
