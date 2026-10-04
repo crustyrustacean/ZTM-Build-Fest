@@ -28,16 +28,6 @@
           <input id="album" type="text" data-bind:album required />
         </div>
 
-        <div class="field">
-          <label for="year">Release year</label>
-          <input id="year" type="number" data-bind:year required />
-        </div>
-
-        <div class="field">
-          <label for="cover">Cover URL</label>
-          <input id="cover" type="text" data-bind:cover />
-        </div>
-
         <div class="field field-full">
           <label for="note">Note</label>
           <input id="note" type="text" data-bind:note />
@@ -46,17 +36,21 @@
         <button type="submit" class="submit">Add to rotation</button>
       </form>
 
-<ul id="rotation-list">
-{% for rotation_entry in rotation_entries %}{% include "rotation.html" %}{% endfor %}
-<!--
-The empty-state message lives INSIDE the list so that the append patch targets
-the same element every time. When the first entry arrives the handler also
-removes this node, so it cannot survive as stale text below the list.
--->
-<li id="rotation-empty" class="rotation-empty" {% if rotation_entries | length > 0 %}hidden{% endif %}>
-Nothing spinning yet. Add the first entry above.
-</li>
-</ul>
+      <!-- Populated only when a lookup fails. The entry is still saved; this
+           just says why it arrived without a cover. -->
+      <p id="metadata-status" class="metadata-status" data-text="$metadata_status"></p>
+
+      <ul id="rotation-list">
+        {% for rotation_entry in rotation_entries %}{% include "rotation.html" %}{% endfor %}
+        <!--
+        The empty-state message lives INSIDE the list so that the append patch targets
+        the same element every time. When the first entry arrives the handler also
+        removes this node, so it cannot survive as stale text below the list.
+        -->
+        <li id="rotation-empty" class="rotation-empty" {% if rotation_entries | length > 0 %}hidden{% endif %}>
+          Nothing spinning yet. Add the first entry above.
+        </li>
+      </ul>
     </main>
 
     <script type="module" src="/static/datastar.js"></script>

@@ -1,6 +1,7 @@
 // src/routes/rotation.rs
 
 use crate::domain::RotationEntry;
+use crate::metadata::AlbumQuery;
 use crate::state::AppState;
 use crate::utils::{compact_html, error_chain_fmt};
 use axum::response::{
@@ -40,14 +41,19 @@ impl IntoResponse for RotationEntryError {
     }
 }
 
+/// What the form sends. `cover` and `year` are absent by design — they are looked
+/// up, not typed. `id` and `listened_date` are absent because the app controls
+/// them, so a client cannot forge either.
 #[derive(Clone, Deserialize, Serialize)]
 pub struct RawRotationEntry {
     artist: String,
     album: String,
-    cover: String,
-    year: i32,
     note: String,
 }
+
+/// Signal used to tell the user the lookup failed without discarding the entry.
+const METADATA_STATUS: &str = "metadata_status";
+const LOOKUP_FAILED: &str = "Could not look that up - saved without a cover or year";
 
 /// Render a single rotation entry fragment via Tera.
 ///
@@ -68,8 +74,17 @@ pub async fn post_rotation_entry_ds(
     State(state): State<AppState>,
     ReadSignals(raw_rotation_entry): ReadSignals<RawRotationEntry>,
 ) -> Result<Sse<impl tokio_stream::Stream<Item = Result<Event, Infallible>>>, RotationEntryError> {
-    // Claim an id before touching the entries, so the counter lock is released
-    // before we hold the longer-lived entries lock.
+    // Look the album up before anything else. This never blocks the save: a
+    // miss and a failure both come back as empty metadata, and the user is told
+    // which happened via the status signal below.
+    let query = AlbumQuery::new(&raw_rotation_entry.artist, &raw_rotation_entry.album);
+    let looked_up = state.metadata.lookup(&query).await;
+
+    let lookup_failed = looked_up.is_err();
+    let metadata = looked_up.unwrap_or_default();
+
+    // Claim an id only once the entry is going to be saved, so a slow or failed
+    // lookup does not burn a number.
     let id = {
         let mut next = state.next_id.lock().await;
         let id = *next;
@@ -77,16 +92,13 @@ pub async fn post_rotation_entry_ds(
         id
     };
 
-    // Build the entry from the raw form input. `id` and `listened_date` are
-    // app-controlled and deliberately absent from `RawRotationEntry`, so a client
-    // cannot forge either. `note` and `cover` treat an empty string as "absent".
     let entry = RotationEntry {
         id,
         listened_date: Local::now().date_naive(),
         artist: raw_rotation_entry.artist,
         album: raw_rotation_entry.album,
-        cover: (!raw_rotation_entry.cover.is_empty()).then_some(raw_rotation_entry.cover),
-        year: raw_rotation_entry.year,
+        cover: metadata.cover,
+        year: metadata.year,
         note: (!raw_rotation_entry.note.is_empty()).then_some(raw_rotation_entry.note),
     };
 
@@ -101,29 +113,33 @@ pub async fn post_rotation_entry_ds(
         .write_as_axum_sse_event();
 
     // The empty-state message is rendered inside `#rotation-list`, so the append
-    // above would otherwise leave it sitting below the new entry. Remove it now that
-    // there is something to show. Removing an element that is already gone is a no-op,
-    // so this is safe on every subsequent post as well as the first.
+    // above would otherwise leave it sitting below the new entry. Remove it now
+    // that there is something to show. Removing an element that is already gone
+    // is a no-op, so this is safe on every subsequent post as well as the first.
     let clear_empty = PatchElements::new_remove("#rotation-empty").write_as_axum_sse_event();
 
     // Reset the bound signals so the form is ready for the next entry.
     //
-    // `year` is deliberately NOT cleared. It is an `i32`, so pushing an empty
-    // string into that signal would leave it as `""` in the browser, and the NEXT
-    // submission would then fail to deserialize (serde rejects `""` for a number),
-    // be answered with a 400, and silently add nothing. The field is `required`,
-    // so leaving the signal alone is safe - the input just keeps its value.
-    //
-    // Any value pushed back into the form must be something the next request can
-    // actually deserialize. `cleared_signals_must_be_deserializable` guards that.
-    let clear = PatchSignals::new(r#"{"artist":"","album":"","cover":"","note":""}"#)
-        .write_as_axum_sse_event();
+    // Every value pushed back must be something the next request can actually
+    // deserialize. All three fields are `String`, so "" is safe for all of them -
+    // which is precisely why `year` is not bound here any more. It is looked up,
+    // not typed, so there is nothing for the user to clear.
+    let clear = PatchSignals::new(format!(
+        r#"{{"artist":"","album":"","note":"","{METADATA_STATUS}":""}}"#
+    ))
+    .write_as_axum_sse_event();
 
-    let sse_event = Sse::new(tokio_stream::iter(vec![
-        Ok(patch),
-        Ok(clear_empty),
-        Ok(clear),
-    ]));
+    let mut events = vec![Ok(patch), Ok(clear_empty), Ok(clear)];
+
+    // Option 2: the entry is saved either way, but a failed lookup is surfaced
+    // rather than silently dropping the cover the user expected to get.
+    if lookup_failed {
+        let status = PatchSignals::new(format!(r#"{{"{METADATA_STATUS}":"{LOOKUP_FAILED}"}}"#))
+            .write_as_axum_sse_event();
+        events.push(Ok(status));
+    }
+
+    let sse_event = Sse::new(tokio_stream::iter(events));
 
     Ok(sse_event)
 }
@@ -135,9 +151,10 @@ pub async fn get_rotation_entry(
     // Pick a random entry to hand back.
     //
     // The emptiness check MUST come before the index is drawn: `rand::random_range`
-    // panics on an empty range, so asking for a random entry from nothing would take the
-    // request down instead of returning a 404. `entries.get(..)` returning `None` is
-    // therefore not sufficient on its own - `.ok_or(NotFound)` never gets the chance.
+    // panics on an empty range, so asking for a random entry from nothing would
+    // take the request down instead of returning a 404. `entries.get(..)` returning
+    // `None` is therefore not sufficient on its own - `.ok_or(NotFound)` never
+    // gets the chance.
     let entry = {
         let entries = state.rotation_entries.lock().await;
 

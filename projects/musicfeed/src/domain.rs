@@ -10,7 +10,12 @@ pub struct RotationEntry {
     pub album: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cover: Option<String>,
-    pub year: i32,
+    /// Release year, looked up rather than typed. Optional because a miss is
+    /// ordinary — bootlegs and regional compilations often have no reliable
+    /// date. `0` is not a year, which is why this is `Option` and not a plain
+    /// integer with a sentinel.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub year: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub note: Option<String>,
 }

@@ -8,9 +8,9 @@
   {% endif %}
   <div class="rotation-entry-body">
     <p class="rotation-entry-artist">{{ rotation_entry.artist }}</p>
-    <p class="rotation-entry-album">
-      {{ rotation_entry.album }} ({{ rotation_entry.year }})
-    </p>
+<p class="rotation-entry-album">
+{{ rotation_entry.album }}{% if rotation_entry.year %} ({{ rotation_entry.year }}){% endif %}
+</p>
     {% if rotation_entry.note %}
       <p class="rotation-entry-note">{{ rotation_entry.note }}</p>
     {% endif %}

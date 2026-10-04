@@ -2,7 +2,7 @@
 
 use musicfeed::AppState;
 use musicfeed::Application;
-use musicfeed::configuration::get_configuration;
+use musicfeed::configuration::{MetadataSettings, get_configuration};
 use musicfeed::telemetry::{get_subscriber, init_subscriber};
 use std::sync::LazyLock;
 
@@ -24,11 +24,37 @@ pub struct TestApp {
     pub address: String,
     pub port: u16,
     pub api_client: reqwest::Client,
+    /// The metadata stubs, kept alive for as long as the app under test.
+    /// Dropping a `MockServer` shuts it down, so these must outlive every request.
+    pub metadata_stub: crate::metadata_stub::MetadataStubs,
 }
 
+/// Spin up the app with the metadata services stubbed.
+///
+/// **Default for every test.** Pointing at a local stub keeps the suite fast and
+/// hermetic: no network, no rate limits, and no failing tests because
+/// MusicBrainz is briefly unhappy. The stub defaults to a plain miss, so a
+/// lookup yields no cover or year — which most tests do not care about.
+///
+/// To register a specific response, start a `MockServer`, mount your mocks on it,
+/// and call [`spawn_app_against`] with it.
 pub async fn spawn_app() -> TestApp {
+    let stub = crate::metadata_stub::MetadataStubs::miss().await;
+    spawn_app_against(stub).await
+}
+
+/// Spin up the app pointed at an already-configured metadata stub.
+///
+/// Takes the stub by value so it can be stored on the returned [`TestApp`],
+/// which keeps it alive for the duration of the test.
+pub async fn spawn_app_against(metadata_stub: crate::metadata_stub::MetadataStubs) -> TestApp {
     LazyLock::force(&TRACING);
-    let app_state = AppState::default();
+
+    let app_state = AppState::new(&MetadataSettings {
+        musicbrainz_base_url: metadata_stub.musicbrainz.uri(),
+        cover_art_base_url: metadata_stub.cover_art.uri(),
+    });
+
     let configuration = get_configuration().expect("Failed to read configuration");
     let app_address = format!("{}:{}", configuration.application.host, 0);
 
@@ -46,11 +72,10 @@ pub async fn spawn_app() -> TestApp {
         .build()
         .unwrap();
 
-    let test_app = TestApp {
+    TestApp {
         address: format!("http://localhost:{}", application_port),
         port: application_port,
         api_client: client,
-    };
-
-    test_app
+        metadata_stub,
+    }
 }

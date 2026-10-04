@@ -1,15 +1,14 @@
 // tests/api/rotation.rs
 
-use crate::helpers::spawn_app;
+use crate::helpers::{spawn_app, spawn_app_against};
 
 use reqwest::StatusCode;
 
+/// Only what the form actually sends. `cover` and `year` are looked up, not typed.
 fn payload() -> serde_json::Value {
     serde_json::json!({
         "artist": "Sabaton",
         "album": "Attero Dominatus",
-        "cover": "/static/images/covers/attero-dominatus.jpg",
-        "year": 2006,
         "note": "A co-worker turned me on to Sabaton in early 2022."
     })
 }
@@ -101,8 +100,10 @@ async fn cleared_signals_must_be_deserializable() {
 }
 #[tokio::test]
 async fn posted_entry_appears_in_index_list() {
-    // Arrange
-    let app = spawn_app().await;
+    // Arrange — a stubbed hit, so the entry has a year to assert on
+    let mb_id = "b4974b0b-305e-4f98-b16d-04112f3cced2";
+    let stubs = crate::metadata_stub::MetadataStubs::full_hit(mb_id).await;
+    let app = spawn_app_against(stubs).await;
 
     // Act
     let _response = app
@@ -130,11 +131,12 @@ async fn posted_entry_appears_in_index_list() {
 }
 
 #[tokio::test]
-async fn empty_cover_and_note_are_omitted_rather_than_rendered_empty() {
-    // Arrange — a miss is legitimate, so blank fields must not become "" on the page
+async fn an_empty_note_is_omitted_rather_than_rendered_empty() {
+    // Arrange — a blank note is legitimate, so it must not become an empty
+    // paragraph on the page. `cover` and `year` are looked up, not sent, so
+    // there is nothing for them here.
     let app = spawn_app().await;
     let mut body = payload();
-    body["cover"] = serde_json::json!("");
     body["note"] = serde_json::json!("");
 
     // Act
@@ -146,7 +148,7 @@ async fn empty_cover_and_note_are_omitted_rather_than_rendered_empty() {
         .await
         .expect("Failed to execute request.");
 
-    // Assert — the entry still saves, it just carries no cover or note markup
+    // Assert — the entry still saves, it just carries no note markup
     assert!(response.status().is_success());
     let sse_body = response.text().await.unwrap();
     assert!(sse_body.contains("Sabaton"));
@@ -157,13 +159,15 @@ async fn empty_cover_and_note_are_omitted_rather_than_rendered_empty() {
 }
 
 #[tokio::test]
-async fn non_numeric_year_is_rejected_by_the_framework() {
+async fn cover_and_year_cannot_be_supplied_by_the_client() {
     // Arrange
     let app = spawn_app().await;
     let mut body = payload();
-    body["year"] = serde_json::json!("not a year");
+    // Both are app-controlled now. A client that sends them must not win.
+    body["cover"] = serde_json::json!("/static/images/covers/someone-elses-choice.jpg");
+    body["year"] = serde_json::json!(1066);
 
-    // Act — no custom parsing is needed; serde rejects it before the handler runs
+    // Act
     let response = app
         .api_client
         .post(format!("{}/rotation", &app.address))
@@ -172,36 +176,8 @@ async fn non_numeric_year_is_rejected_by_the_framework() {
         .await
         .expect("Failed to execute request.");
 
-    // Assert
-    assert!(
-        !response.status().is_success(),
-        "a bad year should not be accepted, got {}",
-        response.status()
-    );
-}
-
-#[tokio::test]
-async fn cover_is_rendered_when_present_and_omitted_when_absent() {
-    // Arrange
-    let app = spawn_app().await;
-
-    // Act — one entry with a cover, one without
-    app.api_client
-        .post(format!("{}/rotation", &app.address))
-        .json(&payload())
-        .send()
-        .await
-        .expect("Failed to execute request.");
-    app.api_client
-        .post(format!("{}/rotation", &app.address))
-        .json(&serde_json::json!({
-            "artist": "Alestorm", "album": "Cocoon",
-            "cover": "", "year": 2020, "note": ""
-        }))
-        .send()
-        .await
-        .expect("Failed to execute request.");
-
+    // Assert — the entry is saved, but the forged values are ignored entirely.
+    assert!(response.status().is_success());
     let page = app
         .api_client
         .get(&app.address)
@@ -211,15 +187,216 @@ async fn cover_is_rendered_when_present_and_omitted_when_absent() {
         .text()
         .await
         .unwrap();
+    assert!(
+        !page.contains("someone-elses-choice"),
+        "a client-supplied cover was accepted:\n{page}"
+    );
+    assert!(
+        !page.contains("1066"),
+        "a client-supplied year was accepted:\n{page}"
+    );
+}
 
-    // Assert — the cover renders, and a missing cover never becomes an empty src
-    assert!(page.contains("rotation-entry-cover"), "page was: {page}");
-    assert!(page.contains("attero-dominatus.jpg"), "page was: {page}");
+#[tokio::test]
+async fn a_successful_lookup_fills_in_the_cover_and_year() {
+    // Arrange — a stubbed MusicBrainz hit, including a back cover so the
+    // front-cover filter is genuinely exercised.
+    let mb_id = "b4974b0b-305e-4f98-b16d-04112f3cced2";
+    let stubs = crate::metadata_stub::MetadataStubs::full_hit(mb_id).await;
+    let app = spawn_app_against(stubs).await;
+
+    // Act
+    let response = app
+        .api_client
+        .post(format!("{}/rotation", &app.address))
+        .json(&payload())
+        .send()
+        .await
+        .expect("Failed to execute request.");
+
+    // Assert — the entry carries the looked-up year and cover
+    assert!(response.status().is_success());
+    let page = app
+        .api_client
+        .get(&app.address)
+        .send()
+        .await
+        .expect("Failed to execute request")
+        .text()
+        .await
+        .unwrap();
+    assert!(
+        page.contains("rotation-entry-cover"),
+        "the cover was not rendered:\n{page}"
+    );
+    assert!(
+        page.contains("front-250.jpg"),
+        "the wrong thumbnail was chosen:\n{page}"
+    );
+    assert!(
+        page.contains("(2006)"),
+        "the looked-up year is missing:\n{page}"
+    );
+}
+
+#[tokio::test]
+async fn a_cover_is_absent_when_the_release_has_no_art() {
+    // Arrange — the release exists but the archive has nothing for it.
+    let mb_id = "bootleg-0001";
+    let stubs = crate::metadata_stub::MetadataStubs::start().await;
+    stubs.expect_no_art(mb_id).await;
+    let app = spawn_app_against(stubs).await;
+
+    // Act
+    let response = app
+        .api_client
+        .post(format!("{}/rotation", &app.address))
+        .json(&payload())
+        .send()
+        .await
+        .expect("Failed to execute request.");
+
+    // Assert — still saved, with the year but no image
+    assert!(response.status().is_success());
+    let page = app
+        .api_client
+        .get(&app.address)
+        .send()
+        .await
+        .expect("Failed to execute request")
+        .text()
+        .await
+        .unwrap();
+    assert!(
+        page.contains("(2006)"),
+        "the year should still land:\n{page}"
+    );
     assert!(
         !page.contains(r#"src="""#),
-        "a missing cover rendered an empty src: {page}"
+        "a missing cover rendered an empty src:\n{page}"
     );
-    assert!(page.contains("Alestorm"), "page was: {page}");
+    assert!(
+        !page.contains("rotation-entry-cover"),
+        "an image was rendered for a release with no art:\n{page}"
+    );
+}
+
+#[tokio::test]
+async fn a_failing_service_saves_the_entry_and_reports_it() {
+    // Arrange — every request errors. The entry must still be saved, and the
+    // user must be told why it arrived bare.
+    let stubs = crate::metadata_stub::MetadataStubs::failure().await;
+    let app = spawn_app_against(stubs).await;
+
+    // Act
+    let response = app
+        .api_client
+        .post(format!("{}/rotation", &app.address))
+        .json(&payload())
+        .send()
+        .await
+        .expect("Failed to execute request.");
+
+    // Assert — saved...
+    assert!(
+        response.status().is_success(),
+        "a failing metadata service must not block the save"
+    );
+    let body = response.text().await.unwrap();
+    let page = app
+        .api_client
+        .get(&app.address)
+        .send()
+        .await
+        .expect("Failed to execute request")
+        .text()
+        .await
+        .unwrap();
+    assert!(
+        page.contains("Sabaton"),
+        "the entry should be saved:\n{page}"
+    );
+
+    // ...and the user is told, via a signal patch
+    assert!(
+        body.contains("Could not look that up"),
+        "no status signal was sent:\n{body}"
+    );
+    assert!(
+        !body.contains(r#""year":0"#),
+        "a failed lookup produced a zero year:\n{body}"
+    );
+}
+
+#[tokio::test]
+async fn a_miss_is_silent_because_it_is_not_a_failure() {
+    // Arrange — nothing found. Different from an error, so no status message.
+    let stubs = crate::metadata_stub::MetadataStubs::miss().await;
+    let app = spawn_app_against(stubs).await;
+
+    // Act
+    let response = app
+        .api_client
+        .post(format!("{}/rotation", &app.address))
+        .json(&payload())
+        .send()
+        .await
+        .expect("Failed to execute request.");
+    let saved = response.status().is_success();
+    let body = response.text().await.unwrap();
+
+    // Assert — saved, and no scary status message
+    assert!(saved);
+    assert!(
+        !body.contains("Could not look that up"),
+        "a plain miss should not raise a status message:\n{body}"
+    );
+}
+
+#[tokio::test]
+async fn a_lookup_that_finds_nothing_still_saves_the_entry_bare() {
+    // Arrange — a stubbed miss. No network, no live service.
+    let stubs = crate::metadata_stub::MetadataStubs::miss().await;
+    let app = spawn_app_against(stubs).await;
+
+    // Act
+    let response = app
+        .api_client
+        .post(format!("{}/rotation", &app.address))
+        .json(&serde_json::json!({
+            "artist": "Zzz Nonexistent Artist Zzz",
+            "album": "Zzz Nonexistent Album Zzz",
+            "note": ""
+        }))
+        .send()
+        .await
+        .expect("Failed to execute request.");
+
+    // Assert — saved, just without a cover or year.
+    assert!(response.status().is_success());
+    let page = app
+        .api_client
+        .get(&app.address)
+        .send()
+        .await
+        .expect("Failed to execute request")
+        .text()
+        .await
+        .unwrap();
+    assert!(
+        page.contains("Zzz Nonexistent Artist Zzz"),
+        "the entry should save even when the lookup finds nothing:\n{page}"
+    );
+    // A missing cover must never render an empty src.
+    assert!(
+        !page.contains(r#"src="""#),
+        "a missing cover rendered an empty src:\n{page}"
+    );
+    // And no year at all — never zero.
+    assert!(
+        !page.contains("(0)"),
+        "a missing year rendered as zero:\n{page}"
+    );
 }
 
 #[tokio::test]
@@ -349,8 +526,7 @@ async fn every_posted_entry_appears_in_the_index_list() {
         app.api_client
             .post(format!("{}/rotation", &app.address))
             .json(&serde_json::json!({
-                "artist": artist, "album": album,
-                "cover": "", "year": 2000, "note": ""
+                "artist": artist, "album": album, "note": ""
             }))
             .send()
             .await
@@ -463,8 +639,7 @@ async fn random_entry_is_one_of_the_entered_entries() {
         app.api_client
             .post(format!("{}/rotation", &app.address))
             .json(&serde_json::json!({
-                "artist": artist, "album": "X",
-                "cover": "", "year": 2000, "note": ""
+                "artist": artist, "album": "X", "note": ""
             }))
             .send()
             .await
@@ -474,7 +649,7 @@ async fn random_entry_is_one_of_the_entered_entries() {
     // Act — ask for one
     let response = app
         .api_client
-        .get(format!("{}/rotation", &app.address)) // ← the endpoint you haven't built
+        .get(format!("{}/rotation", &app.address))
         .send()
         .await
         .unwrap();
