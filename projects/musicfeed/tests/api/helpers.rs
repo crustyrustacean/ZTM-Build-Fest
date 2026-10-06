@@ -23,7 +23,14 @@ static TRACING: LazyLock<()> = LazyLock::new(|| {
 pub struct TestApp {
     pub address: String,
     pub port: u16,
+    /// Sends Basic credentials, for the routes that require them.
     pub api_client: reqwest::Client,
+    /// Sends no credentials. GET routes are deliberately ungated — the blog
+    /// island fetches them from a static site that has nowhere to keep a secret —
+    /// so tests asserting on those routes must use this client. If it were to
+    /// send credentials anyway, a future regression that gated the GETs would
+    /// pass unnoticed.
+    pub unauthenticated_client: reqwest::Client,
     /// The metadata stubs, kept alive for as long as the app under test.
     /// Dropping a `MockServer` shuts it down, so these must outlive every request.
     pub metadata_stub: crate::metadata_stub::MetadataStubs,
@@ -50,13 +57,18 @@ pub async fn spawn_app() -> TestApp {
 pub async fn spawn_app_against(metadata_stub: crate::metadata_stub::MetadataStubs) -> TestApp {
     LazyLock::force(&TRACING);
 
-    let app_state = AppState::new(&MetadataSettings {
-        musicbrainz_base_url: metadata_stub.musicbrainz.uri(),
-        cover_art_base_url: metadata_stub.cover_art.uri(),
-    });
-
     let configuration = get_configuration().expect("Failed to read configuration");
     let app_address = format!("{}:{}", configuration.application.host, 0);
+
+    let app_state = AppState::new(
+        &MetadataSettings {
+            musicbrainz_base_url: metadata_stub.musicbrainz.uri(),
+            cover_art_base_url: metadata_stub.cover_art.uri(),
+        },
+        // The same credentials base.toml supplies, so the authenticated client
+        // below matches what the app under test expects.
+        &configuration.basicauth,
+    );
 
     let application = Application::build(&app_address, app_state)
         .await
@@ -67,7 +79,29 @@ pub async fn spawn_app_against(metadata_stub: crate::metadata_stub::MetadataStub
         .expect("Unable to obtain the application port");
     let _ = tokio::spawn(application.run_until_stopped());
 
-    let client = reqwest::Client::builder()
+    // Two clients, two purposes. The authenticated one sends the Basic
+    // credentials on every request; the bare one documents that the GETs are open.
+    // reqwest has no per-client credential setting, so the header is pre-computed
+    // once and attached as a default — the browser equivalent of a cached login.
+    use base64::Engine;
+    let encoded = base64::engine::general_purpose::STANDARD.encode(format!(
+        "{}:{}",
+        configuration.basicauth.username, configuration.basicauth.password
+    ));
+    let auth_header = format!("Basic {encoded}");
+
+    let api_client = reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .default_headers(
+            std::iter::once((
+                reqwest::header::AUTHORIZATION,
+                reqwest::header::HeaderValue::from_str(&auth_header).unwrap(),
+            ))
+            .collect(),
+        )
+        .build()
+        .unwrap();
+    let unauthenticated_client = reqwest::Client::builder()
         .redirect(reqwest::redirect::Policy::none())
         .build()
         .unwrap();
@@ -75,7 +109,8 @@ pub async fn spawn_app_against(metadata_stub: crate::metadata_stub::MetadataStub
     TestApp {
         address: format!("http://localhost:{}", application_port),
         port: application_port,
-        api_client: client,
+        api_client,
+        unauthenticated_client,
         metadata_stub,
     }
 }

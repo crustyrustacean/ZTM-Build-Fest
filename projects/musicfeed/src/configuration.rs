@@ -6,6 +6,7 @@ use serde::Deserialize;
 pub struct Settings {
     pub application: ApplicationSettings,
     pub metadata: MetadataSettings,
+    pub basicauth: BasicAuthSettings,
 }
 
 #[derive(Deserialize)]
@@ -19,6 +20,12 @@ pub struct MetadataSettings {
     /// Overridable so a test can point both services at a local stub.
     pub musicbrainz_base_url: String,
     pub cover_art_base_url: String,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct BasicAuthSettings {
+    pub username: String,
+    pub password: String,
 }
 
 pub fn get_configuration() -> Result<Settings, config::ConfigError> {

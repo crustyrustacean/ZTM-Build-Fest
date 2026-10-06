@@ -1,6 +1,6 @@
 // src/state.rs
 
-use crate::configuration::MetadataSettings;
+use crate::configuration::{BasicAuthSettings, MetadataSettings};
 use crate::domain::RotationEntry;
 use crate::metadata::MetadataClient;
 use std::sync::Arc;
@@ -15,10 +15,14 @@ pub struct AppState {
     /// Held here rather than constructed per request so the underlying
     /// connection pool is reused. Cheap to clone, no global state.
     pub metadata: MetadataClient,
+    pub basicauth: BasicAuthSettings,
 }
 
 impl AppState {
-    pub fn new(metadata_settings: &MetadataSettings) -> Self {
+    pub fn new(
+        metadata_settings: &MetadataSettings,
+        basicauth_settings: &BasicAuthSettings,
+    ) -> Self {
         let mut tera = Tera::default();
         tera.load_from_glob("templates/**/*.html")
             .expect("Unable to load the Tera templates.");
@@ -31,6 +35,7 @@ impl AppState {
                 metadata_settings.musicbrainz_base_url.clone(),
                 metadata_settings.cover_art_base_url.clone(),
             ),
+            basicauth: basicauth_settings.to_owned(),
         }
     }
 }

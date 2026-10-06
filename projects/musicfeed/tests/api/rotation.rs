@@ -2,6 +2,7 @@
 
 use crate::helpers::{spawn_app, spawn_app_against};
 
+use base64::Engine;
 use reqwest::StatusCode;
 
 /// Only what the form actually sends. `cover` and `year` are looked up, not typed.
@@ -604,19 +605,22 @@ async fn random_entry_with_no_entries_returns_404() {
     // Arrange — a fresh app has nothing in its rotation
     let app = spawn_app().await;
 
-    // Act — ask for one anyway
+    // Assert — a 404, not a dropped connection.
+    //
+    // Uses the unauthenticated client on purpose: the blog island fetches this
+    // route from a static site, so it must stay open. A regression that gates it
+    // would show up here as a 401 instead.
+    //
+    // This is also the case that catches a missing emptiness guard: drawing a random
+    // index from an empty range panics, so the request is killed mid-response and the
+    // client sees a transport error rather than any status at all.
     let response = app
-        .api_client
+        .unauthenticated_client
         .get(format!("{}/rotation", &app.address))
         .send()
         .await
         .expect("Failed to execute request.");
 
-    // Assert — a 404, not a dropped connection.
-    //
-    // This is the case that catches a missing emptiness guard: drawing a random
-    // index from an empty range panics, so the request is killed mid-response and the
-    // client sees a transport error rather than any status at all.
     assert_eq!(
         response.status(),
         StatusCode::NOT_FOUND,
@@ -649,19 +653,98 @@ async fn random_entry_is_one_of_the_entered_entries() {
             .unwrap();
     }
 
-    // Act — ask for one
+    // Act — ask for one, sending no credentials: the island needs this open.
     let response = app
-        .api_client
+        .unauthenticated_client
         .get(format!("{}/rotation", &app.address))
         .send()
         .await
         .unwrap();
 
-    // Assert — 200, and the artist is one we entered
+    // Assert — 200 without credentials, because the island must stay readable.
     assert!(response.status().is_success());
     let body = response.text().await.unwrap();
     assert!(
         body.contains("rotation-artist"),
         "expected a rendered entry, got: {body}"
+    );
+}
+
+#[tokio::test]
+async fn posting_without_credentials_is_rejected() {
+    // The blog island can read, but only the owner should be able to write.
+    // A POST with no Authorization header must get a 401 — and specifically a
+    // 401 carrying WWW-Authenticate, which is what makes a browser render its
+    // native login box rather than showing a blank error.
+    let app = spawn_app().await;
+
+    let response = app
+        .unauthenticated_client
+        .post(format!("{}/rotation", &app.address))
+        .json(&payload())
+        .send()
+        .await
+        .expect("Failed to execute request.");
+
+    assert_eq!(
+        response.status(),
+        StatusCode::UNAUTHORIZED,
+        "an unauthenticated POST must not reach the handler"
+    );
+    let challenge = response
+        .headers()
+        .get("www-authenticate")
+        .expect("401 must carry WWW-Authenticate or no browser login box appears")
+        .to_str()
+        .unwrap();
+    assert!(
+        challenge.starts_with("Basic"),
+        "expected a Basic challenge, got: {challenge}"
+    );
+}
+
+#[tokio::test]
+async fn posting_with_wrong_credentials_is_rejected() {
+    // Presence of a header is not enough — the comparison must actually compare.
+    // This is the test that catches an implementation that decodes and forgets
+    // to check, which would accept any well-formed credentials.
+    let app = spawn_app().await;
+
+    let encoded = base64::engine::general_purpose::STANDARD.encode("test:wrongpass");
+    let response = app
+        .unauthenticated_client
+        .post(format!("{}/rotation", &app.address))
+        .header("Authorization", format!("Basic {encoded}"))
+        .json(&payload())
+        .send()
+        .await
+        .expect("Failed to execute request.");
+
+    assert_eq!(
+        response.status(),
+        StatusCode::UNAUTHORIZED,
+        "wrong credentials must be rejected, got {}",
+        response.status()
+    );
+}
+
+#[tokio::test]
+async fn the_index_page_stays_open() {
+    // The form lives on `/` and is fetched before any login happens. It is not
+    // gated — the browser will challenge on the first POST instead — so a GET
+    // with no credentials must still render the page.
+    let app = spawn_app().await;
+
+    let response = app
+        .unauthenticated_client
+        .get(&app.address)
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    assert_eq!(
+        response.status(),
+        StatusCode::OK,
+        "the form page should load before authentication"
     );
 }

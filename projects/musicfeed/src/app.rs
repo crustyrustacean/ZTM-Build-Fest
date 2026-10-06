@@ -1,6 +1,7 @@
 // src/app.rs
 
 use crate::AppState;
+use crate::middleware::basic_auth;
 use crate::routes::{get_index_page, get_rotation_entry, health_check, post_rotation_entry_ds};
 use crate::shutdown_signal;
 use crate::telemetry::{MakeRequestUuid, request_span};
@@ -10,6 +11,7 @@ use axum::{
         HeaderName, Method,
         header::{ACCEPT, CONTENT_TYPE},
     },
+    middleware,
     routing::{get, post},
 };
 use tokio::net::TcpListener;
@@ -79,7 +81,11 @@ pub fn build_router(state: AppState) -> Router {
         .route("/", get(get_index_page))
         .route("/health_check", get(health_check))
         .route("/rotation", get(get_rotation_entry))
-        .route("/rotation", post(post_rotation_entry_ds))
+        .route(
+            "/rotation",
+            post(post_rotation_entry_ds)
+                .layer(middleware::from_fn_with_state(state.clone(), basic_auth)),
+        )
         .layer(
             ServiceBuilder::new()
                 .layer(SetRequestIdLayer::new(

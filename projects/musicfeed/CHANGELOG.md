@@ -9,6 +9,51 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 Nothing yet.
 
+## [0.4.0] - 2026-10-06
+
+The write path is gated. Posting an entry now requires Basic credentials, and the browser
+asks for them itself — no login page, no form changes.
+
+### Added
+
+- `basic_auth` middleware (`src/middleware.rs`), attached to `POST /rotation` only via
+  `from_fn_with_state`. Parses the `Authorization` header through six stages — header present,
+  valid text, `Basic ` scheme, base64, UTF-8, split on the first colon — with every failure
+  converging on the same 401. Implemented by hand rather than via `axum-extra`'s
+  `ValidateRequestHeader`, because the point was to understand the mechanism.
+- The 401 carries `WWW-Authenticate: Basic realm="musicfeed"`, which is what makes a browser
+  render its own native login box. The form needs no changes: the browser prompts on the first
+  POST, caches the credentials, and replays the request with them attached.
+- `[basicauth]` configuration section and `BasicAuthSettings`, threaded through
+  `AppState::new` following the existing `metadata` precedent. Local defaults are `test`/`test`;
+  production reads real values from `APP_BASICAUTH__USERNAME` / `APP_BASICAUTH__PASSWORD` on
+  Railway.
+- Tests: 47 passing. The harness now builds two clients — one authenticated, one bare — so the
+  suite documents which routes are protected. New cases cover no credentials (asserting the
+  `WWW-Authenticate` header is present, not just the status, because a bare 401 would pass the
+  status check while breaking the browser login box), wrong credentials (catching an
+  implementation that decodes but forgets to compare), and the index page staying open.
+
+### Notes
+
+- Basic auth over sessions is deliberate. There is exactly one authorised user, the credential
+  lives in an environment variable rather than a database, and the app is stateless by design —
+  a session store would break across the serverless sleep cycles. "Never use basic auth" is
+  consumer-product advice (password resets, MFA, many users) that does not reach a single-user
+  gate over HTTPS. The known costs — no logout except closing the browser, and rotation being
+  the real remedy for a stale credential — are accepted.
+- `GET /` and `GET /rotation` stay open on purpose. The blog island fetches the latter from a
+  static site that has nowhere to keep a secret, and the form needs to load before any login
+  happens. CORS already restricts the write path to browsers; this closes the `curl` hole.
+
+### Known issues
+
+- Storage is in memory, so every deploy empties the rotation.
+- `allow_origin(Any)` still permits any site to read the rotation.
+- *Invincible Shield* resolves to a release MusicBrainz has no artwork for, so it renders without
+  a cover or year.
+- The `year` field does not visually clear after submission in Firefox.
+
 ## [0.3.1] - 2026-10-04
 
 The API is deployed and serving the blog from production.
@@ -159,7 +204,8 @@ Initial scaffold, renamed from the `axum-tera-datastar` starter.
   tracing, and graceful shutdown.
 - `GET /health_check` and a starter to-do demo.
 
-[Unreleased]: https://github.com/crustyrustacean/ZTM-Build-Fest/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/crustyrustacean/ZTM-Build-Fest/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/crustyrustacean/ZTM-Build-Fest/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/crustyrustacean/ZTM-Build-Fest/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/crustyrustacean/ZTM-Build-Fest/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/crustyrustacean/ZTM-Build-Fest/releases/tag/musicfeed-v0.2.0

@@ -9,3 +9,7 @@ port = 8000
 # hot path until that is accounted for.
 musicbrainz_base_url = "https://musicbrainz.org/ws/2"
 cover_art_base_url = "https://coverartarchive.org"
+
+[basicauth]
+username = "test"
+password = "test"

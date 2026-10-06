@@ -1028,11 +1028,12 @@ checksum = "743fb55ba31b18fb1ecef6bdc9aa2743314978ac084044301a7eee33fb99a20d"
 
 [[package]]
 name = "musicfeed"
-version = "0.3.1"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "axum",
  "axum-macros",
+ "base64 0.23.1",
  "chrono",
  "config",
  "datastar",
