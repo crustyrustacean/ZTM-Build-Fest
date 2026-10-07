@@ -7,6 +7,38 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-07
+
+Missing metadata is no longer permanent. A background healer wakes with the process,
+re-runs the metadata lookup for entries saved without cover art or a release year,
+and writes back whatever it finds.
+
+### Added
+
+- `heal_attempts` column (migration 2): the worker's memory of failure. Entries at or
+  over the cap drop out of the candidate query, so permanently-unfindable albums are
+  left alone instead of retried forever. Success resets the counter.
+- `list_incomplete` / `update_metadata` / `record_heal_failure` on `DatabaseBackend` —
+  the healer's entire storage surface.
+- `src/healer.rs`: `heal_once` (one candidate pass: lookup, write back, count) and
+  `spawn_healer` (spawned at startup — pass one fires on wake, then a pass every
+  `interval_secs`).
+- `[healing]` configuration: `enabled` (kill switch via `APP_HEALING__ENABLED=false`),
+  `interval_secs = 900`, `max_attempts = 3`, `per_pass = 3`.
+
+### Changed
+
+- `main.rs` spawns the healer alongside the server. A sleeping container wakes when
+  the blog widget GETs, the process starts, and pass one fires — readership is the de
+  facto scheduler.
+- Politeness budget: at most 3 lookups per pass, one pass per 15 minutes.
+
+### Notes
+
+- The first deployed entry — saved during a Cover Art Archive outage — is the
+  healer's first real patient.
+- A pass interrupted by a restart is redone on the next start; nothing is lost.
+
 ## [0.5.0] - 2026-10-07
 
 The rotation survives restarts, deploys, and Railway sleep cycles. The oldest known issue —

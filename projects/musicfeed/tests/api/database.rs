@@ -188,7 +188,9 @@ async fn list_incomplete_returns_only_entries_missing_metadata() {
     repo.insert(partial).await.expect("insert");
 
     // bare: nothing present
-    repo.insert(entry("Motörhead", "Ace of Spades")).await.expect("insert");
+    repo.insert(entry("Motörhead", "Ace of Spades"))
+        .await
+        .expect("insert");
 
     let candidates = repo.list_incomplete(5, 10).await.expect("list_incomplete");
 
@@ -209,7 +211,10 @@ async fn list_incomplete_respects_the_attempt_cap() {
     repo.record_heal_failure(inserted.id).await.expect("record");
 
     let capped = repo.list_incomplete(3, 10).await.expect("list at the cap");
-    assert!(capped.is_empty(), "an entry at the cap must drop out of the candidates");
+    assert!(
+        capped.is_empty(),
+        "an entry at the cap must drop out of the candidates"
+    );
 
     let lenient = repo.list_incomplete(4, 10).await.expect("lenient list");
     assert_eq!(lenient.len(), 1, "the entry returns once the cap is raised");
@@ -233,7 +238,10 @@ async fn update_metadata_fills_fields_and_resets_attempts() {
     .expect("update");
 
     let candidates = repo.list_incomplete(5, 10).await.expect("list_incomplete");
-    assert!(candidates.is_empty(), "a healed entry is no longer a candidate");
+    assert!(
+        candidates.is_empty(),
+        "a healed entry is no longer a candidate"
+    );
 
     let listed = repo.list().await.expect("list");
     assert_eq!(
