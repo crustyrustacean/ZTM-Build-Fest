@@ -39,7 +39,10 @@ RUN apt-get update -y \
     && apt-get clean -y \
     && rm -rf /var/lib/apt/lists/*
 # `get_configuration` reads configuration/, `AppState::new` globs templates/
-# from the working directory, and the datastar client is served from static/.
+# and the datastar client is served from static/. migrations/ is NOT copied:
+# sqlx::migrate!("./migrations") embeds the SQL at compile time, so the
+# binary carries its own schema. Consequence worth knowing — changing a
+# migration requires a rebuild, not just a new file in a running image.
 COPY --from=builder /app/target/release/musicfeed musicfeed
 COPY configuration configuration
 COPY static static
