@@ -1,5 +1,6 @@
 // tests/api/main.rs
 
+mod database;
 mod health_check;
 mod helpers;
 mod index;

@@ -1,2 +1,8 @@
 [application]
 host = "0.0.0.0"
+
+[database]
+# Interim: container-local until the Railway volume is mounted (Phase 3).
+# Flipping this to /data/musicfeed.db happens with the volume, not before —
+# SQLite cannot create a file inside a directory that is not there.
+path = "musicfeed.db"

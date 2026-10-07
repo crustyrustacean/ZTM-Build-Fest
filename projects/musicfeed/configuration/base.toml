@@ -13,3 +13,8 @@ cover_art_base_url = "https://coverartarchive.org"
 [basicauth]
 username = "test"
 password = "test"
+
+[database]
+# Created on first run; survives between runs by design (v0.5.0).
+path = "musicfeed.db"
+max_connections = 5

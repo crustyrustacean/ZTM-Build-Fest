@@ -2,7 +2,7 @@
 
 use musicfeed::AppState;
 use musicfeed::Application;
-use musicfeed::configuration::{MetadataSettings, get_configuration};
+use musicfeed::configuration::{DatabaseSettings, MetadataSettings, get_configuration};
 use musicfeed::telemetry::{get_subscriber, init_subscriber};
 use std::sync::LazyLock;
 
@@ -34,6 +34,9 @@ pub struct TestApp {
     /// The metadata stubs, kept alive for as long as the app under test.
     /// Dropping a `MockServer` shuts it down, so these must outlive every request.
     pub metadata_stub: crate::metadata_stub::MetadataStubs,
+    /// The store's scratch directory. Held (not merely remembered) so the
+    /// SQLite file exists for as long as the app under test does.
+    pub database_dir: tempfile::TempDir,
 }
 
 /// Spin up the app with the metadata services stubbed.
@@ -60,6 +63,14 @@ pub async fn spawn_app_against(metadata_stub: crate::metadata_stub::MetadataStub
     let configuration = get_configuration().expect("Failed to read configuration");
     let app_address = format!("{}:{}", configuration.application.host, 0);
 
+    // One throwaway store per app. A fresh file per test keeps the suite
+    // parallel-safe: no test can see another's rotation.
+    let database_dir = tempfile::tempdir().expect("Failed to create a temp directory");
+    let database_settings = DatabaseSettings {
+        path: database_dir.path().join("test.db").display().to_string(),
+        max_connections: Some(1),
+    };
+
     let app_state = AppState::new(
         &MetadataSettings {
             musicbrainz_base_url: metadata_stub.musicbrainz.uri(),
@@ -68,7 +79,10 @@ pub async fn spawn_app_against(metadata_stub: crate::metadata_stub::MetadataStub
         // The same credentials base.toml supplies, so the authenticated client
         // below matches what the app under test expects.
         &configuration.basicauth,
-    );
+        &database_settings,
+    )
+    .await
+    .expect("Failed to construct the application state");
 
     let application = Application::build(&app_address, app_state)
         .await
@@ -77,7 +91,9 @@ pub async fn spawn_app_against(metadata_stub: crate::metadata_stub::MetadataStub
     let application_port = application
         .port()
         .expect("Unable to obtain the application port");
-    let _ = tokio::spawn(application.run_until_stopped());
+    // Spawn-and-forget: the server runs until the test process ends. The
+    // JoinHandle is dropped on purpose — nothing joins a test server.
+    tokio::spawn(application.run_until_stopped());
 
     // Two clients, two purposes. The authenticated one sends the Basic
     // credentials on every request; the bare one documents that the GETs are open.
@@ -112,5 +128,6 @@ pub async fn spawn_app_against(metadata_stub: crate::metadata_stub::MetadataStub
         api_client,
         unauthenticated_client,
         metadata_stub,
+        database_dir,
     }
 }
