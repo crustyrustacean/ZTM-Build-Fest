@@ -47,4 +47,24 @@ pub trait DatabaseBackend: Send + Sync {
     /// One uniformly-random entry. `NotFound` when the store is empty: the
     /// empty-rotation 404 contract lives here now, not in the route.
     async fn random(&self) -> Result<RotationEntry, DatabaseError>;
+
+    /// Candidates for the metadata healer: entries where cover or year is
+    /// NULL, excluding any that have burned `max_attempts` failed lookups.
+    async fn list_incomplete(
+        &self,
+        max_attempts: u32,
+        limit: i64,
+    ) -> Result<Vec<RotationEntry>, DatabaseError>;
+
+    /// Write back what a healed lookup found, and clear the attempt counter —
+    /// success wipes the slate.
+    async fn update_metadata(
+        &self,
+        id: u64,
+        cover: Option<String>,
+        year: Option<i32>,
+    ) -> Result<(), DatabaseError>;
+
+    /// Record that a heal attempt found nothing for this entry.
+    async fn record_heal_failure(&self, id: u64) -> Result<(), DatabaseError>;
 }

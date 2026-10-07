@@ -167,3 +167,101 @@ async fn entries_survive_closing_and_reopening_the_database() {
     let albums: Vec<&str> = listed.iter().map(|e| e.album.as_str()).collect();
     assert_eq!(albums, ["Invincible Shield", "To Mega Therion"]);
 }
+
+// ---------------------------------------------------------------------------
+// Healing store: candidates, metadata writes, attempt counter
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn list_incomplete_returns_only_entries_missing_metadata() {
+    let (_dir, repo) = store().await;
+
+    // complete: cover and year both present — not a candidate
+    let mut complete = entry("Judas Priest", "Invincible Shield");
+    complete.cover = Some("http://coverartarchive.org/front.jpg".to_string());
+    complete.year = Some(2024);
+    repo.insert(complete).await.expect("insert");
+
+    // partial: cover present, year missing
+    let mut partial = entry("Celtic Frost", "To Mega Therion");
+    partial.cover = Some("http://coverartarchive.org/front.jpg".to_string());
+    repo.insert(partial).await.expect("insert");
+
+    // bare: nothing present
+    repo.insert(entry("Motörhead", "Ace of Spades")).await.expect("insert");
+
+    let candidates = repo.list_incomplete(5, 10).await.expect("list_incomplete");
+
+    let albums: Vec<&str> = candidates.iter().map(|e| e.album.as_str()).collect();
+    assert_eq!(albums, ["To Mega Therion", "Ace of Spades"]);
+}
+
+#[tokio::test]
+async fn list_incomplete_respects_the_attempt_cap() {
+    let (_dir, repo) = store().await;
+    let inserted = repo
+        .insert(entry("Celtic Frost", "To Mega Therion"))
+        .await
+        .expect("insert");
+
+    repo.record_heal_failure(inserted.id).await.expect("record");
+    repo.record_heal_failure(inserted.id).await.expect("record");
+    repo.record_heal_failure(inserted.id).await.expect("record");
+
+    let capped = repo.list_incomplete(3, 10).await.expect("list at the cap");
+    assert!(capped.is_empty(), "an entry at the cap must drop out of the candidates");
+
+    let lenient = repo.list_incomplete(4, 10).await.expect("lenient list");
+    assert_eq!(lenient.len(), 1, "the entry returns once the cap is raised");
+}
+
+#[tokio::test]
+async fn update_metadata_fills_fields_and_resets_attempts() {
+    let (_dir, repo) = store().await;
+    let inserted = repo
+        .insert(entry("Celtic Frost", "To Mega Therion"))
+        .await
+        .expect("insert");
+
+    repo.record_heal_failure(inserted.id).await.expect("record");
+    repo.update_metadata(
+        inserted.id,
+        Some("http://coverartarchive.org/front.jpg".to_string()),
+        Some(2006),
+    )
+    .await
+    .expect("update");
+
+    let candidates = repo.list_incomplete(5, 10).await.expect("list_incomplete");
+    assert!(candidates.is_empty(), "a healed entry is no longer a candidate");
+
+    let listed = repo.list().await.expect("list");
+    assert_eq!(
+        listed[0].cover.as_deref(),
+        Some("http://coverartarchive.org/front.jpg")
+    );
+    assert_eq!(listed[0].year, Some(2006));
+}
+
+#[tokio::test]
+async fn record_heal_failure_increments_the_attempt_counter() {
+    let (_dir, repo) = store().await;
+    let inserted = repo
+        .insert(entry("Motörhead", "Ace of Spades"))
+        .await
+        .expect("insert");
+
+    // attempts=0 < cap 1 → still a candidate
+    let at_cap_one = repo.list_incomplete(1, 10).await.expect("list");
+    assert_eq!(at_cap_one.len(), 1);
+
+    repo.record_heal_failure(inserted.id).await.expect("record");
+
+    // attempts=1, cap 1 → aged out
+    let aged_out = repo.list_incomplete(1, 10).await.expect("list");
+    assert!(aged_out.is_empty(), "an entry at the cap must be excluded");
+
+    // raise the cap → candidate again
+    let under_cap = repo.list_incomplete(2, 10).await.expect("list");
+    assert_eq!(under_cap.len(), 1);
+}

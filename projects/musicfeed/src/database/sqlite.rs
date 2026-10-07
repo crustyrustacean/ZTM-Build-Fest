@@ -124,4 +124,59 @@ impl DatabaseBackend for SqliteRepository {
 
         Ok(row.into())
     }
+
+    async fn list_incomplete(
+        &self,
+        max_attempts: u32,
+        limit: i64,
+    ) -> Result<Vec<RotationEntry>, DatabaseError> {
+        let rows = sqlx::query_as::<_, RotationEntryRow>(
+            "SELECT id, listened_date, artist, album, cover, year, note \
+             FROM rotation_entries \
+             WHERE (cover IS NULL OR year IS NULL) AND heal_attempts < ?1 \
+             ORDER BY id LIMIT ?2",
+        )
+        .bind(max_attempts)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await
+        .context("failed to list incomplete rotation entries")?;
+
+        Ok(rows.into_iter().map(Into::into).collect())
+    }
+
+    async fn update_metadata(
+        &self,
+        id: u64,
+        cover: Option<String>,
+        year: Option<i32>,
+    ) -> Result<(), DatabaseError> {
+        sqlx::query(
+            "UPDATE rotation_entries \
+             SET cover = ?1, year = ?2, heal_attempts = 0 \
+             WHERE id = ?3",
+        )
+        .bind(cover)
+        .bind(year)
+        .bind(i64::try_from(id).context("rotation entry id overflowed i64")?)
+        .execute(&self.pool)
+        .await
+        .context("failed to update rotation entry metadata")?;
+
+        Ok(())
+    }
+
+    async fn record_heal_failure(&self, id: u64) -> Result<(), DatabaseError> {
+        sqlx::query(
+            "UPDATE rotation_entries \
+             SET heal_attempts = heal_attempts + 1 \
+             WHERE id = ?1",
+        )
+        .bind(i64::try_from(id).context("rotation entry id overflowed i64")?)
+        .execute(&self.pool)
+        .await
+        .context("failed to record heal failure")?;
+
+        Ok(())
+    }
 }
