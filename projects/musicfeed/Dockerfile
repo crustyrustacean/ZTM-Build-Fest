@@ -47,8 +47,5 @@ COPY --from=builder /app/target/release/musicfeed musicfeed
 COPY configuration configuration
 COPY static static
 COPY templates templates
-# The store lives on a mounted volume (Railway), not in the image layers — a
-# declaration for humans; the mount itself is provisioned outside Docker.
-VOLUME /data
 ENV APP_ENVIRONMENT=production
 ENTRYPOINT ["./musicfeed"]
