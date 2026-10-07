@@ -2,7 +2,7 @@
 host = "0.0.0.0"
 
 [database]
-# Interim: container-local until the Railway volume is mounted (Phase 3).
-# Flipping this to /data/musicfeed.db happens with the volume, not before —
-# SQLite cannot create a file inside a directory that is not there.
-path = "musicfeed.db"
+# On the Railway volume, so entries survive restarts, deploys, and sleeps.
+# Provisioning the mount at /data is what makes this path real — flipping it
+# before the volume exists would crash SQLite against a missing directory.
+path = "/data/musicfeed.db"
