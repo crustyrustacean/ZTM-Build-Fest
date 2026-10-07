@@ -84,6 +84,62 @@ pub async fn spawn_app_against(metadata_stub: crate::metadata_stub::MetadataStub
     .await
     .expect("Failed to construct the application state");
 
+    build_test_app(
+        app_address,
+        app_state,
+        metadata_stub,
+        &configuration.basicauth,
+        database_dir,
+    )
+    .await
+}
+
+/// Spin up the app over a *specific* store file.
+///
+/// The persistence test's needs: spawn an application, post an entry, drop it,
+/// spawn a second application over the same file, and assert the entry
+/// survived. Nothing else in the harness cares about the path.
+pub async fn spawn_app_at(db_path: impl AsRef<std::path::Path>) -> TestApp {
+    LazyLock::force(&TRACING);
+
+    let configuration = get_configuration().expect("Failed to read configuration");
+    let app_address = format!("{}:{}", configuration.application.host, 0);
+
+    let database_settings = DatabaseSettings {
+        path: db_path.as_ref().display().to_string(),
+        max_connections: Some(1),
+    };
+
+    let stub = crate::metadata_stub::MetadataStubs::miss().await;
+    let app_state = AppState::new(
+        &MetadataSettings {
+            musicbrainz_base_url: stub.musicbrainz.uri(),
+            cover_art_base_url: stub.cover_art.uri(),
+        },
+        &configuration.basicauth,
+        &database_settings,
+    )
+    .await
+    .expect("Failed to construct the application state");
+
+    build_test_app(
+        app_address,
+        app_state,
+        stub,
+        &configuration.basicauth,
+        tempfile::tempdir().expect("temp dir"),
+    )
+    .await
+}
+
+/// Shared construction: bind port 0, spawn the server, build the clients.
+async fn build_test_app(
+    app_address: String,
+    app_state: AppState,
+    metadata_stub: crate::metadata_stub::MetadataStubs,
+    basicauth: &musicfeed::configuration::BasicAuthSettings,
+    database_dir: tempfile::TempDir,
+) -> TestApp {
     let application = Application::build(&app_address, app_state)
         .await
         .expect("Unable to build the application");
@@ -100,10 +156,8 @@ pub async fn spawn_app_against(metadata_stub: crate::metadata_stub::MetadataStub
     // reqwest has no per-client credential setting, so the header is pre-computed
     // once and attached as a default — the browser equivalent of a cached login.
     use base64::Engine;
-    let encoded = base64::engine::general_purpose::STANDARD.encode(format!(
-        "{}:{}",
-        configuration.basicauth.username, configuration.basicauth.password
-    ));
+    let encoded = base64::engine::general_purpose::STANDARD
+        .encode(format!("{}:{}", basicauth.username, basicauth.password));
     let auth_header = format!("Basic {encoded}");
 
     let api_client = reqwest::Client::builder()

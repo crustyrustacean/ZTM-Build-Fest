@@ -5,4 +5,5 @@ mod health_check;
 mod helpers;
 mod index;
 mod metadata_stub;
+mod persistence;
 mod rotation;
