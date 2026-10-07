@@ -7,7 +7,44 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-Nothing yet.
+## [0.5.0] - 2026-10-07
+
+The rotation survives restarts, deploys, and Railway sleep cycles. The oldest known issue —
+"storage is in memory, so every deploy empties the rotation" — is closed.
+
+### Added
+
+- A persistence layer, borrowed in shape from the metallian-photos database layer: a
+  `DatabaseBackend` trait (`insert` / `list` / `random`) that routes code against, and a
+  `SqliteRepository` implementation on `sqlx` behind it. The trait is the expansion seam for
+  tracking listening habits later — one migration for an events table, new trait methods,
+  nothing else moves.
+- Embedded SQLx migrations (`migrations/`): `rotation_entries` mirrors the domain struct, with
+  sequential `INTEGER PRIMARY KEY` ids preserving the u64 ids the templates and API expose.
+- `DatabaseSettings` (`[database]` path + optional `max_connections`) in the configuration
+  crate, threaded through `AppState::new` following the `basicauth` precedent. Production
+  points at `/data/musicfeed.db` on a Railway volume.
+- WAL journal mode: blog-island reads never block a form write, and an acknowledged insert
+  survives a crash between commit and checkpoint.
+- `tests/api/persistence.rs`: spawn an app, post an entry, drop the app, spawn a second app
+  over the same file, assert the entry is served by both the index page and the random
+  endpoint. Fails by construction against the in-memory state of 0.4.0.
+- `tests/api/database.rs`: CRUD suite for the repository itself — sequential ids, optional-field
+  round-trips, insertion order, random draw, empty-store `NotFound`, and reopen persistence.
+
+### Changed
+
+- `AppState` holds `Arc<dyn DatabaseBackend>` instead of `Arc<Mutex<Vec<RotationEntry>>>` and a
+  `next_id` counter. The database is the counter now; `AppState::new` is async and fallible
+  (connect + migrate before the first request).
+- Random draws moved from `rand::random_range` to `ORDER BY RANDOM() LIMIT 1`; the empty-rotation
+  404 contract now lives in the store. The `rand` dependency is gone.
+- Route error enums gained a `Database` variant (500); the 404-on-empty behavior of
+  `GET /rotation` is unchanged.
+- `POST /rotation` renders after inserting rather than before. With in-memory state, rendering
+  first protected against a half-added entry; with a store as the source of truth the risk
+  inverts — a template failure after a successful insert leaves the entry saved but unpatched,
+  recoverable on the next page load.
 
 ## [0.4.0] - 2026-10-06
 

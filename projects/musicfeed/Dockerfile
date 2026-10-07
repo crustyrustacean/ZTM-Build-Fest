@@ -9,7 +9,6 @@
 #     builds C and needs cmake; `openssl` is not needed, the TLS stack is rustls
 #   - `configuration`, `static` and `templates` are copied in, because the app
 #     reads all three from the working directory at startup and panics without them
-
 FROM lukemathwalker/cargo-chef:latest-rust-1-bookworm AS chef
 WORKDIR /app
 RUN apt update && apt install lld clang cmake -y
@@ -45,5 +44,8 @@ COPY --from=builder /app/target/release/musicfeed musicfeed
 COPY configuration configuration
 COPY static static
 COPY templates templates
+# The store lives on a mounted volume (Railway), not in the image layers — a
+# declaration for humans; the mount itself is provisioned outside Docker.
+VOLUME /data
 ENV APP_ENVIRONMENT=production
 ENTRYPOINT ["./musicfeed"]

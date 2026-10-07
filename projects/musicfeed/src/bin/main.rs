@@ -15,7 +15,8 @@ async fn main() -> anyhow::Result<()> {
     let settings = get_configuration()?;
 
     // construct the application state
-    let app_state = AppState::new(&settings.metadata, &settings.basicauth);
+    let app_state =
+        AppState::new(&settings.metadata, &settings.basicauth, &settings.database).await?;
 
     let app_address = format!(
         "{}:{}",
